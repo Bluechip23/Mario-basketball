@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using MarioBasketball.Characters;
 using MarioBasketball.Gameplay;
 
 namespace MarioBasketball.Core
@@ -76,8 +77,30 @@ namespace MarioBasketball.Core
 
         void Start()
         {
-            // Q1 tip-off to the home side (contested tip arrives with AI).
-            BeginTipOff(TeamSide.Home);
+            BeginTipOff(ContestTip());
+        }
+
+        /// <summary>Decide the jump ball, weighted by each team's best
+        /// (Power + Rebounds) on the floor.</summary>
+        TeamSide ContestTip()
+        {
+            float home = BestTipScore(Home);
+            float away = BestTipScore(Away);
+            float total = home + away;
+            if (total <= 0f) return TeamSide.Home;
+            return UnityEngine.Random.value < home / total ? TeamSide.Home : TeamSide.Away;
+        }
+
+        static float BestTipScore(TeamState team)
+        {
+            float best = 0f;
+            foreach (var p in team.onCourt)
+            {
+                if (p == null || p.Character == null) continue;
+                float s = p.Character.GetEffective(StatType.Power) + p.Character.GetEffective(StatType.Rebounds);
+                if (s > best) best = s;
+            }
+            return best;
         }
 
         // ---- Public API used by gameplay objects and debug controls --------
@@ -195,9 +218,7 @@ namespace MarioBasketball.Core
                     if (CountdownDone(dt))
                     {
                         Clock.AdvanceQuarter();
-                        // Alternate the tip each quarter.
-                        TeamSide starter = (Clock.Quarter % 2 == 1) ? TeamSide.Home : TeamSide.Away;
-                        BeginTipOff(starter);
+                        BeginTipOff(ContestTip());
                     }
                     break;
             }

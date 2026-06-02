@@ -150,25 +150,33 @@ stat system should support diverse archetypes across the Mario roster.
     **stops on a made basket until the inbound**; final buzzer = `GameOver`.
   - **20-second shot clock**: resets on possession change and on a rim touch
     (`Rim` trigger); expiry = turnover.
-  - **Possession & inbounding**: tip-off to start, opponent inbounds after a
-    make, inbound after turnovers; auto-resumes so play flows without AI.
+  - **Possession & inbounding**: contested tip-off to start (each quarter),
+    opponent inbounds after a make, inbound after turnovers.
   - Scoring **2 / 3 / 1** (free throw via `RegisterFreeThrow`).
   - **Timeouts**: 3 per team; calling one grants **+30 energy** to the on-court
     five (`CallTimeout`).
   - **No out of bounds**: perimeter walls — ball bounces, players are stopped.
   - Painted lane, three-point arcs, and centre circle.
   - Debug keys: **T** home timeout, **Y** home substitution.
+- **AI** (`PlayerAI` drives every non-human player):
+  - Offense on ball: drive to the rim, shoot in range, kick to an open
+    teammate when smothered.
+  - Offense off ball: spread to a wing spot for spacing.
+  - Defense: the closest defender guards the ball, others guard the nearest
+    man, all positioned goal-side.
+  - Loose balls: the closest teammate chases the rebound.
+  - **Contested tip-off** weighted by each team's best (Power + Rebounds).
 
 **Assumptions made (confirm / adjust)**
-- Tip-off is currently **uncontested** (home gets Q1; tips alternate). A real
-  jump contested by Power/Rebounds waits on AI.
 - Timeout's +30 energy is applied to **all on-court players** of the calling
   team (spec said "a player" — flag if it should be one player only).
-- Opponents are passive (no AI yet), so on offense they simply let the shot
-  clock expire for a turnover — expected until AI lands.
+- AI is intentionally basic: no contests/steals/blocks/screens yet, and it
+  shoots on a simple range + openness heuristic. Defense slows drives with
+  bodies but can't actively strip the ball, so possessions usually change on
+  makes, missed-shot rebounds, or shot-clock violations.
 
 **Not yet built (roadmap, rough order)**
-- [ ] AI for teammates/opponents (and a real contested tip).
+- [ ] Smarter AI: shot contests, help defense, screens, better shot selection.
 - [ ] Player-switching so the human controls the on-ball defender / nearest man.
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
 - [ ] Post-up: button-mash back-down (Power) + contextual post moves

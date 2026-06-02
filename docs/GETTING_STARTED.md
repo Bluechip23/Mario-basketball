@@ -56,10 +56,10 @@ It's a full-court **3v3** game (you control the home point guard, in gold). Walk
 over the loose ball to scoop it up, then press **Shoot** to launch an arc at the
 basket your team attacks. Shots from beyond the arc count for 3.
 
-There's no AI yet, so the other five players stand still — on offense the
-opponent simply lets the shot clock run out for a turnover, then you get the
-ball back. The HUD shows quarter, game clock, shot clock, possession, fouls,
-timeouts and your energy.
+The other five players are AI-controlled: your two teammates space and defend,
+the three opponents drive, shoot, pass and guard. The tip-off is contested by
+Power + Rebounds. The HUD shows quarter, game clock, shot clock, possession,
+fouls, timeouts and your energy.
 
 ## Where things live
 

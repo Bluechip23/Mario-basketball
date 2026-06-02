@@ -6,22 +6,22 @@ using MarioBasketball.InputControl;
 namespace MarioBasketball.Gameplay
 {
     /// <summary>
-    /// A controllable player. Handles ground movement, jumping, scooping up a
-    /// loose ball, shooting on an arc toward the attacking hoop, and a simple
-    /// forward pass. Built on a <see cref="CharacterController"/> for crisp,
-    /// arcade-style movement (NBA Street rather than sim).
+    /// A player's body and actions. Movement and actions are driven by an
+    /// <i>intent</i> (a move vector plus shoot/pass/jump triggers) that comes
+    /// from either the human (<see cref="isHuman"/>, via <see cref="InputReader"/>)
+    /// or a <c>PlayerAI</c> brain. Built on a <see cref="CharacterController"/>
+    /// for crisp, arcade-style movement.
     ///
-    /// Only the player flagged <see cref="isHuman"/> reads input; the rest
-    /// stand in place until AI arrives. Movement speed and shot accuracy are
-    /// derived from the attached <see cref="PlayerCharacter"/>'s effective
-    /// stats, so Bowser lumbers and bricks from deep.
+    /// Movement speed and shot accuracy are derived from the attached
+    /// <see cref="PlayerCharacter"/>'s effective stats, so Bowser lumbers and
+    /// bricks from deep.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
     {
         [Header("Identity")]
         public TeamSide team = TeamSide.Home;
-        [Tooltip("Only the human-controlled player reads input (until AI exists).")]
+        [Tooltip("The human-controlled player reads input; others are AI-driven.")]
         public bool isHuman = false;
 
         [Header("Movement (mapped from the Speed stat)")]
@@ -52,11 +52,14 @@ namespace MarioBasketball.Gameplay
         public Vector3 BallHoldPoint => transform.position + transform.forward * 0.55f + Vector3.up * 0.4f;
 
         public PlayerCharacter Character => _character;
+        public bool HasBall => Ball != null && Ball.Holder == this;
 
         CharacterController _cc;
         PlayerCharacter _character;
         InputReader _input;
         float _verticalVelocity;
+        Vector2 _moveIntent;
+        bool _sprintIntent;
 
         void Awake()
         {
@@ -66,27 +69,40 @@ namespace MarioBasketball.Gameplay
 
         void OnEnable()
         {
-            if (!isHuman) return; // non-human players don't take input yet
+            if (!isHuman) return; // AI players are driven by a PlayerAI brain
             _input = new InputReader();
-            _input.ShootPressed += OnShoot;
-            _input.PassPressed += OnPass;
-            _input.JumpPressed += OnJump;
+            _input.ShootPressed += TriggerShoot;
+            _input.PassPressed += TriggerPass;
+            _input.JumpPressed += TriggerJump;
             _input.Enable();
         }
 
         void OnDisable()
         {
             if (_input == null) return;
-            _input.ShootPressed -= OnShoot;
-            _input.PassPressed -= OnPass;
-            _input.JumpPressed -= OnJump;
+            _input.ShootPressed -= TriggerShoot;
+            _input.PassPressed -= TriggerPass;
+            _input.JumpPressed -= TriggerJump;
             _input.Disable();
             _input = null;
         }
 
+        /// <summary>Set this frame's desired movement. Used by the AI brain;
+        /// the human overrides it from input each frame.</summary>
+        public void SetMoveIntent(Vector2 move, bool sprint)
+        {
+            _moveIntent = move;
+            _sprintIntent = sprint;
+        }
+
         void Update()
         {
-            _input?.Tick();
+            if (isHuman && _input != null)
+            {
+                _input.Tick();
+                _moveIntent = _input.Move;
+                _sprintIntent = _input.SprintHeld;
+            }
             Move();
             TryPickUpLooseBall();
         }
@@ -109,14 +125,13 @@ namespace MarioBasketball.Gameplay
 
         void Move()
         {
-            Vector2 m = _input != null ? _input.Move : Vector2.zero;
-            Vector3 dir = new Vector3(m.x, 0f, m.y);
+            Vector3 dir = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
             if (dir.sqrMagnitude > 1f) dir.Normalize();
 
             // Effective Speed (1-10ish) maps onto the configured m/s band.
             float speedStat = Effective(StatType.Speed, 5f);
             float baseSpeed = Mathf.Lerp(minMoveSpeed, maxMoveSpeed, Mathf.Clamp01((speedStat - 1f) / 9f));
-            bool sprinting = _input != null && _input.SprintHeld && dir.sqrMagnitude > 0.01f;
+            bool sprinting = _sprintIntent && dir.sqrMagnitude > 0.01f;
             float speed = baseSpeed * (sprinting ? sprintMultiplier : 1f);
 
             if (_character != null)
@@ -139,23 +154,24 @@ namespace MarioBasketball.Gameplay
         }
 
         BallController Ball => GameManager.Instance != null ? GameManager.Instance.ball : null;
-        bool HasBall => Ball != null && Ball.Holder == this;
 
         void TryPickUpLooseBall()
         {
             // Only contest live balls — not during inbounds/stoppages.
             if (GameManager.Instance == null || GameManager.Instance.State != GameState.Playing) return;
             var ball = Ball;
-            if (ball == null || !ball.CanBePickedUp) return;
+            if (ball == null || !ball.CanBePickedUpBy(this)) return;
             if (Vector3.Distance(transform.position, ball.transform.position) <= pickupRadius)
             {
                 ball.PickUp(this);
-                if (GameManager.Instance != null)
-                    GameManager.Instance.OnPossessionGained(this);
+                GameManager.Instance.OnPossessionGained(this);
             }
         }
 
-        void OnShoot()
+        // ---- Actions (called by input events or the AI brain) --------------
+
+        /// <summary>Face the attacking hoop and shoot, accuracy from the right stat.</summary>
+        public void TriggerShoot()
         {
             if (!HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
@@ -178,13 +194,20 @@ namespace MarioBasketball.Gameplay
             Ball.Shoot(hoop.AimPoint, team, points, shotFlightTime, spread);
         }
 
-        void OnPass()
+        public void TriggerPass()
         {
             if (!HasBall) return;
             Ball.Pass(transform.forward, passPower);
         }
 
-        void OnJump()
+        /// <summary>A directed pass to a teammate (used by the AI).</summary>
+        public void PassToward(Vector3 worldPoint)
+        {
+            if (!HasBall) return;
+            Ball.PassTo(worldPoint);
+        }
+
+        public void TriggerJump()
         {
             if (_cc.isGrounded)
                 _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);

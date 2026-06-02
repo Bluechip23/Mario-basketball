@@ -12,15 +12,17 @@ See [`docs/DESIGN.md`](docs/DESIGN.md) for the full, authoritative design.
 Early prototype. Implemented so far:
 
 - **Full-court 3v3 match structure** — 4×4-minute quarters, 20-second shot
-  clock, tip-off, possession/inbounding, made-basket clock stops, scoring
-  (2/3/1), three timeouts (+30 energy), five-player rosters with substitutions
-  and bench recovery, and walls instead of out-of-bounds.
+  clock, contested tip-off, possession/inbounding, made-basket clock stops,
+  scoring (2/3/1), three timeouts (+30 energy), five-player rosters with
+  substitutions and bench recovery, and walls instead of out-of-bounds.
+- **AI** — the five non-human players drive, shoot, pass, space and play
+  goal-side defense; the tip is contested by Power + Rebounds.
 - **Stat framework** — 14 stats (1-10) + hidden traits, with **Bowser** as the
   demo character. Movement speed and shot accuracy are driven by effective
   stats, and a **stamina/energy** model scales everything as players tire.
 
-The remaining mechanics (AI, post-ups, fouling, on-fire streaks, tricks) are
-designed in `docs/DESIGN.md` and on the roadmap there.
+The remaining mechanics (post-ups, fouling, on-fire streaks, tricks, smarter
+AI) are designed in `docs/DESIGN.md` and on the roadmap there.
 
 ## Quick start
 

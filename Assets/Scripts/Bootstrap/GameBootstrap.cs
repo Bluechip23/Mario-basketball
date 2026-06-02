@@ -117,6 +117,8 @@ namespace MarioBasketball.Bootstrap
             pc.isHuman = isHuman;
             pc.threePointDistance = threePointRadius;
 
+            if (!isHuman) go.AddComponent<MarioBasketball.AI.PlayerAI>();
+
             go.SetActive(true);
 
             if (benched)

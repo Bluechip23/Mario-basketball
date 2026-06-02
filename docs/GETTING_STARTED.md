@@ -49,12 +49,15 @@ the ball, and a scoreboard in the top-left.
 | Shoot  | Space         | A / South      |
 | Pass   | E             | X / West       |
 | Jump   | Left Ctrl     | Y / North      |
+| Switch player | Q      | Left shoulder  |
 | Timeout (home) | T    | —              |
 | Substitute (home) | Y | —              |
 
-It's a full-court **3v3** game (you control the home point guard, in gold). Walk
-over the loose ball to scoop it up, then press **Shoot** to launch an arc at the
-basket your team attacks. Shots from beyond the arc count for 3.
+It's a full-court **3v3** game. You control the player marked with the **gold
+ring**: on offense control follows the ball automatically, and on defense you
+press **Switch** to take the teammate nearest the ball. Walk over a loose ball
+to scoop it up, then **Shoot** to launch an arc at the basket your team attacks;
+shots from beyond the arc count for 3.
 
 The other five players are AI-controlled: your two teammates space and defend,
 the three opponents drive, shoot, pass and guard. The tip-off is contested by

@@ -166,6 +166,11 @@ stat system should support diverse archetypes across the Mario roster.
     man, all positioned goal-side.
   - Loose balls: the closest teammate chases the rebound.
   - **Contested tip-off** weighted by each team's best (Power + Rebounds).
+- **Player switching** (`PlayerSwitchManager`): exactly one human-controlled
+  player at a time; control auto-follows the ball on offense, and the Switch
+  button (Q / left shoulder) grabs the nearest man on defense. Camera and HUD
+  follow the controlled player, who is marked with a gold ring; control
+  recovers automatically if that player is substituted out.
 
 **Assumptions made (confirm / adjust)**
 - Timeout's +30 energy is applied to **all on-court players** of the calling
@@ -177,7 +182,6 @@ stat system should support diverse archetypes across the Mario roster.
 
 **Not yet built (roadmap, rough order)**
 - [ ] Smarter AI: shot contests, help defense, screens, better shot selection.
-- [ ] Player-switching so the human controls the on-ball defender / nearest man.
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
 - [ ] Post-up: button-mash back-down (Power) + contextual post moves
       (Post Offense vs Post Defense).

@@ -66,6 +66,11 @@ namespace MarioBasketball.Bootstrap
             gm.awaySubEntry = new Vector3(0f, 1.1f, 4f);
 
             BuildCamera(gm.humanPlayer != null ? gm.humanPlayer.transform : null);
+
+            var switcher = gameObject.AddComponent<MarioBasketball.Control.PlayerSwitchManager>();
+            switcher.humanSide = TeamSide.Home;
+            switcher.initial = gm.humanPlayer;
+
             gameObject.AddComponent<DebugHUD>();
             gameObject.AddComponent<DebugMatchControls>();
         }
@@ -114,10 +119,11 @@ namespace MarioBasketball.Bootstrap
 
             var pc = go.AddComponent<PlayerController>();
             pc.team = side;
-            pc.isHuman = isHuman;
+            pc.isHuman = false; // control is assigned at runtime by PlayerSwitchManager
             pc.threePointDistance = threePointRadius;
 
-            if (!isHuman) go.AddComponent<MarioBasketball.AI.PlayerAI>();
+            // Every player has a brain; it yields on whoever the human controls.
+            go.AddComponent<MarioBasketball.AI.PlayerAI>();
 
             go.SetActive(true);
 

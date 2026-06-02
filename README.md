@@ -17,6 +17,8 @@ Early prototype. Implemented so far:
   substitutions and bench recovery, and walls instead of out-of-bounds.
 - **AI** — the five non-human players drive, shoot, pass, space and play
   goal-side defense; the tip is contested by Power + Rebounds.
+- **Player switching** — control auto-follows the ball on offense; a Switch
+  button grabs the nearest defender. The controlled player wears a gold ring.
 - **Stat framework** — 14 stats (1-10) + hidden traits, with **Bowser** as the
   demo character. Movement speed and shot accuracy are driven by effective
   stats, and a **stamina/energy** model scales everything as players tire.

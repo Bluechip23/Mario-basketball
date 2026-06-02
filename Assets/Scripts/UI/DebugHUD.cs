@@ -54,11 +54,12 @@ namespace MarioBasketball.UI
                 }
             }
 
-            GUI.Label(new Rect(20, Screen.height - 110, 760, 110),
+            GUI.Label(new Rect(20, Screen.height - 128, 760, 128),
                 "Move: WASD / Left Stick    Sprint: Shift / LT    Jump: Ctrl / Y\n" +
-                "Shoot: Space / A    Pass: E / X\n" +
+                "Shoot: Space / A    Pass: E / X    Switch player: Q / LB\n" +
                 "Timeout (home): T    Substitute (home): Y\n" +
-                "3v3, full court. Hit the rim within 20s. Clock stops on a make until inbound.",
+                "You control the player under the gold marker. On offense control\n" +
+                "follows the ball; on defense press Switch for the nearest man.",
                 _small);
         }
     }

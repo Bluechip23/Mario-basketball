@@ -69,7 +69,35 @@ namespace MarioBasketball.Gameplay
 
         void OnEnable()
         {
-            if (!isHuman) return; // AI players are driven by a PlayerAI brain
+            if (isHuman) EnableInput();
+        }
+
+        void OnDisable()
+        {
+            DisableInput();
+        }
+
+        /// <summary>Hand control of this player to / from the human. The switch
+        /// manager calls this; exactly one player is human-controlled at a time
+        /// so only one <see cref="InputReader"/> is ever active.</summary>
+        public void SetHumanControlled(bool value)
+        {
+            isHuman = value;
+            if (value)
+            {
+                EnableInput();
+            }
+            else
+            {
+                DisableInput();
+                _moveIntent = Vector2.zero;
+                _sprintIntent = false;
+            }
+        }
+
+        void EnableInput()
+        {
+            if (_input != null) return;
             _input = new InputReader();
             _input.ShootPressed += TriggerShoot;
             _input.PassPressed += TriggerPass;
@@ -77,7 +105,7 @@ namespace MarioBasketball.Gameplay
             _input.Enable();
         }
 
-        void OnDisable()
+        void DisableInput()
         {
             if (_input == null) return;
             _input.ShootPressed -= TriggerShoot;

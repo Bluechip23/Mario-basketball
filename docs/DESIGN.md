@@ -133,19 +133,44 @@ stat system should support diverse archetypes across the Mario roster.
 - 3D character movement core loop (move, speed-burst sprint, jump) on a
   `CharacterController`; runtime-built court via `GameBootstrap`.
 - Pick up loose ball; shoot a ballistic arc at the attacking hoop; 2s/3s by
-  distance; auto-reset after a make; first-to-21 win check.
+  distance.
 - **Stat framework**: `StatType`, `CharacterStats` (14 stats + hidden trait),
   `CharacterDefinition` (ScriptableObject for editor authoring),
   `CharacterLibrary` (Bowser in code).
 - **Energy/effectiveness**: `PlayerCharacter` scales stats by energy, drains
-  faster when sprinting, recovers when idle; on-fire knobs + `SetOnFire` hook.
+  faster when sprinting, recovers when idle (and 30/min on the bench); on-fire
+  knobs + `SetOnFire` hook; `AddEnergy` for timeouts.
 - **Stats drive play**: movement speed (Speed) and shot accuracy (3-Point /
   Mid Range / Inside Scoring by distance) come from effective stats.
+- **3v3 match structure** (`GameManager` orchestrator):
+  - Full court, two hoops with rims; teams attack the far basket.
+  - Five-player rosters per team (3 on court, 2 bench); **substitutions**
+    (`Substitute`) move players on/off, bench players recover 30/min.
+  - **Game clock**: 4 × 4-minute quarters, alternating tip each quarter; clock
+    **stops on a made basket until the inbound**; final buzzer = `GameOver`.
+  - **20-second shot clock**: resets on possession change and on a rim touch
+    (`Rim` trigger); expiry = turnover.
+  - **Possession & inbounding**: tip-off to start, opponent inbounds after a
+    make, inbound after turnovers; auto-resumes so play flows without AI.
+  - Scoring **2 / 3 / 1** (free throw via `RegisterFreeThrow`).
+  - **Timeouts**: 3 per team; calling one grants **+30 energy** to the on-court
+    five (`CallTimeout`).
+  - **No out of bounds**: perimeter walls — ball bounces, players are stopped.
+  - Painted lane, three-point arcs, and centre circle.
+  - Debug keys: **T** home timeout, **Y** home substitution.
+
+**Assumptions made (confirm / adjust)**
+- Tip-off is currently **uncontested** (home gets Q1; tips alternate). A real
+  jump contested by Power/Rebounds waits on AI.
+- Timeout's +30 energy is applied to **all on-court players** of the calling
+  team (spec said "a player" — flag if it should be one player only).
+- Opponents are passive (no AI yet), so on offense they simply let the shot
+  clock expire for a turnover — expected until AI lands.
 
 **Not yet built (roadmap, rough order)**
-- [ ] 3v3 structure: spawn six players, teams, possession after makes.
+- [ ] AI for teammates/opponents (and a real contested tip).
+- [ ] Player-switching so the human controls the on-ball defender / nearest man.
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
-- [ ] AI for teammates/opponents.
 - [ ] Post-up: button-mash back-down (Power) + contextual post moves
       (Post Offense vs Post Defense).
 - [ ] On-fire streak tracker (needs per-player shot attribution; needs owner
@@ -156,7 +181,8 @@ stat system should support diverse archetypes across the Mario roster.
 - [ ] Passing: tap-loft vs hold-hard, teammate icon targeting.
 - [ ] Dunks/alley-oops, mid-air shot adjust (double-tap), tricks + gamebreakers.
 - [ ] Hidden-trait effects (e.g. catch-and-shoot penalty off the dribble).
-- [ ] Timeout. Art/animation pass; proper UI; audio.
+- [ ] Free-throw flow (the +1 scoring and penalty count exist; shooting does not).
+- [ ] Art/animation pass; proper UI (replace the IMGUI HUD); audio.
 
 ## Architecture intent
 

@@ -30,8 +30,13 @@ namespace MarioBasketball.Characters
         public float baseDrainPerSecond = 1.2f;
         [Tooltip("Extra drain multiplier while sprinting.")]
         public float sprintDrainMultiplier = 2.5f;
-        [Tooltip("Energy recovered per second while idling.")]
+        [Tooltip("Energy recovered per second while idling on court.")]
         public float idleRecoverPerSecond = 3f;
+        [Tooltip("Energy recovered per second while on the bench (30/min).")]
+        public float benchRecoverPerSecond = 0.5f;
+
+        /// <summary>While benched a player doesn't tire and slowly recovers.</summary>
+        public bool IsBenched { get; set; }
 
         [Header("On fire tuning")]
         [Tooltip("Flat bonus added to every stat while on fire.")]
@@ -73,6 +78,13 @@ namespace MarioBasketball.Characters
 
         void UpdateEnergy(float dt)
         {
+            if (IsBenched)
+            {
+                // Resting players don't tire; they recover 30/min to full.
+                energy = Mathf.Min(maxEnergy, energy + benchRecoverPerSecond * dt);
+                return;
+            }
+
             if (_movingThisFrame)
             {
                 // Higher Stamina stat → slower fade. Stat 1 ≈ 2x, stat 10 ≈ 0.5x.
@@ -112,6 +124,10 @@ namespace MarioBasketball.Characters
         }
 
         public void SetOnFire(bool value) => OnFire = value;
+
+        /// <summary>Add (or remove) energy, clamped to the legal range. Used by
+        /// timeouts (+30) and any other instantaneous stamina effects.</summary>
+        public void AddEnergy(float amount) => energy = Mathf.Clamp(energy + amount, 0f, maxEnergy);
 
         public void RefillEnergy() => energy = maxEnergy;
     }

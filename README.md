@@ -11,13 +11,15 @@ See [`docs/DESIGN.md`](docs/DESIGN.md) for the full, authoritative design.
 
 Early prototype. Implemented so far:
 
-- **Playable core loop** — move a player in 3D, scoop up the ball, shoot an arc
-  at the hoop (2s/3s by distance), scoreboard, first-to-21.
+- **Full-court 3v3 match structure** — 4×4-minute quarters, 20-second shot
+  clock, tip-off, possession/inbounding, made-basket clock stops, scoring
+  (2/3/1), three timeouts (+30 energy), five-player rosters with substitutions
+  and bench recovery, and walls instead of out-of-bounds.
 - **Stat framework** — 14 stats (1-10) + hidden traits, with **Bowser** as the
   demo character. Movement speed and shot accuracy are driven by effective
   stats, and a **stamina/energy** model scales everything as players tire.
 
-The big mechanics (3v3, post-ups, fouling, on-fire streaks, tricks) are
+The remaining mechanics (AI, post-ups, fouling, on-fire streaks, tricks) are
 designed in `docs/DESIGN.md` and on the roadmap there.
 
 ## Quick start

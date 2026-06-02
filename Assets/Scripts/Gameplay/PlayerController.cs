@@ -11,17 +11,18 @@ namespace MarioBasketball.Gameplay
     /// forward pass. Built on a <see cref="CharacterController"/> for crisp,
     /// arcade-style movement (NBA Street rather than sim).
     ///
-    /// Movement speed and shot accuracy are derived from the attached
-    /// <see cref="PlayerCharacter"/>'s effective stats, so Bowser (Speed 2,
-    /// 3-Point 1) lumbers and bricks from deep while a guard would not. The
-    /// many remaining mechanics (post-ups, tricks, fouling, on-fire streaks)
-    /// are tracked in <c>docs/DESIGN.md</c> and not yet implemented here.
+    /// Only the player flagged <see cref="isHuman"/> reads input; the rest
+    /// stand in place until AI arrives. Movement speed and shot accuracy are
+    /// derived from the attached <see cref="PlayerCharacter"/>'s effective
+    /// stats, so Bowser lumbers and bricks from deep.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
     {
-        [Header("Team")]
+        [Header("Identity")]
         public TeamSide team = TeamSide.Home;
+        [Tooltip("Only the human-controlled player reads input (until AI exists).")]
+        public bool isHuman = false;
 
         [Header("Movement (mapped from the Speed stat)")]
         [Tooltip("Move speed at effective Speed 1 / Speed 10, in m/s.")]
@@ -36,7 +37,7 @@ namespace MarioBasketball.Gameplay
         [Tooltip("How close a loose ball must be to scoop it up, in metres.")]
         public float pickupRadius = 1.2f;
         [Tooltip("Distance from the basket beyond which a make is worth 3.")]
-        public float threePointDistance = 7f;
+        public float threePointDistance = 6.75f;
         [Tooltip("Within this radius a shot uses Inside Scoring, not Mid Range.")]
         public float paintRadius = 2.5f;
 
@@ -49,6 +50,8 @@ namespace MarioBasketball.Gameplay
 
         /// <summary>Where the carried ball sits — out in front, hip height.</summary>
         public Vector3 BallHoldPoint => transform.position + transform.forward * 0.55f + Vector3.up * 0.4f;
+
+        public PlayerCharacter Character => _character;
 
         CharacterController _cc;
         PlayerCharacter _character;
@@ -63,6 +66,7 @@ namespace MarioBasketball.Gameplay
 
         void OnEnable()
         {
+            if (!isHuman) return; // non-human players don't take input yet
             _input = new InputReader();
             _input.ShootPressed += OnShoot;
             _input.PassPressed += OnPass;
@@ -77,13 +81,27 @@ namespace MarioBasketball.Gameplay
             _input.PassPressed -= OnPass;
             _input.JumpPressed -= OnJump;
             _input.Disable();
+            _input = null;
         }
 
         void Update()
         {
-            _input.Tick();
+            _input?.Tick();
             Move();
             TryPickUpLooseBall();
+        }
+
+        /// <summary>
+        /// Move the player, working around the CharacterController (which
+        /// otherwise overrides direct transform writes). Used for inbounds,
+        /// tip-offs and substitutions.
+        /// </summary>
+        public void Teleport(Vector3 position)
+        {
+            bool was = _cc.enabled;
+            _cc.enabled = false;
+            transform.position = position;
+            _cc.enabled = was;
         }
 
         float Effective(StatType stat, float fallback) =>
@@ -91,14 +109,14 @@ namespace MarioBasketball.Gameplay
 
         void Move()
         {
-            Vector2 m = _input.Move;
+            Vector2 m = _input != null ? _input.Move : Vector2.zero;
             Vector3 dir = new Vector3(m.x, 0f, m.y);
             if (dir.sqrMagnitude > 1f) dir.Normalize();
 
             // Effective Speed (1-10ish) maps onto the configured m/s band.
             float speedStat = Effective(StatType.Speed, 5f);
             float baseSpeed = Mathf.Lerp(minMoveSpeed, maxMoveSpeed, Mathf.Clamp01((speedStat - 1f) / 9f));
-            bool sprinting = _input.SprintHeld && dir.sqrMagnitude > 0.01f;
+            bool sprinting = _input != null && _input.SprintHeld && dir.sqrMagnitude > 0.01f;
             float speed = baseSpeed * (sprinting ? sprintMultiplier : 1f);
 
             if (_character != null)
@@ -125,10 +143,16 @@ namespace MarioBasketball.Gameplay
 
         void TryPickUpLooseBall()
         {
+            // Only contest live balls — not during inbounds/stoppages.
+            if (GameManager.Instance == null || GameManager.Instance.State != GameState.Playing) return;
             var ball = Ball;
             if (ball == null || !ball.CanBePickedUp) return;
             if (Vector3.Distance(transform.position, ball.transform.position) <= pickupRadius)
+            {
                 ball.PickUp(this);
+                if (GameManager.Instance != null)
+                    GameManager.Instance.OnPossessionGained(this);
+            }
         }
 
         void OnShoot()

@@ -1,16 +1,24 @@
-# Mario-basketball
+# Mario Street Basketball
 
-An arcade basketball game in the spirit of **NBA Jam** and **NBA Street**,
-with a colourful **Mario-sports** style. Built in **Unity 6** (3D, URP, new
-Input System).
+An arcade-style **3-on-3** street basketball game starring Mario characters,
+inspired by **NBA Street (2001)**, **NBA Jam**, and **Looney Tunes Basketball**
+— leaning heavily toward NBA Street (post-ups, alley-oops, tricks,
+gamebreakers). Built in **Unity 6** (3D, URP, new Input System).
 
-> Mario style nba jam, maybe something like nba street.
+See [`docs/DESIGN.md`](docs/DESIGN.md) for the full, authoritative design.
 
 ## Status
 
-Early prototype. The first playable **core loop** is in: move a player in 3D,
-scoop up the ball, and shoot an arc at the hoop to score (2s and 3s, with a
-scoreboard and a first-to-21 win check).
+Early prototype. Implemented so far:
+
+- **Playable core loop** — move a player in 3D, scoop up the ball, shoot an arc
+  at the hoop (2s/3s by distance), scoreboard, first-to-21.
+- **Stat framework** — 14 stats (1-10) + hidden traits, with **Bowser** as the
+  demo character. Movement speed and shot accuracy are driven by effective
+  stats, and a **stamina/energy** model scales everything as players tire.
+
+The big mechanics (3v3, post-ups, fouling, on-fire streaks, tricks) are
+designed in `docs/DESIGN.md` and on the roadmap there.
 
 ## Quick start
 

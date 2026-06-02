@@ -1,5 +1,6 @@
 using UnityEngine;
 using MarioBasketball.Core;
+using MarioBasketball.Characters;
 using MarioBasketball.InputControl;
 
 namespace MarioBasketball.Gameplay
@@ -10,8 +11,11 @@ namespace MarioBasketball.Gameplay
     /// forward pass. Built on a <see cref="CharacterController"/> for crisp,
     /// arcade-style movement (NBA Street rather than sim).
     ///
-    /// The initial core loop spawns a single human player; the AI/teammate
-    /// hooks are deliberately left out so this class stays readable.
+    /// Movement speed and shot accuracy are derived from the attached
+    /// <see cref="PlayerCharacter"/>'s effective stats, so Bowser (Speed 2,
+    /// 3-Point 1) lumbers and bricks from deep while a guard would not. The
+    /// many remaining mechanics (post-ups, tricks, fouling, on-fire streaks)
+    /// are tracked in <c>docs/DESIGN.md</c> and not yet implemented here.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
@@ -19,9 +23,11 @@ namespace MarioBasketball.Gameplay
         [Header("Team")]
         public TeamSide team = TeamSide.Home;
 
-        [Header("Movement")]
-        public float moveSpeed = 7f;
-        public float sprintMultiplier = 1.5f;
+        [Header("Movement (mapped from the Speed stat)")]
+        [Tooltip("Move speed at effective Speed 1 / Speed 10, in m/s.")]
+        public float minMoveSpeed = 4f;
+        public float maxMoveSpeed = 9f;
+        public float sprintMultiplier = 1.4f;
         public float turnSpeed = 720f;
         public float gravity = -25f;
         public float jumpHeight = 1.4f;
@@ -31,23 +37,28 @@ namespace MarioBasketball.Gameplay
         public float pickupRadius = 1.2f;
         [Tooltip("Distance from the basket beyond which a make is worth 3.")]
         public float threePointDistance = 7f;
+        [Tooltip("Within this radius a shot uses Inside Scoring, not Mid Range.")]
+        public float paintRadius = 2.5f;
 
-        [Header("Shooting")]
+        [Header("Shooting (accuracy mapped from the relevant scoring stat)")]
         public float shotFlightTime = 1.1f;
-        [Tooltip("Horizontal miss spread (metres) at the rim. 0 = always nylon.")]
-        public float shotSpread = 0.35f;
+        [Tooltip("Rim miss spread (metres) at stat 1 / stat 10. Lower stat = wilder.")]
+        public float maxShotSpread = 1.2f;
+        public float minShotSpread = 0.05f;
         public float passPower = 9f;
 
         /// <summary>Where the carried ball sits — out in front, hip height.</summary>
         public Vector3 BallHoldPoint => transform.position + transform.forward * 0.55f + Vector3.up * 0.4f;
 
         CharacterController _cc;
+        PlayerCharacter _character;
         InputReader _input;
         float _verticalVelocity;
 
         void Awake()
         {
             _cc = GetComponent<CharacterController>();
+            _character = GetComponent<PlayerCharacter>();
         }
 
         void OnEnable()
@@ -75,13 +86,24 @@ namespace MarioBasketball.Gameplay
             TryPickUpLooseBall();
         }
 
+        float Effective(StatType stat, float fallback) =>
+            _character != null ? _character.GetEffective(stat) : fallback;
+
         void Move()
         {
             Vector2 m = _input.Move;
             Vector3 dir = new Vector3(m.x, 0f, m.y);
             if (dir.sqrMagnitude > 1f) dir.Normalize();
 
-            float speed = moveSpeed * (_input.SprintHeld ? sprintMultiplier : 1f);
+            // Effective Speed (1-10ish) maps onto the configured m/s band.
+            float speedStat = Effective(StatType.Speed, 5f);
+            float baseSpeed = Mathf.Lerp(minMoveSpeed, maxMoveSpeed, Mathf.Clamp01((speedStat - 1f) / 9f));
+            bool sprinting = _input.SprintHeld && dir.sqrMagnitude > 0.01f;
+            float speed = baseSpeed * (sprinting ? sprintMultiplier : 1f);
+
+            if (_character != null)
+                _character.ReportActivity(dir.sqrMagnitude > 0.01f, sprinting);
+
             Vector3 horizontal = dir * speed;
 
             if (_cc.isGrounded && _verticalVelocity < 0f)
@@ -117,8 +139,17 @@ namespace MarioBasketball.Gameplay
 
             float distance = Vector3.Distance(transform.position, hoop.AimPoint);
             int points = distance >= threePointDistance ? 3 : 2;
-            // Long-range jumpers are a little less reliable.
-            float spread = shotSpread * Mathf.Clamp01(distance / (threePointDistance * 1.5f));
+
+            // Which scoring stat governs this look depends on where it's taken.
+            StatType shotStat =
+                distance >= threePointDistance ? StatType.ThreePoint :
+                distance <= paintRadius ? StatType.InsideScoring :
+                StatType.MidRange;
+
+            // Higher effective stat → tighter spread → more makes.
+            float stat = Effective(shotStat, 5f);
+            float t = Mathf.Clamp01((stat - 1f) / 9f);
+            float spread = Mathf.Lerp(maxShotSpread, minShotSpread, t);
 
             Ball.Shoot(hoop.AimPoint, team, points, shotFlightTime, spread);
         }

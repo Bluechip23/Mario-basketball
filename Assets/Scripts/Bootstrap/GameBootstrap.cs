@@ -1,5 +1,6 @@
 using UnityEngine;
 using MarioBasketball.Core;
+using MarioBasketball.Characters;
 using MarioBasketball.Gameplay;
 using MarioBasketball.CameraControl;
 using MarioBasketball.UI;
@@ -112,6 +113,11 @@ namespace MarioBasketball.Bootstrap
             cc.center = new Vector3(0f, 0f, 0f);
             cc.height = 2f;
             cc.radius = 0.4f;
+
+            // Give the demo player Bowser's stat sheet. PlayerCharacter is added
+            // before PlayerController so the controller finds it on Awake.
+            var character = go.AddComponent<PlayerCharacter>();
+            character.stats = CharacterLibrary.Bowser();
 
             return go.AddComponent<PlayerController>();
         }

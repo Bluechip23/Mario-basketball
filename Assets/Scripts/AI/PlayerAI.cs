@@ -6,42 +6,51 @@ using MarioBasketball.Gameplay;
 namespace MarioBasketball.AI
 {
     /// <summary>
-    /// A lightweight basketball brain that drives a non-human
-    /// <see cref="PlayerController"/> each frame by setting its move intent and
-    /// firing its shoot/pass actions. It reads the world from
-    /// <see cref="GameManager"/> and behaves by role:
-    /// <list type="bullet">
-    ///   <item><b>Loose ball</b>: the closest teammate chases it.</item>
-    ///   <item><b>Offense, on ball</b>: drive to the rim, shoot in range,
-    ///   kick to an open teammate when smothered.</item>
-    ///   <item><b>Offense, off ball</b>: spread to a wing spot for spacing.</item>
-    ///   <item><b>Defense</b>: guard the ball or the nearest man, goal-side.</item>
-    /// </list>
-    /// This is intentionally simple — contests, steals, blocks, screens and
-    /// smarter shot selection are later systems. It exists so the other five
-    /// players actually play.
+    /// A basketball brain that drives a non-human <see cref="PlayerController"/>.
+    /// It yields the instant the human takes this player over.
+    ///
+    /// Offense: the ball handler takes good, <b>stat-aware</b> shots (it won't
+    /// settle for looks it's bad at — Bowser attacks the rim instead of
+    /// chucking threes), kicks to a better/open teammate when smothered, and
+    /// otherwise drives. Off-ball players space to the wings and occasionally
+    /// cut to the rim. Defense: the closest defender pressures the ball and
+    /// tries to strip it; the others guard their man goal-side while sagging to
+    /// help. This is a sensible whole-game first pass meant to be tuned from
+    /// real play, not a finished AI.
     /// </summary>
     [RequireComponent(typeof(PlayerController))]
     public class PlayerAI : MonoBehaviour
     {
         [Header("Shot selection")]
         public float shootRange = 6.5f;
-        public float preferredShootDistance = 4.5f;
-        public float contestShootDistance = 1.8f;
+        [Tooltip("Shoot when (scoring stat + openness) clears this.")]
+        public float shootQualityThreshold = 6.5f;
         public float lowShotClock = 4f;
+        public float passUpgradeMargin = 1.5f;
 
-        [Header("Spacing / passing")]
+        [Header("Spacing / cuts")]
         public float wingSpacing = 3.5f;
+        public float cutTriggerDistance = 3.5f;
+        [Range(0f, 1f)] public float cutChance = 0.4f;
+        public float cutRepathInterval = 2.5f;
+        public float cutReachDistance = 1.5f;
+
+        [Header("Passing")]
         public float openThreshold = 2.6f;
         public float smotheredDistance = 1.6f;
-        public float passCooldown = 1.2f;
+        public float passCooldown = 1.0f;
 
         [Header("Defense")]
-        public float guardGap = 1.3f;
+        public float onBallGap = 1.0f;
+        public float offBallGap = 1.3f;
+        [Range(0f, 1f)] public float helpSag = 0.25f;
         public float sprintDistance = 4f;
+        public float stealRange = 1.3f;
 
         PlayerController _pc;
         float _passTimer;
+        float _cutTimer;
+        bool _cutting;
 
         void Awake()
         {
@@ -51,14 +60,13 @@ namespace MarioBasketball.AI
         void Update()
         {
             if (_passTimer > 0f) _passTimer -= Time.deltaTime;
+            if (_cutTimer > 0f) _cutTimer -= Time.deltaTime;
 
             var gm = GameManager.Instance;
             if (gm == null || _pc == null) return;
 
-            // The human is driving this player right now — hands off.
-            if (_pc.isHuman) return;
+            if (_pc.isHuman) return; // the human is driving this player
 
-            // Benched / disabled, or play stopped → stand still.
             if (!_pc.enabled || (_pc.Character != null && _pc.Character.IsBenched) ||
                 gm.State != GameState.Playing)
             {
@@ -79,7 +87,7 @@ namespace MarioBasketball.AI
             if (holder != null && holder.team == _pc.team)
             {
                 if (holder == _pc) OffenseWithBall(gm);
-                else OffenseOffBall(gm, holder);
+                else OffenseOffBall(gm);
             }
             else
             {
@@ -87,16 +95,7 @@ namespace MarioBasketball.AI
             }
         }
 
-        // ---- Roles ---------------------------------------------------------
-
-        void ChaseLooseBall(GameManager gm, BallController ball)
-        {
-            // Only the closest teammate commits to the ball; others hold spacing.
-            if (IsClosestTeammateTo(gm, ball.transform.position))
-                MoveTo(ball.transform.position, sprint: true);
-            else
-                _pc.SetMoveIntent(Vector2.zero, false);
-        }
+        // ---- Offense -------------------------------------------------------
 
         void OffenseWithBall(GameManager gm)
         {
@@ -108,19 +107,20 @@ namespace MarioBasketball.AI
             float nearestDef = NearestOpponentDistance(gm, transform.position);
             float shotClock = gm.Shot != null ? gm.Shot.Remaining : 20f;
 
-            bool inRange = dist <= shootRange;
-            bool goodLook = dist <= preferredShootDistance || nearestDef < contestShootDistance;
-            if (inRange && (goodLook || shotClock < lowShotClock))
+            float quality = ShotQuality(dist, nearestDef);
+            bool forced = shotClock < lowShotClock;
+
+            if (dist <= shootRange && (quality >= shootQualityThreshold || forced))
             {
                 _pc.SetMoveIntent(Vector2.zero, false);
                 _pc.TriggerShoot();
                 return;
             }
 
-            // Smothered far from the rim → kick to an open teammate.
-            if (nearestDef < smotheredDistance && _passTimer <= 0f)
+            // Smothered → look for a meaningfully better shot elsewhere.
+            if (_passTimer <= 0f && nearestDef < smotheredDistance)
             {
-                var mate = FindOpenTeammate(gm);
+                var mate = BestPassTarget(gm, quality);
                 if (mate != null)
                 {
                     _pc.PassToward(mate.transform.position + Vector3.up * 0.6f);
@@ -132,35 +132,68 @@ namespace MarioBasketball.AI
             MoveTo(aim, sprint: dist > 5f);
         }
 
-        void OffenseOffBall(GameManager gm, PlayerController holder)
+        void OffenseOffBall(GameManager gm)
         {
-            MoveTo(SpacingSpot(gm), sprint: false);
-        }
-
-        void Defense(GameManager gm, PlayerController holder)
-        {
-            Vector3 defendHoop = DefendedHoop(gm);
-
-            PlayerController mark;
-            if (holder != null && IsClosestTeammateTo(gm, holder.transform.position))
-                mark = holder; // I'm the on-ball defender
-            else
-                mark = NearestOpponent(gm, transform.position, exclude: null);
-
-            if (mark == null)
+            if (_cutTimer <= 0f)
             {
-                MoveTo(defendHoop, sprint: false);
-                return;
+                _cutTimer = cutRepathInterval;
+                float myDef = NearestOpponentDistance(gm, transform.position);
+                _cutting = myDef > cutTriggerDistance && Random.value < cutChance;
             }
 
-            // Stand goal-side, between my man and the basket we defend.
-            Vector3 toHoop = (defendHoop - mark.transform.position);
-            toHoop.y = 0f;
-            Vector3 target = mark.transform.position + toHoop.normalized * guardGap;
-            MoveTo(target, sprint: HDist(transform.position, target) > sprintDistance);
+            if (_cutting)
+            {
+                Hoop hoop = gm.GetAttackingHoop(_pc.team);
+                Vector3 aim = hoop != null ? hoop.AimPoint : Vector3.zero;
+                MoveTo(aim, sprint: true);
+                if (HDist(transform.position, aim) < cutReachDistance) _cutting = false;
+            }
+            else
+            {
+                MoveTo(SpacingSpot(gm), sprint: false);
+            }
         }
 
-        // ---- Spatial queries ----------------------------------------------
+        /// <summary>How good a shot from here is: scoring stat for the range
+        /// plus a bonus for being open.</summary>
+        float ShotQuality(float dist, float nearestDef)
+        {
+            StatType stat = ShotStatFor(dist);
+            float statEff = _pc.EffectiveStat(stat);
+            float openness = Mathf.Clamp(nearestDef - 1f, 0f, 3f);
+            return statEff + openness;
+        }
+
+        StatType ShotStatFor(float dist) =>
+            dist >= _pc.threePointDistance ? StatType.ThreePoint :
+            dist <= _pc.paintRadius ? StatType.InsideScoring :
+            StatType.MidRange;
+
+        PlayerController BestPassTarget(GameManager gm, float myQuality)
+        {
+            Hoop hoop = gm.GetAttackingHoop(_pc.team);
+            Vector3 aim = hoop != null ? hoop.AimPoint : Vector3.zero;
+
+            PlayerController best = null;
+            float bestQuality = myQuality + passUpgradeMargin;
+            foreach (var mate in gm.TeamFor(_pc.team).onCourt)
+            {
+                if (mate == null || mate == _pc || !mate.enabled) continue;
+                float matesDef = NearestOpponentDistance(gm, mate.transform.position);
+                if (matesDef < openThreshold) continue; // covered
+
+                float dist = HDist(mate.transform.position, aim);
+                StatType stat = ShotStatForDistance(mate, dist);
+                float q = mate.EffectiveStat(stat) + Mathf.Clamp(matesDef - 1f, 0f, 3f);
+                if (q > bestQuality) { bestQuality = q; best = mate; }
+            }
+            return best;
+        }
+
+        static StatType ShotStatForDistance(PlayerController p, float dist) =>
+            dist >= p.threePointDistance ? StatType.ThreePoint :
+            dist <= p.paintRadius ? StatType.InsideScoring :
+            StatType.MidRange;
 
         Vector3 SpacingSpot(GameManager gm)
         {
@@ -174,6 +207,54 @@ namespace MarioBasketball.AI
                 aim.z + towardCentre * wingSpacing);
         }
 
+        // ---- Defense -------------------------------------------------------
+
+        void Defense(GameManager gm, PlayerController holder)
+        {
+            Vector3 defendHoop = DefendedHoop(gm);
+            bool amOnBall = holder != null && IsClosestTeammateTo(gm, holder.transform.position);
+
+            if (amOnBall)
+            {
+                Vector3 toHoop = (defendHoop - holder.transform.position);
+                toHoop.y = 0f;
+                Vector3 target = holder.transform.position + toHoop.normalized * onBallGap;
+                MoveTo(target, sprint: HDist(transform.position, target) > sprintDistance);
+
+                if (HDist(transform.position, holder.transform.position) <= stealRange)
+                    _pc.TriggerSteal();
+                return;
+            }
+
+            PlayerController man = NearestOpponent(gm, transform.position, exclude: holder)
+                                   ?? NearestOpponent(gm, transform.position, exclude: null);
+            if (man == null)
+            {
+                MoveTo(defendHoop, sprint: false);
+                return;
+            }
+
+            Vector3 manToHoop = (defendHoop - man.transform.position);
+            manToHoop.y = 0f;
+            Vector3 basePos = man.transform.position + manToHoop.normalized * offBallGap;
+
+            // Help: sag a fraction toward the ball.
+            Vector3 ballPos = gm.ball != null ? gm.ball.transform.position : basePos;
+            Vector3 help = ballPos - basePos; help.y = 0f;
+            Vector3 target2 = basePos + help * helpSag;
+            MoveTo(target2, sprint: HDist(transform.position, target2) > sprintDistance);
+        }
+
+        // ---- Shared queries ------------------------------------------------
+
+        void ChaseLooseBall(GameManager gm, BallController ball)
+        {
+            if (IsClosestTeammateTo(gm, ball.transform.position))
+                MoveTo(ball.transform.position, sprint: true);
+            else
+                _pc.SetMoveIntent(Vector2.zero, false);
+        }
+
         Vector3 DefendedHoop(GameManager gm)
         {
             Hoop hoop = gm.GetAttackingHoop(GameManager.Opponent(_pc.team));
@@ -182,13 +263,11 @@ namespace MarioBasketball.AI
 
         bool IsClosestTeammateTo(GameManager gm, Vector3 point)
         {
-            var team = gm.TeamFor(_pc.team);
             float mine = HDist(transform.position, point);
-            foreach (var mate in team.onCourt)
+            foreach (var mate in gm.TeamFor(_pc.team).onCourt)
             {
                 if (mate == null || mate == _pc || !mate.enabled) continue;
                 float d = HDist(mate.transform.position, point);
-                // Tie-break on instance id so exactly one player commits.
                 if (d < mine || (Mathf.Approximately(d, mine) && mate.GetInstanceID() < _pc.GetInstanceID()))
                     return false;
             }
@@ -211,21 +290,6 @@ namespace MarioBasketball.AI
                 if (o == null || o == exclude || !o.enabled) continue;
                 float d = HDist(o.transform.position, point);
                 if (d < bestD) { bestD = d; best = o; }
-            }
-            return best;
-        }
-
-        PlayerController FindOpenTeammate(GameManager gm)
-        {
-            var team = gm.TeamFor(_pc.team);
-            PlayerController best = null;
-            float bestD = Mathf.Infinity;
-            foreach (var mate in team.onCourt)
-            {
-                if (mate == null || mate == _pc || !mate.enabled) continue;
-                if (NearestOpponentDistance(gm, mate.transform.position) < openThreshold) continue;
-                float d = HDist(transform.position, mate.transform.position);
-                if (d < bestD) { bestD = d; best = mate; }
             }
             return best;
         }

@@ -158,14 +158,21 @@ stat system should support diverse archetypes across the Mario roster.
   - **No out of bounds**: perimeter walls — ball bounces, players are stopped.
   - Painted lane, three-point arcs, and centre circle.
   - Debug keys: **T** home timeout, **Y** home substitution.
-- **AI** (`PlayerAI` drives every non-human player):
-  - Offense on ball: drive to the rim, shoot in range, kick to an open
-    teammate when smothered.
-  - Offense off ball: spread to a wing spot for spacing.
-  - Defense: the closest defender guards the ball, others guard the nearest
-    man, all positioned goal-side.
+- **AI** (`PlayerAI` drives every non-human player — a whole-game first pass):
+  - Offense on ball: **stat-aware shot selection** (shoots only looks it's good
+    at + openness + shot clock, so Bowser attacks the rim rather than chucking
+    threes), kicks to a meaningfully better/open teammate, otherwise drives.
+  - Offense off ball: space to the wings and occasionally **cut** to the rim.
+  - Defense: the closest defender pressures the ball and **attempts steals**;
+    the others guard their man goal-side while **sagging to help**.
   - Loose balls: the closest teammate chases the rebound.
   - **Contested tip-off** weighted by each team's best (Power + Rebounds).
+- **Shot contests, blocks, steals** (in `PlayerController`, so the human is
+  subject to them too):
+  - A defender near the shooter widens the miss (Perimeter/Post Defense), and a
+    point-blank defender can **block** (Blocks vs the finisher's stat).
+  - **Steal** strips a nearby handler — Steals vs Ball Handling, on a cooldown.
+    Bound to **F / B**; the AI uses it on defense.
 - **Player switching** (`PlayerSwitchManager`): exactly one human-controlled
   player at a time; control auto-follows the ball on offense, and the Switch
   button (Q / left shoulder) grabs the nearest man on defense. Camera and HUD
@@ -175,20 +182,20 @@ stat system should support diverse archetypes across the Mario roster.
 **Assumptions made (confirm / adjust)**
 - Timeout's +30 energy is applied to **all on-court players** of the calling
   team (spec said "a player" — flag if it should be one player only).
-- AI is intentionally basic: no contests/steals/blocks/screens yet, and it
-  shoots on a simple range + openness heuristic. Defense slows drives with
-  bodies but can't actively strip the ball, so possessions usually change on
-  makes, missed-shot rebounds, or shot-clock violations.
+- Steal/contest/block odds are first-pass numbers exposed as tunable fields on
+  `PlayerController`. Because every player is currently Bowser (Ball Handling 2),
+  expect plenty of steals — that should settle once real guards exist.
 
 **Not yet built (roadmap, rough order)**
-- [ ] Smarter AI: shot contests, help defense, screens, better shot selection.
+- [ ] AI polish from play-testing: screens, double-teams, smarter help
+      rotations, better cut timing, contest jump animations.
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
 - [ ] Post-up: button-mash back-down (Power) + contextual post moves
       (Post Offense vs Post Defense).
 - [ ] On-fire streak tracker (needs per-player shot attribution; needs owner
       decisions on boost magnitude and exit condition).
 - [ ] Fouling + push mechanic; team-foul count → free throws at 10.
-- [ ] Steals, blocks, rebound catch-radius contests.
+- [ ] Rebound catch-radius contests (Rebounds stat); steals/blocks polish.
 - [ ] Dribble moves, speed burst as distinct mechanic, defensive stance.
 - [ ] Passing: tap-loft vs hold-hard, teammate icon targeting.
 - [ ] Dunks/alley-oops, mid-air shot adjust (double-tap), tricks + gamebreakers.

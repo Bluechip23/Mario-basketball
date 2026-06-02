@@ -15,8 +15,12 @@ Early prototype. Implemented so far:
   clock, contested tip-off, possession/inbounding, made-basket clock stops,
   scoring (2/3/1), three timeouts (+30 energy), five-player rosters with
   substitutions and bench recovery, and walls instead of out-of-bounds.
-- **AI** — the five non-human players drive, shoot, pass, space and play
-  goal-side defense; the tip is contested by Power + Rebounds.
+- **AI** — a whole-game first pass: stat-aware shot selection (Bowser attacks
+  the rim, doesn't chuck threes), kick-out passing, off-ball cuts, help
+  defense, and steals. The tip is contested by Power + Rebounds.
+- **Shot contests, blocks and steals** — defenders widen misses, swat
+  point-blank looks, and strip handlers (Steals vs Ball Handling); the human is
+  subject to all of it too.
 - **Player switching** — control auto-follows the ball on offense; a Switch
   button grabs the nearest defender. The controlled player wears a gold ring.
 - **Stat framework** — 14 stats (1-10) + hidden traits, with **Bowser** as the

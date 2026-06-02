@@ -48,6 +48,7 @@ the ball, and a scoreboard in the top-left.
 | Sprint | Left Shift    | Left trigger   |
 | Shoot  | Space         | A / South      |
 | Pass   | E             | X / West       |
+| Steal  | F             | B / East       |
 | Jump   | Left Ctrl     | Y / North      |
 | Switch player | Q      | Left shoulder  |
 | Timeout (home) | T    | —              |

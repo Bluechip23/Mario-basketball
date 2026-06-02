@@ -24,12 +24,14 @@ namespace MarioBasketball.InputControl
         public event Action ShootPressed;
         public event Action PassPressed;
         public event Action JumpPressed;
+        public event Action StealPressed;
 
         readonly InputAction _move;
         readonly InputAction _sprint;
         readonly InputAction _shoot;
         readonly InputAction _pass;
         readonly InputAction _jump;
+        readonly InputAction _steal;
 
         public InputReader()
         {
@@ -53,9 +55,13 @@ namespace MarioBasketball.InputControl
             _jump = new InputAction("Jump", InputActionType.Button, "<Keyboard>/leftCtrl");
             _jump.AddBinding("<Gamepad>/buttonNorth");
 
+            _steal = new InputAction("Steal", InputActionType.Button, "<Keyboard>/f");
+            _steal.AddBinding("<Gamepad>/buttonEast");
+
             _shoot.performed += _ => ShootPressed?.Invoke();
             _pass.performed += _ => PassPressed?.Invoke();
             _jump.performed += _ => JumpPressed?.Invoke();
+            _steal.performed += _ => StealPressed?.Invoke();
         }
 
         public void Enable()
@@ -65,6 +71,7 @@ namespace MarioBasketball.InputControl
             _shoot.Enable();
             _pass.Enable();
             _jump.Enable();
+            _steal.Enable();
         }
 
         public void Disable()
@@ -74,6 +81,7 @@ namespace MarioBasketball.InputControl
             _shoot.Disable();
             _pass.Disable();
             _jump.Disable();
+            _steal.Disable();
         }
 
         /// <summary>Sample the continuously-read values. Call once per frame.</summary>

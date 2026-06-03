@@ -47,10 +47,22 @@ namespace MarioBasketball.AI
         public float sprintDistance = 4f;
         public float stealRange = 1.3f;
 
+        [Header("Post offense")]
+        public float postRange = 4.5f;
+        public float postGuardDist = 2.2f;
+        public float aiPostSkillMin = 6f;
+        [Range(0f, 1f)] public float aiPostStartChance = 0.015f;
+        public float aiPostTapInterval = 0.18f;
+        public float aiPostMaxTime = 3.5f;
+        public float aiPostFinishLeverage = 5f;
+        public float aiPostDeepLeverage = 7f;
+
         PlayerController _pc;
         float _passTimer;
         float _cutTimer;
         bool _cutting;
+        float _postTapTimer;
+        float _postDecisionTimer;
 
         void Awake()
         {
@@ -75,6 +87,12 @@ namespace MarioBasketball.AI
                 return;
             }
 
+            if (_pc.IsStunned)
+            {
+                _pc.SetMoveIntent(Vector2.zero, false);
+                return;
+            }
+
             var ball = gm.ball;
             if (ball == null) return;
 
@@ -87,7 +105,11 @@ namespace MarioBasketball.AI
             var holder = ball.Holder;
             if (holder != null && holder.team == _pc.team)
             {
-                if (holder == _pc) OffenseWithBall(gm);
+                if (holder == _pc)
+                {
+                    if (_pc.IsPosting) AIPostOffense(gm);
+                    else OffenseWithBall(gm);
+                }
                 else OffenseOffBall(gm);
             }
             else
@@ -107,6 +129,18 @@ namespace MarioBasketball.AI
             float dist = HDist(transform.position, aim);
             float nearestDef = NearestOpponentDistance(gm, transform.position);
             float shotClock = gm.Shot != null ? gm.Shot.Remaining : 20f;
+
+            // Back a smaller, guarding defender down when we're a post threat.
+            if (ShouldPostUp(dist, nearestDef))
+            {
+                _pc.BeginPost();
+                if (_pc.IsPosting)
+                {
+                    _postDecisionTimer = aiPostMaxTime;
+                    _postTapTimer = 0f;
+                    return;
+                }
+            }
 
             float quality = ShotQuality(dist, nearestDef);
             bool forced = shotClock < lowShotClock;
@@ -131,6 +165,34 @@ namespace MarioBasketball.AI
             }
 
             MoveTo(aim, sprint: dist > 5f);
+        }
+
+        bool ShouldPostUp(float distToHoop, float nearestDef)
+        {
+            return !_pc.IsPosting
+                && distToHoop <= postRange
+                && nearestDef <= postGuardDist
+                && _pc.EffectiveStat(StatType.PostOffense) >= aiPostSkillMin
+                && Random.value < aiPostStartChance;
+        }
+
+        void AIPostOffense(GameManager gm)
+        {
+            float dt = Time.deltaTime;
+            _postTapTimer -= dt;
+            _postDecisionTimer -= dt;
+
+            _pc.SetMoveIntent(Vector2.zero, false); // PostUpController drives the back-down
+
+            if (_postTapTimer <= 0f)
+            {
+                _pc.PostBackDown();
+                _postTapTimer = aiPostTapInterval;
+            }
+
+            float lev = _pc.Post != null ? _pc.Post.Leverage : 0f;
+            if (lev >= aiPostFinishLeverage || _postDecisionTimer <= 0f)
+                _pc.DoPostMove(lev >= aiPostDeepLeverage ? PostMove.DropStep : PostMove.Hook);
         }
 
         void OffenseOffBall(GameManager gm)
@@ -213,6 +275,15 @@ namespace MarioBasketball.AI
         void Defense(GameManager gm, PlayerController holder)
         {
             Vector3 defendHoop = DefendedHoop(gm);
+
+            // If I'm being backed down, hold goal-side; my resistance is automatic.
+            if (holder != null && holder.IsPosting && holder.Post != null && holder.Post.EngagedDefender == _pc)
+            {
+                Vector3 toHoop = defendHoop - holder.transform.position; toHoop.y = 0f;
+                MoveTo(holder.transform.position + toHoop.normalized * 0.8f, sprint: false);
+                return;
+            }
+
             bool amOnBall = holder != null && IsClosestTeammateTo(gm, holder.transform.position);
 
             if (amOnBall)

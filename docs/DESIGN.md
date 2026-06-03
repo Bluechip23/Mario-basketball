@@ -188,8 +188,19 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   subject to them too):
   - A defender near the shooter widens the miss (Perimeter/Post Defense), and a
     point-blank defender can **block** (Blocks vs the finisher's stat).
-  - **Steal** strips a nearby handler — Steals vs Ball Handling, on a cooldown.
-    Bound to **F / B**; the AI uses it on defense.
+  - **Steal** strips a nearby handler — Steals vs Ball Handling, on a cooldown
+    (Steal button); the AI uses it on defense.
+- **Post-up** (`PostUpController`): hold Post Up to turn your back to the basket
+  and start a **back-down battle** — offense taps Back Down (worth their
+  **Power**), the defender resists (human taps the same button; AI resists from
+  Power + Post Defense). Running `Leverage` backs you toward the rim; a big loss
+  **shoves you out**, a bigger one **knocks you down and turns it over**. Post
+  moves: **Hook** (high, hard to block), **Drop Step** (lunge + point-blank
+  finish, blockable), **Spin** (layup; risks a strip), **Fake** (if the defender
+  bites, the next move is freer). Resolution uses **Post Offense vs Post
+  Defense** + leverage + **Blocks**. You can still **pass out** of the post
+  (kicks to the most open teammate). The AI both posts up and defends the post.
+- **Dive for loose balls** (Dive button): a lunge with extended pickup reach.
 - **Team select** (`TeamSelectMenu`): pre-match screen to draft five characters
   per side from the roster (first home pick is the player you control), with
   randomize and sensible defaults; `GameBootstrap.StartMatch` then spawns the
@@ -213,8 +224,7 @@ Lineups are chosen on the pre-match **team select** screen (see below).
 - [ ] AI polish from play-testing: screens, double-teams, smarter help
       rotations, better cut timing, contest jump animations.
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
-- [ ] Post-up: button-mash back-down (Power) + contextual post moves
-      (Post Offense vs Post Defense).
+- [ ] Post-up polish: animations, distinct move feel, jump-to-contest timing.
 - [ ] On-fire streak tracker (needs per-player shot attribution; needs owner
       decisions on boost magnitude and exit condition).
 - [ ] Fouling + push mechanic; team-foul count → free throws at 10.

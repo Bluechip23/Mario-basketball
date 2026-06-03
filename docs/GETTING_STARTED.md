@@ -51,9 +51,23 @@ control), then **Start Game**. The match spawns and tips off.
 | Pass   | E             | X / West       |
 | Steal  | F             | B / East       |
 | Jump   | Left Ctrl     | Y / North      |
+| Dive (loose ball) | X  | Right stick (press) |
+| Post up (hold) | R    | Right shoulder |
+| Back down / bump | B  | Right trigger  |
+| Post: Hook     | H    | D-pad up       |
+| Post: Drop step | G   | D-pad down     |
+| Post: Spin     | V    | D-pad left     |
+| Post: Fake     | C    | D-pad right    |
 | Switch player | Q      | Left shoulder  |
 | Timeout (home) | T    | —              |
 | Substitute (home) | Y | —              |
+
+**Post game:** with the ball, hold **Post up** to turn your back to the basket,
+then tap **Back down** to bulldoze your defender toward the rim (it's a
+Power-vs-Power tap battle — if they win they shove you off or knock you down).
+Once you've got position, hit a post move (Hook / Drop step / Spin / Fake). You
+can still **Pass** out of the post. On defense against a poster, mash **Back
+down** to bump them off.
 
 It's a full-court **3v3** game. You control the player marked with the **gold
 ring**: on offense control follows the ball automatically, and on defense you

@@ -7,16 +7,17 @@ namespace MarioBasketball.Gameplay
 {
     /// <summary>
     /// A player's body and actions. Movement and actions are driven by an
-    /// <i>intent</i> (a move vector plus shoot/pass/jump/steal triggers) fed by
-    /// either the human (<see cref="InputReader"/>) or a <c>PlayerAI</c> brain.
+    /// <i>intent</i> (a move vector plus action triggers) fed by either the
+    /// human (<see cref="InputReader"/>) or a <c>PlayerAI</c> brain. Built on a
+    /// <see cref="CharacterController"/> for crisp, arcade movement.
     ///
-    /// Outcomes are stat-driven: move speed (Speed) and shot accuracy (3-Point /
-    /// Mid Range / Inside Scoring by distance) scale with effective stats, and
-    /// shots are <b>contested</b> by nearby defenders (Perimeter/Post Defense
-    /// widen the miss, Blocks can swat point-blank attempts). Stealing pits the
-    /// thief's Steals against the handler's Ball Handling.
+    /// Outcomes are stat-driven: speed (Speed), shot accuracy (3-Point / Mid
+    /// Range / Inside Scoring), contests (Perimeter/Post Defense, Blocks),
+    /// steals (Steals vs Ball Handling) and the post game (see
+    /// <see cref="PostUpController"/>, Power + Post Offense/Defense).
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(PostUpController))]
     public class PlayerController : MonoBehaviour
     {
         [Header("Identity")]
@@ -25,7 +26,6 @@ namespace MarioBasketball.Gameplay
         public bool isHuman = false;
 
         [Header("Movement (mapped from the Speed stat)")]
-        [Tooltip("Move speed at effective Speed 1 / Speed 10, in m/s.")]
         public float minMoveSpeed = 4f;
         public float maxMoveSpeed = 9f;
         public float sprintMultiplier = 1.4f;
@@ -34,7 +34,6 @@ namespace MarioBasketball.Gameplay
         public float jumpHeight = 1.4f;
 
         [Header("Ball handling")]
-        [Tooltip("How close a loose ball must be to scoop it up, in metres.")]
         public float pickupRadius = 1.2f;
         [Tooltip("Distance from the basket beyond which a make is worth 3.")]
         public float threePointDistance = 6.75f;
@@ -43,17 +42,13 @@ namespace MarioBasketball.Gameplay
 
         [Header("Shooting (accuracy mapped from the relevant scoring stat)")]
         public float shotFlightTime = 1.1f;
-        [Tooltip("Rim miss spread (metres) at stat 1 / stat 10. Lower stat = wilder.")]
         public float maxShotSpread = 1.2f;
         public float minShotSpread = 0.05f;
         public float passPower = 9f;
 
         [Header("Contest / block (defense on a shot)")]
-        [Tooltip("A defender within this range contests the shot.")]
         public float contestRange = 3f;
-        [Tooltip("Extra miss spread added by a point-blank contest from a great defender.")]
         public float contestMaxSpread = 1.6f;
-        [Tooltip("A defender within this range can block.")]
         public float blockRange = 1.1f;
         public float blockBaseChance = 0.04f;
         public float blockStatScale = 0.05f;
@@ -69,24 +64,40 @@ namespace MarioBasketball.Gameplay
         public float stealMinChance = 0.02f;
         public float stealMaxChance = 0.4f;
 
-        /// <summary>Where the carried ball sits — out in front, hip height.</summary>
+        [Header("Dive / shove")]
+        public float diveDuration = 0.5f;
+        public float diveSpeed = 9f;
+        public float diveReachBonus = 1.0f;
+        public float diveBallSeekRange = 6f;
+        public float shoveDuration = 0.35f;
+
         public Vector3 BallHoldPoint => transform.position + transform.forward * 0.55f + Vector3.up * 0.4f;
 
         public PlayerCharacter Character => _character;
+        public PostUpController Post => _post;
         public bool HasBall => Ball != null && Ball.Holder == this;
+        public bool IsPosting => _post != null && _post.IsPosting;
+        public bool IsStunned => _stunTimer > 0f;
 
         CharacterController _cc;
         PlayerCharacter _character;
+        PostUpController _post;
         InputReader _input;
         float _verticalVelocity;
         Vector2 _moveIntent;
         bool _sprintIntent;
         float _stealCooldown;
+        float _stunTimer;
+        float _diveTimer;
+        Vector3 _diveDir;
+        Vector3 _shoveVel;
+        float _shoveTimer;
 
         void Awake()
         {
             _cc = GetComponent<CharacterController>();
             _character = GetComponent<PlayerCharacter>();
+            _post = GetComponent<PostUpController>();
         }
 
         void OnEnable()
@@ -99,9 +110,6 @@ namespace MarioBasketball.Gameplay
             DisableInput();
         }
 
-        /// <summary>Hand control of this player to / from the human. The switch
-        /// manager calls this; exactly one player is human-controlled at a time
-        /// so only one <see cref="InputReader"/> is ever active.</summary>
         public void SetHumanControlled(bool value)
         {
             isHuman = value;
@@ -114,6 +122,7 @@ namespace MarioBasketball.Gameplay
                 DisableInput();
                 _moveIntent = Vector2.zero;
                 _sprintIntent = false;
+                if (IsPosting) _post.End();
             }
         }
 
@@ -125,6 +134,12 @@ namespace MarioBasketball.Gameplay
             _input.PassPressed += TriggerPass;
             _input.JumpPressed += TriggerJump;
             _input.StealPressed += TriggerSteal;
+            _input.DivePressed += TriggerDive;
+            _input.BackDownPressed += TriggerBackDown;
+            _input.HookPressed += TriggerHook;
+            _input.DropStepPressed += TriggerDropStep;
+            _input.SpinPressed += TriggerSpin;
+            _input.FakePressed += TriggerFake;
             _input.Enable();
         }
 
@@ -135,12 +150,18 @@ namespace MarioBasketball.Gameplay
             _input.PassPressed -= TriggerPass;
             _input.JumpPressed -= TriggerJump;
             _input.StealPressed -= TriggerSteal;
+            _input.DivePressed -= TriggerDive;
+            _input.BackDownPressed -= TriggerBackDown;
+            _input.HookPressed -= TriggerHook;
+            _input.DropStepPressed -= TriggerDropStep;
+            _input.SpinPressed -= TriggerSpin;
+            _input.FakePressed -= TriggerFake;
             _input.Disable();
             _input = null;
         }
 
-        /// <summary>Set this frame's desired movement. Used by the AI brain;
-        /// the human overrides it from input each frame.</summary>
+        /// <summary>Set this frame's desired movement (AI; the human overrides
+        /// it from input each frame).</summary>
         public void SetMoveIntent(Vector2 move, bool sprint)
         {
             _moveIntent = move;
@@ -149,23 +170,31 @@ namespace MarioBasketball.Gameplay
 
         void Update()
         {
-            if (_stealCooldown > 0f) _stealCooldown -= Time.deltaTime;
+            float dt = Time.deltaTime;
+            if (_stealCooldown > 0f) _stealCooldown -= dt;
+            if (_stunTimer > 0f) _stunTimer -= dt;
+            if (_diveTimer > 0f) _diveTimer -= dt;
+            if (_shoveTimer > 0f) _shoveTimer -= dt;
 
             if (isHuman && _input != null)
             {
                 _input.Tick();
                 _moveIntent = _input.Move;
                 _sprintIntent = _input.SprintHeld;
+                HandlePostHold();
             }
+
             Move();
             TryPickUpLooseBall();
         }
 
-        /// <summary>
-        /// Move the player, working around the CharacterController (which
-        /// otherwise overrides direct transform writes). Used for inbounds,
-        /// tip-offs and substitutions.
-        /// </summary>
+        void HandlePostHold()
+        {
+            bool wantPost = _input.PostUpHeld && HasBall && !IsStunned && _cc.isGrounded;
+            if (wantPost && !IsPosting) _post.Begin(NearestOpponentTo(transform.position));
+            else if (!_input.PostUpHeld && IsPosting) _post.End();
+        }
+
         public void Teleport(Vector3 position)
         {
             bool was = _cc.enabled;
@@ -177,36 +206,58 @@ namespace MarioBasketball.Gameplay
         float Effective(StatType stat, float fallback) =>
             _character != null ? _character.GetEffective(stat) : fallback;
 
-        /// <summary>Public effective-stat read for other systems (contest, steal, AI).</summary>
         public float EffectiveStat(StatType stat) => Effective(stat, 5f);
 
         void Move()
         {
-            Vector3 dir = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
-            if (dir.sqrMagnitude > 1f) dir.Normalize();
+            float dt = Time.deltaTime;
+            Vector3 horizontal;
+            bool rotateToMove = false;
+            Vector3 faceDir = Vector3.zero;
 
-            // Effective Speed (1-10ish) maps onto the configured m/s band.
-            float speedStat = Effective(StatType.Speed, 5f);
-            float baseSpeed = Mathf.Lerp(minMoveSpeed, maxMoveSpeed, Mathf.Clamp01((speedStat - 1f) / 9f));
-            bool sprinting = _sprintIntent && dir.sqrMagnitude > 0.01f;
-            float speed = baseSpeed * (sprinting ? sprintMultiplier : 1f);
+            if (IsStunned)
+            {
+                horizontal = Vector3.zero;
+                _character?.ReportActivity(false, false);
+            }
+            else if (IsPosting)
+            {
+                horizontal = _post.DriveVelocity; // PostUpController owns facing
+                _character?.ReportActivity(true, false);
+            }
+            else if (_diveTimer > 0f)
+            {
+                horizontal = _diveDir * diveSpeed;
+                _character?.ReportActivity(true, true);
+            }
+            else
+            {
+                Vector3 dir = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
+                if (dir.sqrMagnitude > 1f) dir.Normalize();
 
-            if (_character != null)
-                _character.ReportActivity(dir.sqrMagnitude > 0.01f, sprinting);
+                float speedStat = Effective(StatType.Speed, 5f);
+                float baseSpeed = Mathf.Lerp(minMoveSpeed, maxMoveSpeed, Mathf.Clamp01((speedStat - 1f) / 9f));
+                bool sprinting = _sprintIntent && dir.sqrMagnitude > 0.01f;
+                float speed = baseSpeed * (sprinting ? sprintMultiplier : 1f);
+                _character?.ReportActivity(dir.sqrMagnitude > 0.01f, sprinting);
 
-            Vector3 horizontal = dir * speed;
+                horizontal = dir * speed;
+                rotateToMove = dir.sqrMagnitude > 0.01f;
+                faceDir = dir;
+            }
 
-            if (_cc.isGrounded && _verticalVelocity < 0f)
-                _verticalVelocity = -2f; // keep the controller snug to the floor
-            _verticalVelocity += gravity * Time.deltaTime;
+            if (_shoveTimer > 0f) horizontal += _shoveVel;
+
+            if (_cc.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
+            _verticalVelocity += gravity * dt;
 
             Vector3 velocity = horizontal + Vector3.up * _verticalVelocity;
-            _cc.Move(velocity * Time.deltaTime);
+            _cc.Move(velocity * dt);
 
-            if (dir.sqrMagnitude > 0.01f)
+            if (rotateToMove)
             {
-                Quaternion want = Quaternion.LookRotation(dir, Vector3.up);
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * Time.deltaTime);
+                Quaternion want = Quaternion.LookRotation(faceDir, Vector3.up);
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * dt);
             }
         }
 
@@ -214,24 +265,22 @@ namespace MarioBasketball.Gameplay
 
         void TryPickUpLooseBall()
         {
-            // Only contest live balls — not during inbounds/stoppages.
             if (GameManager.Instance == null || GameManager.Instance.State != GameState.Playing) return;
             var ball = Ball;
             if (ball == null || !ball.CanBePickedUpBy(this)) return;
-            if (Vector3.Distance(transform.position, ball.transform.position) <= pickupRadius)
+            float reach = _diveTimer > 0f ? pickupRadius + diveReachBonus : pickupRadius;
+            if (Vector3.Distance(transform.position, ball.transform.position) <= reach)
             {
                 ball.PickUp(this);
                 GameManager.Instance.OnPossessionGained(this);
             }
         }
 
-        // ---- Actions (called by input events or the AI brain) --------------
+        // ---- Actions (input events or AI brain) ----------------------------
 
-        /// <summary>Shoot at the attacking hoop. Accuracy comes from the right
-        /// scoring stat, then nearby defenders contest (and may block).</summary>
         public void TriggerShoot()
         {
-            if (MatchPause.IsPaused || !HasBall) return;
+            if (MatchPause.IsPaused || IsStunned || !HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
@@ -248,7 +297,6 @@ namespace MarioBasketball.Gameplay
             float t = Mathf.Clamp01((stat - 1f) / 9f);
             float spread = Mathf.Lerp(maxShotSpread, minShotSpread, t);
 
-            // Defensive contest.
             PlayerController defender = NearestOpponentTo(transform.position);
             if (defender != null)
             {
@@ -266,7 +314,6 @@ namespace MarioBasketball.Gameplay
                         float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - stat), 0f, blockMaxChance) * closeness;
                         if (Random.value < chance)
                         {
-                            // Swatted: the ball is knocked loose away from the rim.
                             Vector3 away = transform.position - aim; away.y = 0f;
                             Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
                             return;
@@ -280,29 +327,33 @@ namespace MarioBasketball.Gameplay
 
         public void TriggerPass()
         {
-            if (MatchPause.IsPaused || !HasBall) return;
+            if (MatchPause.IsPaused || IsStunned || !HasBall) return;
+            if (IsPosting)
+            {
+                // Kick out of the post to the most open teammate.
+                var mate = FindOpenTeammate();
+                _post.End();
+                if (mate != null) { Ball.PassTo(mate.transform.position + Vector3.up * 0.6f); return; }
+            }
             Ball.Pass(transform.forward, passPower);
         }
 
         /// <summary>A directed pass to a teammate (used by the AI).</summary>
         public void PassToward(Vector3 worldPoint)
         {
-            if (MatchPause.IsPaused || !HasBall) return;
+            if (MatchPause.IsPaused || IsStunned || !HasBall) return;
             Ball.PassTo(worldPoint);
         }
 
         public void TriggerJump()
         {
-            if (MatchPause.IsPaused) return;
-            if (_cc.isGrounded)
-                _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);
+            if (MatchPause.IsPaused || IsStunned) return;
+            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);
         }
 
-        /// <summary>Attempt to strip the ball from a nearby opponent ball
-        /// handler — Steals vs their Ball Handling, on a cooldown.</summary>
         public void TriggerSteal()
         {
-            if (MatchPause.IsPaused || _stealCooldown > 0f) return;
+            if (MatchPause.IsPaused || IsStunned || _stealCooldown > 0f) return;
             var gm = GameManager.Instance;
             if (gm == null || gm.ball == null) return;
 
@@ -310,11 +361,7 @@ namespace MarioBasketball.Gameplay
             if (holder == null || holder == this || holder.team == team) return;
 
             float dist = HorizontalDistance(transform.position, holder.transform.position);
-            if (dist > stealReach)
-            {
-                _stealCooldown = stealWhiffCooldown;
-                return;
-            }
+            if (dist > stealReach) { _stealCooldown = stealWhiffCooldown; return; }
 
             _stealCooldown = stealCooldown;
             float steal = EffectiveStat(StatType.Steals);
@@ -327,9 +374,68 @@ namespace MarioBasketball.Gameplay
             }
         }
 
+        /// <summary>Lunge toward a nearby loose ball with extended reach.</summary>
+        public void TriggerDive()
+        {
+            if (MatchPause.IsPaused || IsStunned || IsPosting || _diveTimer > 0f || !_cc.isGrounded) return;
+
+            _diveDir = transform.forward;
+            var ball = Ball;
+            if (ball != null && ball.CanBePickedUpBy(this))
+            {
+                Vector3 to = ball.transform.position - transform.position; to.y = 0f;
+                if (to.sqrMagnitude > 0.01f && to.magnitude <= diveBallSeekRange) _diveDir = to.normalized;
+            }
+            _diveTimer = diveDuration;
+        }
+
+        public void TriggerBackDown()
+        {
+            if (MatchPause.IsPaused || IsStunned) return;
+            if (IsPosting) { _post.OffenseTap(); return; }
+            FindPosterGuardingMe()?.DefenderTap(); // bump a poster while defending
+        }
+
+        void TriggerHook() => TriggerPostMove(PostMove.Hook);
+        void TriggerDropStep() => TriggerPostMove(PostMove.DropStep);
+        void TriggerSpin() => TriggerPostMove(PostMove.Spin);
+        void TriggerFake() => TriggerPostMove(PostMove.Fake);
+
+        public void TriggerPostMove(PostMove move)
+        {
+            if (MatchPause.IsPaused || IsStunned || !IsPosting) return;
+            _post.DoMove(move);
+        }
+
+        // ---- AI hooks ------------------------------------------------------
+
+        public void BeginPost()
+        {
+            if (HasBall && !IsStunned && _cc.isGrounded && !IsPosting)
+                _post.Begin(NearestOpponentTo(transform.position));
+        }
+
+        public void EndPost() { if (IsPosting) _post.End(); }
+        public void PostBackDown() { if (IsPosting) _post.OffenseTap(); }
+        public void DoPostMove(PostMove move) { if (IsPosting) _post.DoMove(move); }
+
+        // ---- State changes from other systems ------------------------------
+
+        public void Stun(float seconds)
+        {
+            _stunTimer = Mathf.Max(_stunTimer, seconds);
+            if (IsPosting) _post.End();
+        }
+
+        public void ApplyShove(Vector3 velocity)
+        {
+            _shoveVel = velocity;
+            _shoveTimer = shoveDuration;
+        }
+
         // ---- Helpers -------------------------------------------------------
 
-        PlayerController NearestOpponentTo(Vector3 point)
+        public PlayerController NearestOpponentTo(Vector3 point)
         {
             var gm = GameManager.Instance;
             if (gm == null) return null;
@@ -341,6 +447,34 @@ namespace MarioBasketball.Gameplay
                 if (o == null || !o.enabled) continue;
                 float d = HorizontalDistance(o.transform.position, point);
                 if (d < bestD) { bestD = d; best = o; }
+            }
+            return best;
+        }
+
+        PostUpController FindPosterGuardingMe()
+        {
+            var gm = GameManager.Instance;
+            if (gm == null) return null;
+            foreach (var o in gm.TeamFor(GameManager.Opponent(team)).onCourt)
+            {
+                if (o == null || o.Post == null) continue;
+                if (o.Post.IsPosting && o.Post.EngagedDefender == this) return o.Post;
+            }
+            return null;
+        }
+
+        PlayerController FindOpenTeammate()
+        {
+            var gm = GameManager.Instance;
+            if (gm == null) return null;
+            PlayerController best = null;
+            float bestOpen = -1f;
+            foreach (var m in gm.TeamFor(team).onCourt)
+            {
+                if (m == null || m == this || !m.enabled) continue;
+                var opp = m.NearestOpponentTo(m.transform.position);
+                float open = opp != null ? HorizontalDistance(opp.transform.position, m.transform.position) : 99f;
+                if (open > bestOpen) { bestOpen = open; best = m; }
             }
             return best;
         }

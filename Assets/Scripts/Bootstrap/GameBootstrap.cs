@@ -133,6 +133,7 @@ namespace MarioBasketball.Bootstrap
             var character = go.AddComponent<PlayerCharacter>();
             character.stats = stats;
 
+            go.AddComponent<PostUpController>(); // required by PlayerController
             var pc = go.AddComponent<PlayerController>();
             pc.team = side;
             pc.isHuman = false; // control is assigned at runtime by PlayerSwitchManager

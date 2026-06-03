@@ -1,6 +1,7 @@
 using UnityEngine;
 using MarioBasketball.Core;
 using MarioBasketball.Characters;
+using MarioBasketball.Gameplay;
 
 namespace MarioBasketball.UI
 {
@@ -42,24 +43,35 @@ namespace MarioBasketball.UI
                     GUI.Label(new Rect(20, 112, 700, 40), winner, _big);
                 }
 
-                PlayerCharacter human = gm.humanPlayer != null ? gm.humanPlayer.Character : null;
+                var humanPc = gm.humanPlayer;
+                PlayerCharacter human = humanPc != null ? humanPc.Character : null;
                 if (human != null)
                 {
                     string fire = human.OnFire ? "   *** ON FIRE ***" : "";
+                    string posting = humanPc.IsPosting ? "   [POSTING]" : "";
                     GUI.Label(new Rect(20, 138, 700, 24),
-                        $"{human.stats.characterName}   Energy {human.Energy:0}{fire}", _small);
+                        $"{human.stats.characterName}   Energy {human.Energy:0}{fire}{posting}", _small);
                     GUI.Box(new Rect(20, 160, 220, 14), GUIContent.none);
                     GUI.Box(new Rect(20, 160, 220 * Mathf.Clamp01(human.EnergyFraction), 14), GUIContent.none);
+
+                    if (humanPc.IsPosting && humanPc.Post != null)
+                    {
+                        float lev = Mathf.Clamp(humanPc.Post.Leverage, -humanPc.Post.maxLeverage, humanPc.Post.maxLeverage);
+                        float frac = Mathf.InverseLerp(-humanPc.Post.maxLeverage, humanPc.Post.maxLeverage, lev);
+                        GUI.Label(new Rect(20, 178, 300, 20), "Back-down (tap B):", _small);
+                        GUI.Box(new Rect(150, 180, 160, 14), GUIContent.none);
+                        GUI.Box(new Rect(150, 180, 160 * frac, 14), GUIContent.none);
+                    }
                 }
             }
 
-            GUI.Label(new Rect(20, Screen.height - 142, 760, 142),
-                "Move: WASD / Left Stick    Sprint: Shift / LT    Jump: Ctrl / Y\n" +
-                "Shoot: Space / A    Pass: E / X    Steal: F / B    Switch: Q / LB\n" +
-                "Timeout (home): T    Substitute (home): Y    Pause/Stats: Esc\n" +
-                "You control the player under the gold marker. On offense control\n" +
-                "follows the ball; on defense press Switch for the nearest man and\n" +
-                "Steal when you're on the ball handler.",
+            GUI.Label(new Rect(20, Screen.height - 176, 820, 176),
+                "Move: WASD / Stick   Sprint: Shift / LT   Jump: Ctrl / N-btn   Dive: X / R-stick\n" +
+                "Shoot: Space / A   Pass: E / W-btn   Steal: F / E-btn   Switch: Q / LB\n" +
+                "Post up (hold): R / RB    Back down (also bump on D): B / RT\n" +
+                "Post moves — Hook: H   Drop step: G   Spin: V   Fake: C   (D-pad on gamepad)\n" +
+                "Timeout: T   Substitute: Y   Pause/Stats: Esc\n" +
+                "You control the gold-ringed player. On offense control follows the ball.",
                 _small);
         }
     }

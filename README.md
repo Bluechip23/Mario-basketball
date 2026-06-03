@@ -26,6 +26,9 @@ Early prototype. Implemented so far:
 - **Team select** — a pre-match screen to draft five characters per side from
   a 13-strong roster (Bowser, DK, Mario, Luigi, Peach, Toad, Waluigi, Diddy,
   Yoshi, Birdo, Boo, Baby Mario, Wario).
+- **Post game** — hold to back your defender down (a Power-based tap battle),
+  then hook / drop step / spin / fake; lose the battle and you get shoved out
+  or knocked down. Plus a dive button for loose balls.
 - **Stat framework** — 14 stats (1-10) + hidden traits, with **Bowser** as the
   demo character. Movement speed and shot accuracy are driven by effective
   stats, and a **stamina/energy** model scales everything as players tire.

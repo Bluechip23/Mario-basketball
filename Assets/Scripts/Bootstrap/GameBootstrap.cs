@@ -9,20 +9,16 @@ using MarioBasketball.UI;
 namespace MarioBasketball.Bootstrap
 {
     /// <summary>
-    /// Builds a complete, playable full-court 3v3 game out of primitives at
-    /// runtime: floor, perimeter walls (there is no out of bounds — the ball
-    /// and players bounce off), painted lane / three-point arcs / centre
-    /// circle, two hoops with rims, two five-player rosters (three on court,
-    /// two on the bench each), the ball, camera, <see cref="GameManager"/> and
-    /// HUD.
+    /// Builds the playable full-court 3v3 game out of primitives at runtime. On
+    /// <see cref="Awake"/> it lays down the static court (floor, perimeter walls
+    /// — there is no out of bounds, things bounce off — painted lane /
+    /// three-point arcs / centre circle, two rimmed hoops, camera) and shows the
+    /// <see cref="TeamSelectMenu"/>. When the player confirms their rosters,
+    /// <see cref="StartMatch"/> spawns the teams and kicks off the game.
     ///
     /// Running from an empty scene with just this component keeps the prototype
     /// free of fragile authored scene/prefab assets. As real content arrives,
     /// this bootstrap shrinks and is retired.
-    ///
-    /// Every player currently uses Bowser's stat sheet (the only character that
-    /// exists); only the home point guard is human, the rest stand until AI is
-    /// built.
     /// </summary>
     public class GameBootstrap : MonoBehaviour
     {
@@ -37,6 +33,8 @@ namespace MarioBasketball.Bootstrap
         static readonly Color HumanColor = new Color(1.0f, 0.78f, 0.1f);
 
         Material _lineMat;
+        Hoop _hoopNeg;
+        Hoop _hoopPos;
 
         void Awake()
         {
@@ -47,25 +45,26 @@ namespace MarioBasketball.Bootstrap
 
             // Teams start on their own half and attack the far basket: home
             // begins on the -z half and attacks the +z hoop, and vice versa.
-            Hoop hoopNeg = BuildHoop("HoopNeg", new Vector3(0f, 0f, -(courtLength / 2f - 1.6f)), TeamSide.Away, faceZ: 1f);
-            Hoop hoopPos = BuildHoop("HoopPos", new Vector3(0f, 0f, courtLength / 2f - 1.6f), TeamSide.Home, faceZ: -1f);
+            _hoopNeg = BuildHoop("HoopNeg", new Vector3(0f, 0f, -(courtLength / 2f - 1.6f)), TeamSide.Away, faceZ: 1f);
+            _hoopPos = BuildHoop("HoopPos", new Vector3(0f, 0f, courtLength / 2f - 1.6f), TeamSide.Home, faceZ: -1f);
 
+            BuildCamera(null); // overview framing until the match starts
+
+            var select = gameObject.AddComponent<TeamSelectMenu>();
+            select.bootstrap = this;
+        }
+
+        /// <summary>
+        /// Spawns both teams and starts the match. Each roster is five
+        /// characters: the first three start (the <b>first</b> is the
+        /// human-controlled player), the last two sit on the bench.
+        /// </summary>
+        public void StartMatch(CharacterStats[] homeRoster, CharacterStats[] awayRoster)
+        {
             var gm = gameObject.AddComponent<GameManager>();
-            gm.hoops.Add(hoopNeg);
-            gm.hoops.Add(hoopPos);
+            gm.hoops.Add(_hoopNeg);
+            gm.hoops.Add(_hoopPos);
 
-            // Distinct lineups so the archetypes are on the floor to balance
-            // against. Slot 1 (index, middle) is the human-controlled starter.
-            var homeRoster = new[]
-            {
-                CharacterLibrary.Luigi(), CharacterLibrary.Mario(), CharacterLibrary.Peach(),
-                CharacterLibrary.Toad(), CharacterLibrary.DiddyKong()
-            };
-            var awayRoster = new[]
-            {
-                CharacterLibrary.DonkeyKong(), CharacterLibrary.Bowser(), CharacterLibrary.Waluigi(),
-                CharacterLibrary.DiddyKong(), CharacterLibrary.Toad()
-            };
             BuildTeam(gm.Home, TeamSide.Home, HomeColor, -1f, true, gm, homeRoster);
             BuildTeam(gm.Away, TeamSide.Away, AwayColor, 1f, false, gm, awayRoster);
 
@@ -77,7 +76,11 @@ namespace MarioBasketball.Bootstrap
             gm.homeSubEntry = new Vector3(0f, 1.1f, -4f);
             gm.awaySubEntry = new Vector3(0f, 1.1f, 4f);
 
-            BuildCamera(gm.humanPlayer != null ? gm.humanPlayer.transform : null);
+            if (Camera.main != null)
+            {
+                var rig = Camera.main.GetComponent<CameraRig>();
+                if (rig != null && gm.humanPlayer != null) rig.target = gm.humanPlayer.transform;
+            }
 
             var switcher = gameObject.AddComponent<MarioBasketball.Control.PlayerSwitchManager>();
             switcher.humanSide = TeamSide.Home;
@@ -93,10 +96,11 @@ namespace MarioBasketball.Bootstrap
         void BuildTeam(TeamState team, TeamSide side, Color color, float halfSign, bool hasHuman, GameManager gm, CharacterStats[] roster)
         {
             // Three on-court spots spread across this team's half, two on bench.
-            float[] xs = { -3f, 0f, 3f };
+            // Slot 0 (centre) is the human's first pick.
+            float[] xs = { 0f, -3f, 3f };
             for (int i = 0; i < 3; i++)
             {
-                bool isHuman = hasHuman && i == 1; // the middle slot is the human starter
+                bool isHuman = hasHuman && i == 0; // first pick is the human starter
                 var pos = new Vector3(xs[i], 1.1f, 4f * halfSign);
                 var pc = BuildPlayer(roster[i], pos, side, isHuman ? HumanColor : color, isHuman, benched: false);
                 team.onCourt.Add(pc);
@@ -292,6 +296,10 @@ namespace MarioBasketball.Bootstrap
                 cam = camGo.AddComponent<Camera>();
                 camGo.AddComponent<AudioListener>();
             }
+            // Overview framing used before a target exists (team select / pre-match).
+            cam.transform.position = new Vector3(0f, 14f, -20f);
+            cam.transform.LookAt(new Vector3(0f, 1f, 0f));
+
             var rig = cam.GetComponent<CameraRig>();
             if (rig == null) rig = cam.gameObject.AddComponent<CameraRig>();
             rig.target = target;

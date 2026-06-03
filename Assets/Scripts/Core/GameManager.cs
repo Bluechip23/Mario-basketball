@@ -149,11 +149,6 @@ namespace MarioBasketball.Core
             _stateTimer = basketMadePause;
         }
 
-        public void RegisterFreeThrow(TeamSide scoringTeam)
-        {
-            AddPoints(scoringTeam, 1);
-        }
-
         public bool CallTimeout(TeamSide side)
         {
             if (State == GameState.GameOver) return false;

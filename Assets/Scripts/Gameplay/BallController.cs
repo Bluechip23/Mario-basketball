@@ -38,7 +38,6 @@ namespace MarioBasketball.Gameplay
         public TeamSide ShooterTeam { get; private set; }
 
         Rigidbody _rb;
-        SphereCollider _collider;
         Vector3 _centreCourt;
         float _shotTimer;
         PlayerController _recentReleaser;
@@ -47,7 +46,6 @@ namespace MarioBasketball.Gameplay
         void Awake()
         {
             _rb = GetComponent<Rigidbody>();
-            _collider = GetComponent<SphereCollider>();
             _centreCourt = transform.position;
         }
 

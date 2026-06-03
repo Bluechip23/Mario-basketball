@@ -33,8 +33,9 @@ There is **no committed scene** — the playable court is built at runtime by
    "Game Bootstrap").
 4. Press **Play**.
 
-You should see a hardwood court with two hoops, a red player capsule holding
-the ball, and a scoreboard in the top-left.
+You'll first see the **Team Select** screen over the empty court: draft five
+characters for each side (your first HOME pick — marked ★ — is the player you
+control), then **Start Game**. The match spawns and tips off.
 
 > Tip: save that scene as `Assets/Scenes/Sandbox.unity` so you can just press
 > Play next time. (Scenes aren't committed yet to avoid binary merge pain on

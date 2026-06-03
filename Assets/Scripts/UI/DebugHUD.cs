@@ -33,7 +33,6 @@ namespace MarioBasketball.UI
                     $"Q{quarter}   {clock}   |   Shot {shot}   |   Ball: {gm.Possession}   |   {gm.State}", _mid);
 
                 GUI.Label(new Rect(20, 86, 700, 24),
-                    $"Fouls  H:{gm.Home.Fouls} A:{gm.Away.Fouls}    " +
                     $"Timeouts  H:{gm.Home.TimeoutsRemaining} A:{gm.Away.TimeoutsRemaining}", _small);
 
                 if (gm.State == GameState.GameOver)

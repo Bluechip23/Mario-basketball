@@ -128,7 +128,5 @@ namespace MarioBasketball.Characters
         /// <summary>Add (or remove) energy, clamped to the legal range. Used by
         /// timeouts (+30) and any other instantaneous stamina effects.</summary>
         public void AddEnergy(float amount) => energy = Mathf.Clamp(energy + amount, 0f, maxEnergy);
-
-        public void RefillEnergy() => energy = maxEnergy;
     }
 }

@@ -98,10 +98,66 @@ namespace MarioBasketball.Characters
             perimeterDefense = 9, stamina = 8, hiddenTrait = HiddenTrait.None
         };
 
+        /// <summary>Yoshi — relentless athlete and lockdown defender with a
+        /// bottomless tank, but no offensive skill outside of dunking.</summary>
+        public static CharacterStats Yoshi() => new CharacterStats
+        {
+            characterName = "Yoshi",
+            speed = 10, ballHandling = 2, threePoint = 2, midRange = 1,
+            insideScoring = 2, postOffense = 2, dunk = 8, power = 7,
+            rebounds = 7, blocks = 7, steals = 8, postDefense = 7,
+            perimeterDefense = 9, stamina = 10, hiddenTrait = HiddenTrait.None
+        };
+
+        /// <summary>Birdo — fast, high-stamina scoring wing who shoots it well
+        /// from everywhere.</summary>
+        public static CharacterStats Birdo() => new CharacterStats
+        {
+            characterName = "Birdo",
+            speed = 9, ballHandling = 5, threePoint = 8, midRange = 8,
+            insideScoring = 6, postOffense = 6, dunk = 7, power = 6,
+            rebounds = 5, blocks = 5, steals = 7, postDefense = 7,
+            perimeterDefense = 7, stamina = 9, hiddenTrait = HiddenTrait.None
+        };
+
+        /// <summary>Boo — pure sniper and pickpocket, but slow and utterly
+        /// powerless everywhere else.</summary>
+        public static CharacterStats Boo() => new CharacterStats
+        {
+            characterName = "Boo",
+            speed = 3, ballHandling = 1, threePoint = 10, midRange = 6,
+            insideScoring = 2, postOffense = 1, dunk = 1, power = 1,
+            rebounds = 4, blocks = 2, steals = 9, postDefense = 4,
+            perimeterDefense = 4, stamina = 6, hiddenTrait = HiddenTrait.None
+        };
+
+        /// <summary>Baby Mario — slick little handle-and-post scorer who can't
+        /// shoot from outside or hold up on defense.</summary>
+        public static CharacterStats BabyMario() => new CharacterStats
+        {
+            characterName = "Baby Mario",
+            speed = 7, ballHandling = 8, threePoint = 3, midRange = 6,
+            insideScoring = 8, postOffense = 8, dunk = 2, power = 5,
+            rebounds = 3, blocks = 3, steals = 6, postDefense = 2,
+            perimeterDefense = 6, stamina = 8, hiddenTrait = HiddenTrait.None
+        };
+
+        /// <summary>Wario — strong, skilled mid-range/post bully with a great
+        /// handle; just slow and a step behind on D.</summary>
+        public static CharacterStats Wario() => new CharacterStats
+        {
+            characterName = "Wario",
+            speed = 4, ballHandling = 8, threePoint = 7, midRange = 10,
+            insideScoring = 6, postOffense = 7, dunk = 5, power = 8,
+            rebounds = 7, blocks = 5, steals = 8, postDefense = 6,
+            perimeterDefense = 5, stamina = 6, hiddenTrait = HiddenTrait.None
+        };
+
         /// <summary>Every character currently defined in code.</summary>
         public static IReadOnlyList<CharacterStats> All() => new List<CharacterStats>
         {
-            Bowser(), DonkeyKong(), Mario(), Luigi(), Peach(), Toad(), Waluigi(), DiddyKong()
+            Bowser(), DonkeyKong(), Mario(), Luigi(), Peach(), Toad(), Waluigi(), DiddyKong(),
+            Yoshi(), Birdo(), Boo(), BabyMario(), Wario()
         };
     }
 }

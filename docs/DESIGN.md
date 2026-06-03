@@ -131,14 +131,17 @@ burst · Dribble move · Timeout.
 | Toad        | 8 | 10| 5 | 5 | 8  | 2 | 1 | 3  | 3 | 1 | 7 | 1 | 6 | 9 |
 | Waluigi     | 6 | 3 | 3 | 3 | 7  | 9 | 6 | 6  | 7 | 8 | 8 | 8 | 1 | 6 |
 | Diddy Kong  | 10| 7 | 2 | 3 | 4  | 1 | 6 | 6  | 6 | 5 | 8 | 3 | 9 | 8 |
+| Yoshi       | 10| 2 | 2 | 1 | 2  | 2 | 8 | 7  | 7 | 7 | 8 | 7 | 9 | 10|
+| Birdo       | 9 | 5 | 8 | 8 | 6  | 6 | 7 | 6  | 5 | 5 | 7 | 7 | 7 | 9 |
+| Boo         | 3 | 1 | 10| 6 | 2  | 1 | 1 | 1  | 4 | 2 | 9 | 4 | 4 | 6 |
+| Baby Mario  | 7 | 8 | 3 | 6 | 8  | 8 | 2 | 5  | 3 | 3 | 6 | 2 | 6 | 8 |
+| Wario       | 4 | 8 | 7 | 10| 6  | 7 | 5 | 8  | 7 | 5 | 8 | 6 | 5 | 6 |
 
 All hidden traits are currently `None`. The stat system supports diverse
 archetypes — Bowser the immobile bruiser, Toad the tiny handle/motor guard,
-Diddy the perimeter speedster, Peach the no-strength sharpshooter, etc.
+Diddy/Yoshi the perimeter speedsters, Peach/Boo the no-strength snipers, etc.
 
-**Demo lineups** (`GameBootstrap`, all interchangeable later):
-home starts Luigi / **Mario (you)** / Peach with Toad + Diddy on the bench;
-away starts Donkey Kong / Bowser / Waluigi with Diddy + Toad benched.
+Lineups are chosen on the pre-match **team select** screen (see below).
 
 ## Implementation status
 
@@ -159,13 +162,14 @@ away starts Donkey Kong / Bowser / Waluigi with Diddy + Toad benched.
   - Full court, two hoops with rims; teams attack the far basket.
   - Five-player rosters per team (3 on court, 2 bench); **substitutions**
     (`Substitute`) move players on/off, bench players recover 30/min.
-  - **Game clock**: 4 × 4-minute quarters, alternating tip each quarter; clock
-    **stops on a made basket until the inbound**; final buzzer = `GameOver`.
+  - **Game clock**: 4 × 4-minute quarters; clock **stops on a made basket
+    until the inbound**; final buzzer = `GameOver`.
   - **20-second shot clock**: resets on possession change and on a rim touch
     (`Rim` trigger); expiry = turnover.
   - **Possession & inbounding**: contested tip-off to start (each quarter),
     opponent inbounds after a make, inbound after turnovers.
-  - Scoring **2 / 3 / 1** (free throw via `RegisterFreeThrow`).
+  - Scoring **2 / 3** by distance (the **1**-point free throw arrives with the
+    fouling system).
   - **Timeouts**: 3 per team; calling one grants **+30 energy** to the on-court
     five (`CallTimeout`).
   - **No out of bounds**: perimeter walls — ball bounces, players are stopped.
@@ -186,6 +190,10 @@ away starts Donkey Kong / Bowser / Waluigi with Diddy + Toad benched.
     point-blank defender can **block** (Blocks vs the finisher's stat).
   - **Steal** strips a nearby handler — Steals vs Ball Handling, on a cooldown.
     Bound to **F / B**; the AI uses it on defense.
+- **Team select** (`TeamSelectMenu`): pre-match screen to draft five characters
+  per side from the roster (first home pick is the player you control), with
+  randomize and sensible defaults; `GameBootstrap.StartMatch` then spawns the
+  game. Restart returns here.
 - **Pause menu** (`PauseMenu`, Esc / Start): freezes the game and inputs;
   Resume / **Stats** (full stat sheet for all ten players) / Restart / Quit.
 - **Player switching** (`PlayerSwitchManager`): exactly one human-controlled

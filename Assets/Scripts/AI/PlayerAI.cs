@@ -65,6 +65,7 @@ namespace MarioBasketball.AI
             var gm = GameManager.Instance;
             if (gm == null || _pc == null) return;
 
+            if (MatchPause.IsPaused) return;
             if (_pc.isHuman) return; // the human is driving this player
 
             if (!_pc.enabled || (_pc.Character != null && _pc.Character.IsBenched) ||

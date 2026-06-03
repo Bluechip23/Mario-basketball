@@ -56,6 +56,7 @@ namespace MarioBasketball.Control
 
         void Update()
         {
+            if (MatchPause.IsPaused) return;
             var gm = GameManager.Instance;
             if (gm == null) return;
 
@@ -82,6 +83,7 @@ namespace MarioBasketball.Control
 
         void OnSwitchPressed(InputAction.CallbackContext ctx)
         {
+            if (MatchPause.IsPaused) return;
             var gm = GameManager.Instance;
             if (gm == null) return;
 

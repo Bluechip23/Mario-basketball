@@ -85,6 +85,7 @@ namespace MarioBasketball.Bootstrap
 
             gameObject.AddComponent<DebugHUD>();
             gameObject.AddComponent<DebugMatchControls>();
+            gameObject.AddComponent<PauseMenu>();
         }
 
         // ---- Teams ---------------------------------------------------------

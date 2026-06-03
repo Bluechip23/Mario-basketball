@@ -57,7 +57,7 @@ namespace MarioBasketball.UI
             GUI.Label(new Rect(20, Screen.height - 142, 760, 142),
                 "Move: WASD / Left Stick    Sprint: Shift / LT    Jump: Ctrl / Y\n" +
                 "Shoot: Space / A    Pass: E / X    Steal: F / B    Switch: Q / LB\n" +
-                "Timeout (home): T    Substitute (home): Y\n" +
+                "Timeout (home): T    Substitute (home): Y    Pause/Stats: Esc\n" +
                 "You control the player under the gold marker. On offense control\n" +
                 "follows the ball; on defense press Switch for the nearest man and\n" +
                 "Steal when you're on the ball handler.",

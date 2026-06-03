@@ -231,7 +231,7 @@ namespace MarioBasketball.Gameplay
         /// scoring stat, then nearby defenders contest (and may block).</summary>
         public void TriggerShoot()
         {
-            if (!HasBall) return;
+            if (MatchPause.IsPaused || !HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
@@ -280,19 +280,20 @@ namespace MarioBasketball.Gameplay
 
         public void TriggerPass()
         {
-            if (!HasBall) return;
+            if (MatchPause.IsPaused || !HasBall) return;
             Ball.Pass(transform.forward, passPower);
         }
 
         /// <summary>A directed pass to a teammate (used by the AI).</summary>
         public void PassToward(Vector3 worldPoint)
         {
-            if (!HasBall) return;
+            if (MatchPause.IsPaused || !HasBall) return;
             Ball.PassTo(worldPoint);
         }
 
         public void TriggerJump()
         {
+            if (MatchPause.IsPaused) return;
             if (_cc.isGrounded)
                 _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);
         }
@@ -301,7 +302,7 @@ namespace MarioBasketball.Gameplay
         /// handler — Steals vs their Ball Handling, on a cooldown.</summary>
         public void TriggerSteal()
         {
-            if (_stealCooldown > 0f) return;
+            if (MatchPause.IsPaused || _stealCooldown > 0f) return;
             var gm = GameManager.Instance;
             if (gm == null || gm.ball == null) return;
 

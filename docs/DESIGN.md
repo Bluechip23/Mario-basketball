@@ -186,6 +186,8 @@ away starts Donkey Kong / Bowser / Waluigi with Diddy + Toad benched.
     point-blank defender can **block** (Blocks vs the finisher's stat).
   - **Steal** strips a nearby handler — Steals vs Ball Handling, on a cooldown.
     Bound to **F / B**; the AI uses it on defense.
+- **Pause menu** (`PauseMenu`, Esc / Start): freezes the game and inputs;
+  Resume / **Stats** (full stat sheet for all ten players) / Restart / Quit.
 - **Player switching** (`PlayerSwitchManager`): exactly one human-controlled
   player at a time; control auto-follows the ball on offense, and the Switch
   button (Q / left shoulder) grabs the nearest man on defense. Camera and HUD

@@ -13,6 +13,7 @@ namespace MarioBasketball.UI
     {
         void Update()
         {
+            if (MatchPause.IsPaused) return;
             var kb = Keyboard.current;
             if (kb == null || GameManager.Instance == null) return;
 

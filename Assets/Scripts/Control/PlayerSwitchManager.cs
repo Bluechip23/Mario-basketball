@@ -34,6 +34,7 @@ namespace MarioBasketball.Control
         {
             _switch = new InputAction("Switch", InputActionType.Button, "<Keyboard>/q");
             _switch.AddBinding("<Gamepad>/leftShoulder");
+            _switch.AddBinding("<Gamepad>/buttonSouth"); // A also switches (only acts on defense)
             _switch.performed += OnSwitchPressed;
             _switch.Enable();
         }

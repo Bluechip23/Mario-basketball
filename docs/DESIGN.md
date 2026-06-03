@@ -111,8 +111,11 @@ shot, e.g. adjust a layup/dunk) · Push/Foul · Post up · Post move (contextual
 buttons while posted) · Defensive stance · Bring up teammate icons · Speed
 burst · Dribble move · Timeout.
 
-> The current prototype implements a reduced subset (move, sprint/burst, jump,
-> shoot, pass) on keyboard + gamepad. See `docs/GETTING_STARTED.md`.
+> **Controller-first.** The prototype uses a contextual gamepad layout (face
+> buttons are shot/pass on offense and post moves while posting; D-pad handles
+> timeout/sub), with keyboard fallbacks. Not yet wired: double-tap mid-air shot
+> adjust, push/foul, defensive stance, teammate-icon passing, dribble moves.
+> See `docs/GETTING_STARTED.md` for the full map.
 
 ## Roster
 

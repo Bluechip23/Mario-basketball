@@ -72,25 +72,26 @@ namespace MarioBasketball.InputControl
             _jump.AddBinding("<Gamepad>/buttonNorth");
 
             _steal = new InputAction("Steal", InputActionType.Button, "<Keyboard>/f");
-            _steal.AddBinding("<Gamepad>/buttonEast");
+            _steal.AddBinding("<Gamepad>/buttonWest"); // X — same button passes when you have the ball
 
             _dive = new InputAction("Dive", InputActionType.Button, "<Keyboard>/x");
-            _dive.AddBinding("<Gamepad>/rightStickPress");
+            _dive.AddBinding("<Gamepad>/buttonEast"); // B (when not posting)
 
             _backDown = new InputAction("BackDown", InputActionType.Button, "<Keyboard>/b");
-            _backDown.AddBinding("<Gamepad>/rightTrigger");
+            _backDown.AddBinding("<Gamepad>/rightTrigger"); // RT
 
+            // Post moves map to the face buttons while posting (contextual).
             _hook = new InputAction("Hook", InputActionType.Button, "<Keyboard>/h");
-            _hook.AddBinding("<Gamepad>/dpad/up");
+            _hook.AddBinding("<Gamepad>/buttonNorth"); // Y
 
             _dropStep = new InputAction("DropStep", InputActionType.Button, "<Keyboard>/g");
-            _dropStep.AddBinding("<Gamepad>/dpad/down");
+            _dropStep.AddBinding("<Gamepad>/buttonSouth"); // A
 
             _spin = new InputAction("Spin", InputActionType.Button, "<Keyboard>/v");
-            _spin.AddBinding("<Gamepad>/dpad/left");
+            _spin.AddBinding("<Gamepad>/buttonEast"); // B
 
             _fake = new InputAction("Fake", InputActionType.Button, "<Keyboard>/c");
-            _fake.AddBinding("<Gamepad>/dpad/right");
+            _fake.AddBinding("<Gamepad>/leftShoulder"); // LB
 
             _shoot.performed += _ => ShootPressed?.Invoke();
             _pass.performed += _ => PassPressed?.Invoke();

@@ -65,13 +65,13 @@ namespace MarioBasketball.UI
                 }
             }
 
-            GUI.Label(new Rect(20, Screen.height - 176, 820, 176),
-                "Move: WASD / Stick   Sprint: Shift / LT   Jump: Ctrl / N-btn   Dive: X / R-stick\n" +
-                "Shoot: Space / A   Pass: E / W-btn   Steal: F / E-btn   Switch: Q / LB\n" +
-                "Post up (hold): R / RB    Back down (also bump on D): B / RT\n" +
-                "Post moves — Hook: H   Drop step: G   Spin: V   Fake: C   (D-pad on gamepad)\n" +
-                "Timeout: T   Substitute: Y   Pause/Stats: Esc\n" +
-                "You control the gold-ringed player. On offense control follows the ball.",
+            GUI.Label(new Rect(20, Screen.height - 176, 860, 176),
+                "CONTROLLER  —  Move: L-stick   Turbo: LT   Jump/Contest: Y   Pause: Start\n" +
+                "With ball:  Shoot A   Pass X   Post up (hold) RB   Dive (loose ball) B\n" +
+                "Posting (hold RB):  Hook Y   Drop step A   Spin B   Fake LB   Back down RT   Pass X\n" +
+                "Defense:  Switch A/LB   Steal X   Bump poster RT   Jump/Block Y\n" +
+                "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +
+                "You control the gold-ringed player; on offense control follows the ball.",
                 _small);
         }
     }

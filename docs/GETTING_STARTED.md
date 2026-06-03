@@ -43,31 +43,41 @@ control), then **Start Game**. The match spawns and tips off.
 
 ## Controls
 
-| Action | Keyboard      | Gamepad        |
-|--------|---------------|----------------|
-| Move   | WASD          | Left stick     |
-| Sprint | Left Shift    | Left trigger   |
-| Shoot  | Space         | A / South      |
-| Pass   | E             | X / West       |
-| Steal  | F             | B / East       |
-| Jump   | Left Ctrl     | Y / North      |
-| Dive (loose ball) | X  | Right stick (press) |
-| Post up (hold) | R    | Right shoulder |
-| Back down / bump | B  | Right trigger  |
-| Post: Hook     | H    | D-pad up       |
-| Post: Drop step | G   | D-pad down     |
-| Post: Spin     | V    | D-pad left     |
-| Post: Fake     | C    | D-pad right    |
-| Switch player | Q      | Left shoulder  |
-| Timeout (home) | T    | —              |
-| Substitute (home) | Y | —              |
+**This is a controller-first game** (Xbox layout below; PlayStation equivalents
+in parentheses). The buttons are **contextual** — the face buttons are your
+shot/pass on offense and your post moves while you hold Post Up. Keyboard
+bindings exist as a fallback.
 
-**Post game:** with the ball, hold **Post up** to turn your back to the basket,
-then tap **Back down** to bulldoze your defender toward the rim (it's a
-Power-vs-Power tap battle — if they win they shove you off or knock you down).
-Once you've got position, hit a post move (Hook / Drop step / Spin / Fake). You
-can still **Pass** out of the post. On defense against a poster, mash **Back
-down** to bump them off.
+| Action | Gamepad | Keyboard |
+|--------|---------|----------|
+| Move | Left stick | WASD |
+| Turbo / speed burst | LT (L2) | Left Shift |
+| **Shoot** | A (✕) | Space |
+| **Pass** (to most open teammate) | X (□) | E |
+| **Jump / contest / rebound** | Y (△) | Left Ctrl |
+| **Steal** | X (□) — when you have no ball | F |
+| **Switch player** (defense) | A (✕) or LB (L1) | Q |
+| **Dive** for a loose ball | B (○) | X |
+| **Post up** (hold) | RB (R1) | R |
+| **Back down** / bump a poster | RT (R2) | B |
+| Post move — **Hook** | Y (△) | H |
+| Post move — **Drop step** | A (✕) | G |
+| Post move — **Spin** | B (○) | V |
+| Post move — **Fake** | LB (L1) | C |
+| Timeout (home) | D-pad Up | T |
+| Substitute (home) | D-pad Down | Y |
+| Pause / Stats | Start | Esc |
+
+**Post game:** with the ball, hold **RB** to turn your back to the basket, then
+tap **RT** (Back down) to bulldoze your defender toward the rim — a
+Power-vs-Power tap battle; if they win they shove you off or knock you down.
+With position, hit a post move: **Y** Hook, **A** Drop step, **B** Spin, **LB**
+Fake. You can still **pass out** with **X**. On defense against a poster, mash
+**RT** to bump them off.
+
+> Because the buttons are contextual, the same face button does different things
+> by situation (e.g. **A** shoots with the ball, switches on defense, and is the
+> Drop step while posting). The on-screen HUD lists the current scheme.
 
 It's a full-court **3v3** game. You control the player marked with the **gold
 ring**: on offense control follows the ball automatically, and on defense you
@@ -78,7 +88,7 @@ shots from beyond the arc count for 3.
 The other five players are AI-controlled: your two teammates space and defend,
 the three opponents drive, shoot, pass and guard. The tip-off is contested by
 Power + Rebounds. The HUD shows quarter, game clock, shot clock, possession,
-fouls, timeouts and your energy.
+timeouts and your energy.
 
 ## Where things live
 

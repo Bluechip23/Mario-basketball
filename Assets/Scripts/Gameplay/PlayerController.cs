@@ -280,7 +280,7 @@ namespace MarioBasketball.Gameplay
 
         public void TriggerShoot()
         {
-            if (MatchPause.IsPaused || IsStunned || !HasBall) return;
+            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
@@ -328,14 +328,11 @@ namespace MarioBasketball.Gameplay
         public void TriggerPass()
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
-            if (IsPosting)
-            {
-                // Kick out of the post to the most open teammate.
-                var mate = FindOpenTeammate();
-                _post.End();
-                if (mate != null) { Ball.PassTo(mate.transform.position + Vector3.up * 0.6f); return; }
-            }
-            Ball.Pass(transform.forward, passPower);
+            if (IsPosting) _post.End(); // kick out of the post
+            // Pass to the most open teammate (a blind outlet if nobody's open).
+            var mate = FindOpenTeammate();
+            if (mate != null) Ball.PassTo(mate.transform.position + Vector3.up * 0.6f);
+            else Ball.Pass(transform.forward, passPower);
         }
 
         /// <summary>A directed pass to a teammate (used by the AI).</summary>
@@ -347,7 +344,7 @@ namespace MarioBasketball.Gameplay
 
         public void TriggerJump()
         {
-            if (MatchPause.IsPaused || IsStunned) return;
+            if (MatchPause.IsPaused || IsStunned || IsPosting) return; // Y is Hook while posting
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);
         }
 

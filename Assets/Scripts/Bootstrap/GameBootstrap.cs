@@ -54,8 +54,20 @@ namespace MarioBasketball.Bootstrap
             gm.hoops.Add(hoopNeg);
             gm.hoops.Add(hoopPos);
 
-            BuildTeam(gm.Home, TeamSide.Home, HomeColor, -1f, true, gm);
-            BuildTeam(gm.Away, TeamSide.Away, AwayColor, 1f, false, gm);
+            // Distinct lineups so the archetypes are on the floor to balance
+            // against. Slot 1 (index, middle) is the human-controlled starter.
+            var homeRoster = new[]
+            {
+                CharacterLibrary.Luigi(), CharacterLibrary.Mario(), CharacterLibrary.Peach(),
+                CharacterLibrary.Toad(), CharacterLibrary.DiddyKong()
+            };
+            var awayRoster = new[]
+            {
+                CharacterLibrary.DonkeyKong(), CharacterLibrary.Bowser(), CharacterLibrary.Waluigi(),
+                CharacterLibrary.DiddyKong(), CharacterLibrary.Toad()
+            };
+            BuildTeam(gm.Home, TeamSide.Home, HomeColor, -1f, true, gm, homeRoster);
+            BuildTeam(gm.Away, TeamSide.Away, AwayColor, 1f, false, gm, awayRoster);
 
             gm.ball = BuildBall(new Vector3(0f, 1.1f, 0f));
 
@@ -77,15 +89,15 @@ namespace MarioBasketball.Bootstrap
 
         // ---- Teams ---------------------------------------------------------
 
-        void BuildTeam(TeamState team, TeamSide side, Color color, float halfSign, bool hasHuman, GameManager gm)
+        void BuildTeam(TeamState team, TeamSide side, Color color, float halfSign, bool hasHuman, GameManager gm, CharacterStats[] roster)
         {
             // Three on-court spots spread across this team's half, two on bench.
             float[] xs = { -3f, 0f, 3f };
             for (int i = 0; i < 3; i++)
             {
-                bool isHuman = hasHuman && i == 1; // the middle slot is the human PG
+                bool isHuman = hasHuman && i == 1; // the middle slot is the human starter
                 var pos = new Vector3(xs[i], 1.1f, 4f * halfSign);
-                var pc = BuildPlayer($"{side}{i + 1}", pos, side, isHuman ? HumanColor : color, isHuman, benched: false);
+                var pc = BuildPlayer(roster[i], pos, side, isHuman ? HumanColor : color, isHuman, benched: false);
                 team.onCourt.Add(pc);
                 if (isHuman) gm.humanPlayer = pc;
             }
@@ -94,15 +106,15 @@ namespace MarioBasketball.Bootstrap
             for (int i = 0; i < 2; i++)
             {
                 var pos = new Vector3(benchX, 1.1f, -2f + i * 2f);
-                var pc = BuildPlayer($"{side}Bench{i + 1}", pos, side, color, isHuman: false, benched: true);
+                var pc = BuildPlayer(roster[3 + i], pos, side, color, isHuman: false, benched: true);
                 team.bench.Add(pc);
             }
         }
 
-        PlayerController BuildPlayer(string label, Vector3 pos, TeamSide side, Color color, bool isHuman, bool benched)
+        PlayerController BuildPlayer(CharacterStats stats, Vector3 pos, TeamSide side, Color color, bool isHuman, bool benched)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.name = label;
+            go.name = $"{side}_{stats.characterName}";
             go.SetActive(false); // configure before Awake/OnEnable run
             go.transform.position = pos;
             Tint(go, color);
@@ -114,8 +126,7 @@ namespace MarioBasketball.Bootstrap
             cc.radius = 0.4f;
 
             var character = go.AddComponent<PlayerCharacter>();
-            character.stats = CharacterLibrary.Bowser();
-            character.stats.characterName = isHuman ? "Bowser" : label;
+            character.stats = stats;
 
             var pc = go.AddComponent<PlayerController>();
             pc.team = side;

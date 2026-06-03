@@ -116,16 +116,29 @@ burst · Dribble move · Timeout.
 
 ## Roster
 
-> **Characters are designed collaboratively. Do not invent characters.**
-> Only the demo character below exists.
+> **Characters are designed collaboratively. Do not invent or tweak characters
+> without sign-off.** Defined in code in `CharacterLibrary`.
+> Stat columns: Spd · BH · 3PT · Mid · Ins · PostO · Dunk · Pow · Reb · Blk ·
+> Stl · PostD · PerD · Sta.
 
-### Bowser (demo)
-Speed 2 · Ball Handling 2 · 3-Point 1 · Mid Range 2 · Inside Scoring 10 ·
-Post Offense 9 · Dunk 3 · Power 10 · Rebounds 5 · Blocks 5 · Steals 8 ·
-Post Defense 7 · Perimeter Defense 1 · Stamina 4 · Hidden: none.
+| Character | Spd | BH | 3PT | Mid | Ins | PostO | Dunk | Pow | Reb | Blk | Stl | PostD | PerD | Sta |
+|-----------|----|----|-----|-----|-----|-------|------|-----|-----|-----|-----|-------|------|-----|
+| Bowser      | 2 | 2 | 1 | 2 | 10 | 9 | 3 | 10 | 5 | 5 | 8 | 7 | 1 | 4 |
+| Donkey Kong | 7 | 2 | 1 | 1 | 5  | 5 | 10| 9  | 8 | 8 | 8 | 8 | 7 | 7 |
+| Mario       | 7 | 7 | 7 | 8 | 7  | 7 | 7 | 6  | 6 | 6 | 6 | 4 | 6 | 7 |
+| Luigi       | 7 | 5 | 6 | 6 | 8  | 6 | 8 | 6  | 7 | 7 | 7 | 7 | 8 | 8 |
+| Peach       | 6 | 6 | 8 | 6 | 5  | 5 | 5 | 3  | 3 | 3 | 6 | 3 | 6 | 8 |
+| Toad        | 8 | 10| 5 | 5 | 8  | 2 | 1 | 3  | 3 | 1 | 7 | 1 | 6 | 9 |
+| Waluigi     | 6 | 3 | 3 | 3 | 7  | 9 | 6 | 6  | 7 | 8 | 8 | 8 | 1 | 6 |
+| Diddy Kong  | 10| 7 | 2 | 3 | 4  | 1 | 6 | 6  | 6 | 5 | 8 | 3 | 9 | 8 |
 
-A dominant interior force who gasses out and can't play on the perimeter. The
-stat system should support diverse archetypes across the Mario roster.
+All hidden traits are currently `None`. The stat system supports diverse
+archetypes — Bowser the immobile bruiser, Toad the tiny handle/motor guard,
+Diddy the perimeter speedster, Peach the no-strength sharpshooter, etc.
+
+**Demo lineups** (`GameBootstrap`, all interchangeable later):
+home starts Luigi / **Mario (you)** / Peach with Toad + Diddy on the bench;
+away starts Donkey Kong / Bowser / Waluigi with Diddy + Toad benched.
 
 ## Implementation status
 

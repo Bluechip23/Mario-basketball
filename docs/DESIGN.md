@@ -139,6 +139,8 @@ burst · Dribble move · Timeout.
 | Boo         | 3 | 1 | 10| 6 | 2  | 1 | 1 | 1  | 4 | 2 | 9 | 4 | 4 | 6 |
 | Baby Mario  | 7 | 8 | 3 | 6 | 8  | 8 | 2 | 5  | 3 | 3 | 6 | 2 | 6 | 8 |
 | Wario       | 4 | 8 | 7 | 10| 6  | 7 | 5 | 8  | 7 | 5 | 8 | 6 | 5 | 6 |
+| Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 6 | 3 | 6 |
+| Daisy       | 7 | 7 | 5 | 8 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
 
 All hidden traits are currently `None`. The stat system supports diverse
 archetypes — Bowser the immobile bruiser, Toad the tiny handle/motor guard,

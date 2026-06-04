@@ -153,11 +153,33 @@ namespace MarioBasketball.Characters
             perimeterDefense = 5, stamina = 6, hiddenTrait = HiddenTrait.None
         };
 
+        /// <summary>Piranha Plant — quirky stretch big: knock-down three and a
+        /// monster on the glass, but no handle, drive, or finishing.</summary>
+        public static CharacterStats PiranhaPlant() => new CharacterStats
+        {
+            characterName = "Piranha Plant",
+            speed = 5, ballHandling = 3, threePoint = 8, midRange = 2,
+            insideScoring = 3, postOffense = 2, dunk = 1, power = 6,
+            rebounds = 8, blocks = 5, steals = 4, postDefense = 6,
+            perimeterDefense = 3, stamina = 6, hiddenTrait = HiddenTrait.None
+        };
+
+        /// <summary>Daisy — quick two-way guard: smooth mid-range and a real
+        /// perimeter pest, but slight and a non-factor inside.</summary>
+        public static CharacterStats Daisy() => new CharacterStats
+        {
+            characterName = "Daisy",
+            speed = 7, ballHandling = 7, threePoint = 5, midRange = 8,
+            insideScoring = 6, postOffense = 3, dunk = 3, power = 3,
+            rebounds = 3, blocks = 3, steals = 6, postDefense = 3,
+            perimeterDefense = 8, stamina = 8, hiddenTrait = HiddenTrait.None
+        };
+
         /// <summary>Every character currently defined in code.</summary>
         public static IReadOnlyList<CharacterStats> All() => new List<CharacterStats>
         {
             Bowser(), DonkeyKong(), Mario(), Luigi(), Peach(), Toad(), Waluigi(), DiddyKong(),
-            Yoshi(), Birdo(), Boo(), BabyMario(), Wario()
+            Yoshi(), Birdo(), Boo(), BabyMario(), Wario(), PiranhaPlant(), Daisy()
         };
     }
 }

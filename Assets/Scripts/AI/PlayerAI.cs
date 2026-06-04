@@ -46,6 +46,9 @@ namespace MarioBasketball.AI
         [Range(0f, 1f)] public float helpSag = 0.25f;
         public float sprintDistance = 4f;
         public float stealRange = 1.3f;
+        public float pushRange = 1.5f;
+        [Tooltip("Per-frame chance the on-ball defender commits a foul.")]
+        [Range(0f, 1f)] public float pushChance = 0.0015f;
 
         [Header("Post offense")]
         public float postRange = 4.5f;
@@ -293,8 +296,9 @@ namespace MarioBasketball.AI
                 Vector3 target = holder.transform.position + toHoop.normalized * onBallGap;
                 MoveTo(target, sprint: HDist(transform.position, target) > sprintDistance);
 
-                if (HDist(transform.position, holder.transform.position) <= stealRange)
-                    _pc.TriggerSteal();
+                float onBall = HDist(transform.position, holder.transform.position);
+                if (onBall <= stealRange) _pc.TriggerSteal();
+                if (onBall <= pushRange && Random.value < pushChance) _pc.AttemptPush();
                 return;
             }
 

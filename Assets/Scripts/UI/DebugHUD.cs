@@ -33,8 +33,15 @@ namespace MarioBasketball.UI
                 GUI.Label(new Rect(20, 56, 700, 28),
                     $"Q{quarter}   {clock}   |   Shot {shot}   |   Ball: {gm.Possession}   |   {gm.State}", _mid);
 
-                GUI.Label(new Rect(20, 86, 700, 24),
+                string homePen = gm.Home.InPenalty ? "(PEN)" : "";
+                string awayPen = gm.Away.InPenalty ? "(PEN)" : "";
+                GUI.Label(new Rect(20, 86, 760, 24),
+                    $"Fouls  H:{gm.Home.Fouls}{homePen} A:{gm.Away.Fouls}{awayPen}     " +
                     $"Timeouts  H:{gm.Home.TimeoutsRemaining} A:{gm.Away.TimeoutsRemaining}", _small);
+
+                if (gm.IsFreeThrow && gm.FreeThrowShooter != null && gm.FreeThrowShooter.Character != null)
+                    GUI.Label(new Rect(20, 110, 760, 26),
+                        $"FREE THROW — {gm.FreeThrowShooter.Character.stats.characterName}  ({gm.FreeThrowsRemaining} left)", _mid);
 
                 if (gm.State == GameState.GameOver)
                 {
@@ -69,7 +76,7 @@ namespace MarioBasketball.UI
                 "CONTROLLER  —  Move: L-stick   Turbo: LT   Jump/Contest: Y   Pause: Start\n" +
                 "With ball:  Shoot A   Pass X   Post up (hold) RB   Dive (loose ball) B\n" +
                 "Posting (hold RB):  Hook Y   Drop step A   Spin B   Fake LB   Back down RT   Pass X\n" +
-                "Defense:  Switch A/LB   Steal X   Bump poster RT   Jump/Block Y\n" +
+                "Defense:  Switch A/LB   Steal X   Push/foul or bump RT   Jump/Block Y\n" +
                 "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +
                 "You control the gold-ringed player; on offense control follows the ball.",
                 _small);

@@ -71,6 +71,16 @@ namespace MarioBasketball.Gameplay
         public float diveBallSeekRange = 6f;
         public float shoveDuration = 0.35f;
 
+        [Header("Push / foul (Power)")]
+        public float pushRange = 1.7f;
+        public float pushCooldown = 0.8f;
+        public float pushWhiffCooldown = 0.3f;
+        public float pushForce = 7f;
+        [Tooltip("Power advantage at/above which the push knocks the target down.")]
+        public float pushKnockdownPowerGap = 4f;
+        public float pushKnockLooseBase = 0.2f;
+        public float pushKnockLooseScale = 0.06f;
+
         public Vector3 BallHoldPoint => transform.position + transform.forward * 0.55f + Vector3.up * 0.4f;
 
         public PlayerCharacter Character => _character;
@@ -92,6 +102,7 @@ namespace MarioBasketball.Gameplay
         Vector3 _diveDir;
         Vector3 _shoveVel;
         float _shoveTimer;
+        float _pushCooldown;
 
         void Awake()
         {
@@ -175,6 +186,7 @@ namespace MarioBasketball.Gameplay
             if (_stunTimer > 0f) _stunTimer -= dt;
             if (_diveTimer > 0f) _diveTimer -= dt;
             if (_shoveTimer > 0f) _shoveTimer -= dt;
+            if (_pushCooldown > 0f) _pushCooldown -= dt;
 
             if (isHuman && _input != null)
             {
@@ -389,8 +401,58 @@ namespace MarioBasketball.Gameplay
         public void TriggerBackDown()
         {
             if (MatchPause.IsPaused || IsStunned) return;
-            if (IsPosting) { _post.OffenseTap(); return; }
-            FindPosterGuardingMe()?.DefenderTap(); // bump a poster while defending
+            if (IsPosting) { _post.OffenseTap(); return; }       // push in
+            var poster = FindPosterGuardingMe();
+            if (poster != null) { poster.DefenderTap(); return; } // bump a poster
+            TryPush();                                            // push/foul in space
+        }
+
+        /// <summary>AI hook to commit a foul.</summary>
+        public void AttemptPush() => TryPush();
+
+        /// <summary>
+        /// Shove the nearest opponent (Power vs Power). It's a team foul: below
+        /// the penalty limit play continues and the shove just disrupts (and can
+        /// knock the ball loose / knock a weaker player down); in the penalty it
+        /// sends them to the line.
+        /// </summary>
+        void TryPush()
+        {
+            if (_pushCooldown > 0f || HasBall) return;
+            var gm = GameManager.Instance;
+            if (gm == null || gm.State != GameState.Playing) return;
+
+            var target = NearestOpponentTo(transform.position);
+            if (target == null) return;
+            if (HorizontalDistance(transform.position, target.transform.position) > pushRange)
+            {
+                _pushCooldown = pushWhiffCooldown;
+                return;
+            }
+
+            _pushCooldown = pushCooldown;
+
+            bool whistle = gm.RegisterFoul(team, target, target.HasBall);
+            if (whistle) return; // free throws — don't play the contact out
+
+            float myPower = EffectiveStat(StatType.Power);
+            float targetPower = target.EffectiveStat(StatType.Power);
+
+            Vector3 dir = target.transform.position - transform.position; dir.y = 0f;
+            dir = dir.sqrMagnitude > 0.01f ? dir.normalized : transform.forward;
+
+            float strength = Mathf.Clamp01((myPower - targetPower + 5f) / 10f);
+            target.ApplyShove(dir * pushForce * strength);
+
+            bool overpowered = myPower - targetPower >= pushKnockdownPowerGap;
+            if (overpowered) target.Stun(0.7f);
+
+            if (target.HasBall && gm.ball != null)
+            {
+                float gap = myPower - (targetPower + target.EffectiveStat(StatType.BallHandling)) * 0.5f;
+                float knock = overpowered ? 1f : Mathf.Clamp(pushKnockLooseBase + pushKnockLooseScale * gap, 0.05f, 0.9f);
+                if (Random.value < knock) gm.ball.Pass(dir, 3f); // pop it loose
+            }
         }
 
         void TriggerHook() => TriggerPostMove(PostMove.Hook);

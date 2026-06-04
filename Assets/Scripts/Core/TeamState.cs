@@ -5,24 +5,33 @@ namespace MarioBasketball.Core
 {
     /// <summary>
     /// One team's match state: its five-player roster split into who is on the
-    /// court (three at a time) and who is on the bench, plus remaining timeouts.
-    /// Score is kept by <see cref="GameManager"/>. (Team fouls / free-throw
-    /// penalty land with the fouling system — see the roadmap.)
+    /// court (three at a time) and who is on the bench, plus team fouls and
+    /// remaining timeouts. Score is kept by <see cref="GameManager"/>.
     /// </summary>
     public class TeamState
     {
         public const int StartingTimeouts = 3;
+        /// <summary>Once a team has committed this many fouls, every further
+        /// foul sends the fouled team to the free-throw line.</summary>
+        public const int PenaltyFoulLimit = 10;
 
         public readonly TeamSide side;
         public readonly List<PlayerController> onCourt = new List<PlayerController>();
         public readonly List<PlayerController> bench = new List<PlayerController>();
 
+        public int Fouls { get; private set; }
         public int TimeoutsRemaining { get; private set; } = StartingTimeouts;
 
         public TeamState(TeamSide side)
         {
             this.side = side;
         }
+
+        public void AddFoul() => Fouls++;
+
+        /// <summary>This team has fouled enough that its fouls now grant the
+        /// opponent free throws.</summary>
+        public bool InPenalty => Fouls >= PenaltyFoulLimit;
 
         public bool UseTimeout()
         {

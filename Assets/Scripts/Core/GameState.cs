@@ -16,6 +16,8 @@ namespace MarioBasketball.Core
         Inbounding,
         /// <summary>A team called timeout; brief stoppage, players catch a breath.</summary>
         Timeout,
+        /// <summary>A fouled player is shooting free throws.</summary>
+        FreeThrow,
         /// <summary>Between quarters.</summary>
         QuarterBreak,
         /// <summary>Final buzzer.</summary>

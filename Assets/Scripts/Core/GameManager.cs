@@ -37,6 +37,12 @@ namespace MarioBasketball.Core
         public float timeoutDuration = 3f;
         public float quarterBreakDuration = 3f;
 
+        [Header("Free throws (success scales with Mid Range)")]
+        public int freeThrowCount = 2;
+        public float freeThrowInterval = 1.1f;
+        [Range(0f, 1f)] public float freeThrowMinPct = 0.4f;  // at Mid Range 1
+        [Range(0f, 1f)] public float freeThrowMaxPct = 0.95f; // at Mid Range 10
+
         [Header("Scene references (auto-wired by GameBootstrap)")]
         public BallController ball;
         public PlayerController humanPlayer;
@@ -59,10 +65,15 @@ namespace MarioBasketball.Core
         public MatchClock Clock { get; private set; }
         public ShotClock Shot { get; private set; }
 
+        public bool IsFreeThrow => State == GameState.FreeThrow;
+        public PlayerController FreeThrowShooter { get; private set; }
+        public int FreeThrowsRemaining { get; private set; }
+
         public event Action ScoreChanged;
         public event Action<GameState> StateChanged;
 
         float _stateTimer;
+        float _ftTimer;
 
         void Awake()
         {
@@ -149,6 +160,51 @@ namespace MarioBasketball.Core
             _stateTimer = basketMadePause;
         }
 
+        /// <summary>
+        /// Record a foul by <paramref name="foulingTeam"/> on
+        /// <paramref name="fouled"/>. Below the penalty limit a foul has no
+        /// whistle (play continues — the push just disrupts). Once the fouling
+        /// team is in the penalty, the fouled player shoots free throws.
+        /// Returns true if it blew the whistle (free throws), so the caller
+        /// knows not to keep playing the contact out.
+        /// </summary>
+        public bool RegisterFoul(TeamSide foulingTeam, PlayerController fouled, bool shootingFoul)
+        {
+            if (State != GameState.Playing) return false;
+
+            var team = TeamFor(foulingTeam);
+            team.AddFoul();
+
+            if (team.InPenalty && fouled != null)
+            {
+                BeginFreeThrows(fouled);
+                return true;
+            }
+            return false;
+        }
+
+        void BeginFreeThrows(PlayerController shooter)
+        {
+            FreeThrowShooter = shooter;
+            FreeThrowsRemaining = freeThrowCount;
+            SetClocksRunning(false);
+            State = GameState.FreeThrow;
+            StateChanged?.Invoke(State);
+            _ftTimer = freeThrowInterval;
+        }
+
+        void ResolveOneFreeThrow()
+        {
+            if (FreeThrowShooter != null)
+            {
+                float mid = FreeThrowShooter.EffectiveStat(StatType.MidRange);
+                float pct = Mathf.Lerp(freeThrowMinPct, freeThrowMaxPct, Mathf.Clamp01((mid - 1f) / 9f));
+                if (UnityEngine.Random.value < pct)
+                    AddPoints(FreeThrowShooter.team, 1);
+            }
+            FreeThrowsRemaining--;
+        }
+
         public bool CallTimeout(TeamSide side)
         {
             if (State == GameState.GameOver) return false;
@@ -207,6 +263,25 @@ namespace MarioBasketball.Core
                 case GameState.Timeout:
                     if (CountdownDone(dt))
                         BeginInbound(Possession, MidCourtInbound());
+                    break;
+
+                case GameState.FreeThrow:
+                    _ftTimer -= dt;
+                    if (_ftTimer <= 0f)
+                    {
+                        ResolveOneFreeThrow();
+                        if (FreeThrowsRemaining > 0)
+                        {
+                            _ftTimer = freeThrowInterval;
+                        }
+                        else
+                        {
+                            // Fouling team takes the ball out after the attempts.
+                            TeamSide inbound = Opponent(FreeThrowShooter != null ? FreeThrowShooter.team : Possession);
+                            FreeThrowShooter = null;
+                            BeginInbound(inbound, MidCourtInbound());
+                        }
+                    }
                     break;
 
                 case GameState.QuarterBreak:

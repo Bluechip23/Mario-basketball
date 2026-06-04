@@ -59,7 +59,7 @@ bindings exist as a fallback.
 | **Switch player** (defense) | A (✕) or LB (L1) | Q |
 | **Dive** for a loose ball | B (○) | X |
 | **Post up** (hold) | RB (R1) | R |
-| **Back down** / bump a poster | RT (R2) | B |
+| **Back down** / bump / **push-foul** | RT (R2) | B |
 | Post move — **Hook** | Y (△) | H |
 | Post move — **Drop step** | A (✕) | G |
 | Post move — **Spin** | B (○) | V |
@@ -67,6 +67,11 @@ bindings exist as a fallback.
 | Timeout (home) | D-pad Up | T |
 | Substitute (home) | D-pad Down | Y |
 | Pause / Stats | Start | Esc |
+
+**Fouling:** on defense, **RT** in open space is a **push/foul** — Power vs
+Power, it knocks players around (and can pop the ball loose). It's free up to
+**10 team fouls**; after that, fouling sends the other team to the line (free
+throw make% scales with the shooter's Mid Range). Nobody fouls out.
 
 **Post game:** with the ball, hold **RB** to turn your back to the basket, then
 tap **RT** (Back down) to bulldoze your defender toward the rim — a

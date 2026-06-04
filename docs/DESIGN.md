@@ -114,7 +114,7 @@ burst · Dribble move · Timeout.
 > **Controller-first.** The prototype uses a contextual gamepad layout (face
 > buttons are shot/pass on offense and post moves while posting; D-pad handles
 > timeout/sub), with keyboard fallbacks. Not yet wired: double-tap mid-air shot
-> adjust, push/foul, defensive stance, teammate-icon passing, dribble moves.
+> adjust, defensive stance, teammate-icon passing, dribble moves.
 > See `docs/GETTING_STARTED.md` for the full map.
 
 ## Roster
@@ -195,6 +195,14 @@ Lineups are chosen on the pre-match **team select** screen (see below).
     point-blank defender can **block** (Blocks vs the finisher's stat).
   - **Steal** strips a nearby handler — Steals vs Ball Handling, on a cooldown
     (Steal button); the AI uses it on defense.
+- **Fouling** (push, the RT "muscle" button): shove the nearest opponent —
+  Power vs Power knockback, can knock a weaker player down and pop the ball
+  loose. Each push is a **team foul**. Below **10 team fouls** there's no
+  whistle (play continues, NBA-Jam style); at the limit the fouled team is **in
+  the penalty** and every further foul sends them to the line. **Free throws**
+  auto-resolve (2 attempts) with make% scaling off the shooter's **Mid Range**;
+  the fouling team inbounds afterward. The AI fouls occasionally on the ball.
+  (No fouling out; team fouls accumulate over the whole game — tunable.)
 - **Post-up** (`PostUpController`): hold Post Up to turn your back to the basket
   and start a **back-down battle** — offense taps Back Down (worth their
   **Power**), the defender resists (human taps the same button; AI resists from
@@ -232,13 +240,11 @@ Lineups are chosen on the pre-match **team select** screen (see below).
 - [ ] Post-up polish: animations, distinct move feel, jump-to-contest timing.
 - [ ] On-fire streak tracker (needs per-player shot attribution; needs owner
       decisions on boost magnitude and exit condition).
-- [ ] Fouling + push mechanic; team-foul count → free throws at 10.
 - [ ] Rebound catch-radius contests (Rebounds stat); steals/blocks polish.
 - [ ] Dribble moves, speed burst as distinct mechanic, defensive stance.
 - [ ] Passing: tap-loft vs hold-hard, teammate icon targeting.
 - [ ] Dunks/alley-oops, mid-air shot adjust (double-tap), tricks + gamebreakers.
 - [ ] Hidden-trait effects (e.g. catch-and-shoot penalty off the dribble).
-- [ ] Free-throw flow (the +1 scoring and penalty count exist; shooting does not).
 - [ ] Art/animation pass; proper UI (replace the IMGUI HUD); audio.
 
 ## Architecture intent

@@ -29,6 +29,9 @@ Early prototype. Implemented so far:
 - **Post game** — hold to back your defender down (a Power-based tap battle),
   then hook / drop step / spin / fake; lose the battle and you get shoved out
   or knocked down. Plus a dive button for loose balls.
+- **Fouling** — a push button (Power vs Power) that knocks players around with
+  no whistle until a team hits 10 fouls, then it's free throws (make% off Mid
+  Range). No fouling out.
 - **Stat framework** — 14 stats (1-10) + hidden traits, with **Bowser** as the
   demo character. Movement speed and shot accuracy are driven by effective
   stats, and a **stamina/energy** model scales everything as players tire.

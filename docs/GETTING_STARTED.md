@@ -57,7 +57,7 @@ bindings exist as a fallback.
 |--------|---------|----------|
 | Move | Left stick | WASD |
 | Turbo / speed burst | LT (L2) | Left Shift |
-| **Shoot** | A (✕) | Space |
+| **Shoot** (jump shots: hold, release at apex) | A (✕) | Space |
 | **Pass** (to most open teammate) | X (□) | E |
 | **Jump / contest / rebound** | Y (△) | Left Ctrl |
 | **Steal** | X (□) — when you have no ball | F |

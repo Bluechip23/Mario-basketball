@@ -110,6 +110,12 @@ the relevant scoring stat (1-10 → ~28-85%), then modifiers add/subtract:
 Blocks are a separate roll *before* the make check, so on-fire never helps you
 avoid a block. All knobs are public statics on `ShotMath`.
 
+**Shot timing (jump shots).** Mid-range and three-point shots use a hold-and-
+release meter (`PlayerController`): press to rise into the jump, release at the
+apex for a **perfect** shot (full make%); mistiming multiplies make% down toward
+`minTimingMultiplier`. Layups/dunks (inside) fire instantly. The AI always
+releases perfectly.
+
 ### Stat interactions
 Some stats reinforce or gate one another. Example from the spec:
 - **Power vs Post Defense.** A defender with high **Power** but low **Post

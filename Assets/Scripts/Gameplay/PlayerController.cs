@@ -45,6 +45,15 @@ namespace MarioBasketball.Gameplay
         public float shotFlightTime = 1.1f;
         public float passPower = 9f;
 
+        [Header("Shot timing (jump shots only; layups/dunks are instant)")]
+        [Tooltip("Release within this many seconds of the jump's apex for a perfect shot.")]
+        public float perfectReleaseWindow = 0.07f;
+        [Tooltip("Make% multiplier lost per second of mistiming beyond the window.")]
+        public float timingFalloffPerSec = 2f;
+        [Range(0f, 1f)] public float minTimingMultiplier = 0.35f;
+        [Tooltip("Auto-release this long after the apex if the button is still held.")]
+        public float shotAutoReleaseAfterApex = 0.45f;
+
         [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
         public float blockRange = 1.1f;
@@ -86,6 +95,12 @@ namespace MarioBasketball.Gameplay
         public bool HasBall => Ball != null && Ball.Holder == this;
         public bool IsPosting => _post != null && _post.IsPosting;
         public bool IsStunned => _stunTimer > 0f;
+        public bool IsShooting => _shooting;
+        /// <summary>How full the shot meter is (0-1) for the jump in progress.</summary>
+        public float ShotChargeFraction => _shooting ? Mathf.Clamp01(_shotCharge / ShotMeterDuration) : 0f;
+        /// <summary>Where the perfect-release marker sits on the meter (0-1).</summary>
+        public float ShotPerfectFraction => Mathf.Clamp01(_apexTime / ShotMeterDuration);
+        float ShotMeterDuration => Mathf.Max(0.01f, _apexTime + shotAutoReleaseAfterApex);
 
         CharacterController _cc;
         PlayerCharacter _character;
@@ -101,12 +116,17 @@ namespace MarioBasketball.Gameplay
         Vector3 _shoveVel;
         float _shoveTimer;
         float _pushCooldown;
+        bool _shooting;
+        float _shotCharge;
+        float _apexTime;
 
         void Awake()
         {
             _cc = GetComponent<CharacterController>();
             _character = GetComponent<PlayerCharacter>();
             _post = GetComponent<PostUpController>();
+            // Time from launch to the top of the jump = the ideal release point.
+            _apexTime = Mathf.Sqrt(-2f * gravity * jumpHeight) / -gravity;
         }
 
         void OnEnable()
@@ -131,6 +151,7 @@ namespace MarioBasketball.Gameplay
                 DisableInput();
                 _moveIntent = Vector2.zero;
                 _sprintIntent = false;
+                _shooting = false;
                 if (IsPosting) _post.End();
             }
         }
@@ -139,7 +160,8 @@ namespace MarioBasketball.Gameplay
         {
             if (_input != null) return;
             _input = new InputReader();
-            _input.ShootPressed += TriggerShoot;
+            _input.ShootPressed += OnShootPressed;
+            _input.ShootReleased += OnShootReleased;
             _input.PassPressed += TriggerPass;
             _input.JumpPressed += TriggerJump;
             _input.StealPressed += TriggerSteal;
@@ -155,7 +177,8 @@ namespace MarioBasketball.Gameplay
         void DisableInput()
         {
             if (_input == null) return;
-            _input.ShootPressed -= TriggerShoot;
+            _input.ShootPressed -= OnShootPressed;
+            _input.ShootReleased -= OnShootReleased;
             _input.PassPressed -= TriggerPass;
             _input.JumpPressed -= TriggerJump;
             _input.StealPressed -= TriggerSteal;
@@ -194,8 +217,17 @@ namespace MarioBasketball.Gameplay
                 HandlePostHold();
             }
 
+            AdvanceShotMeter(dt);
             Move();
             TryPickUpLooseBall();
+        }
+
+        void AdvanceShotMeter(float dt)
+        {
+            if (!_shooting) return;
+            if (IsStunned || !HasBall) { _shooting = false; return; } // lost the ball / knocked
+            _shotCharge += dt;
+            if (_shotCharge >= ShotMeterDuration) ReleaseJumpShot(); // held too long → late shot
         }
 
         void HandlePostHold()
@@ -288,9 +320,52 @@ namespace MarioBasketball.Gameplay
 
         // ---- Actions (input events or AI brain) ----------------------------
 
+        /// <summary>Immediate shot with perfect timing — used by the AI.</summary>
         public void TriggerShoot()
         {
-            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall) return;
+            if (MatchPause.IsPaused || IsStunned || IsPosting) return;
+            ExecuteShot(1f);
+        }
+
+        // Human shooting: press to rise into the jump, release near the apex.
+        // Layups/dunks (inside) fire instantly; only jump shots use the meter.
+        void OnShootPressed()
+        {
+            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _shooting) return;
+            Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
+            if (hoop == null) return;
+
+            float distance = HorizontalDistance(transform.position, hoop.AimPoint);
+            if (distance <= paintRadius) { ExecuteShot(1f); return; } // layup/dunk: no timing
+
+            _shooting = true;
+            _shotCharge = 0f;
+            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // jump
+        }
+
+        void OnShootReleased()
+        {
+            if (_shooting) ReleaseJumpShot();
+        }
+
+        void ReleaseJumpShot()
+        {
+            _shooting = false;
+            float error = Mathf.Abs(_shotCharge - _apexTime);
+            float timing = error <= perfectReleaseWindow
+                ? 1f
+                : Mathf.Clamp(1f - (error - perfectReleaseWindow) * timingFalloffPerSec, minTimingMultiplier, 1f);
+            ExecuteShot(timing);
+        }
+
+        /// <summary>
+        /// Resolve a shot: block roll first (unaffected by timing or on fire),
+        /// then a make roll using <see cref="ShotMath"/> scaled by the release
+        /// <paramref name="timingMultiplier"/> (1 = perfect).
+        /// </summary>
+        void ExecuteShot(float timingMultiplier)
+        {
+            if (!HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
@@ -305,7 +380,7 @@ namespace MarioBasketball.Gameplay
 
             PlayerController defender = NearestOpponentTo(transform.position);
 
-            // Block check first — unaffected by being on fire.
+            // Block check first — unaffected by timing or being on fire.
             if (defender != null)
             {
                 float dd = HorizontalDistance(defender.transform.position, transform.position);
@@ -326,7 +401,8 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _character != null && _character.OnFire;
-            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire);
+            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire) * timingMultiplier;
+            makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);
         }

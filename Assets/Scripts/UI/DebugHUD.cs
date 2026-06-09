@@ -43,6 +43,10 @@ namespace MarioBasketball.UI
                     GUI.Label(new Rect(20, 110, 760, 26),
                         $"FREE THROW — {gm.FreeThrowShooter.Character.stats.characterName}  ({gm.FreeThrowsRemaining} left)", _mid);
 
+                string onFire = OnFireNames(gm);
+                if (!string.IsNullOrEmpty(onFire))
+                    GUI.Label(new Rect(Screen.width - 340, 14, 320, 26), $"ON FIRE: {onFire}", _mid);
+
                 if (gm.State == GameState.GameOver)
                 {
                     string winner = gm.HomeScore == gm.AwayScore ? "TIE" :
@@ -80,6 +84,24 @@ namespace MarioBasketball.UI
                 "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +
                 "You control the gold-ringed player; on offense control follows the ball.",
                 _small);
+        }
+
+        static string OnFireNames(GameManager gm)
+        {
+            string result = "";
+            AppendOnFire(gm.Home, ref result);
+            AppendOnFire(gm.Away, ref result);
+            return result;
+        }
+
+        static void AppendOnFire(TeamState team, ref string result)
+        {
+            foreach (var p in team.onCourt)
+            {
+                if (p == null || p.Character == null || !p.Character.OnFire) continue;
+                if (result.Length > 0) result += ", ";
+                result += p.Character.stats.characterName;
+            }
         }
     }
 }

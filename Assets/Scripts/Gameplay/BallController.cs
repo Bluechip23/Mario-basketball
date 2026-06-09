@@ -36,10 +36,13 @@ namespace MarioBasketball.Gameplay
         public PlayerController Holder { get; private set; }
         public int PendingPoints { get; private set; }
         public TeamSide ShooterTeam { get; private set; }
+        /// <summary>Who launched the current shot (for streak attribution).</summary>
+        public PlayerController Shooter { get; private set; }
 
         Rigidbody _rb;
         Vector3 _centreCourt;
         float _shotTimer;
+        bool _shotPending;
         PlayerController _recentReleaser;
         float _releaseLockTimer;
 
@@ -65,7 +68,14 @@ namespace MarioBasketball.Gameplay
                 // After a while a missed shot becomes a loose ball again.
                 _shotTimer -= Time.deltaTime;
                 if (_shotTimer <= 0f)
+                {
                     State = BallState.Free;
+                    if (_shotPending)
+                    {
+                        _shotPending = false; // it didn't go in → a miss
+                        if (GameManager.Instance != null) GameManager.Instance.OnShotMissed(Shooter);
+                    }
+                }
             }
         }
 
@@ -90,12 +100,14 @@ namespace MarioBasketball.Gameplay
         /// Uses a fixed flight time so the arc reads well regardless of range;
         /// <paramref name="spread"/> adds a little horizontal miss.
         /// </summary>
-        public void Shoot(Vector3 target, TeamSide team, int points, float flightTime, float spread)
+        public void Shoot(Vector3 target, TeamSide team, int points, float flightTime, float spread, PlayerController shooter)
         {
             MarkReleased();
             ShooterTeam = team;
+            Shooter = shooter;
             PendingPoints = points;
             State = BallState.Shot;
+            _shotPending = true;
             _shotTimer = flightTime + 3f;
 
             GoLive();
@@ -149,6 +161,7 @@ namespace MarioBasketball.Gameplay
             Holder = null;
             State = BallState.Free;
             PendingPoints = 0;
+            _shotPending = false;
             GoLive();
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
@@ -159,6 +172,7 @@ namespace MarioBasketball.Gameplay
         public void OnScored()
         {
             PendingPoints = 0;
+            _shotPending = false; // resolved as a make
             State = BallState.Free;
         }
 
@@ -166,6 +180,7 @@ namespace MarioBasketball.Gameplay
         {
             _recentReleaser = Holder;
             _releaseLockTimer = releaseLockDuration;
+            _shotPending = false;
             Holder = null;
         }
 

@@ -45,6 +45,8 @@ namespace MarioBasketball.Gameplay
         public float maxShotSpread = 1.2f;
         public float minShotSpread = 0.05f;
         public float passPower = 9f;
+        [Tooltip("Extra chance an on-fire shot just goes in (after the block check).")]
+        [Range(0f, 1f)] public float onFireMakeBonus = 0.30f;
 
         [Header("Contest / block (defense on a shot)")]
         public float contestRange = 3f;
@@ -328,13 +330,18 @@ namespace MarioBasketball.Gameplay
                         {
                             Vector3 away = transform.position - aim; away.y = 0f;
                             Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
+                            GameManager.Instance.OnShotMissed(this); // blocked → streak broken
                             return;
                         }
                     }
                 }
             }
 
-            Ball.Shoot(aim, team, points, shotFlightTime, spread);
+            // On fire: a flat extra chance the ball just drops (block already resolved).
+            if (_character != null && _character.OnFire && Random.value < onFireMakeBonus)
+                spread = Mathf.Min(spread, minShotSpread);
+
+            Ball.Shoot(aim, team, points, shotFlightTime, spread, this);
         }
 
         public void TriggerPass()

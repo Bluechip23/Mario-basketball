@@ -147,10 +147,11 @@ namespace MarioBasketball.Core
                 Shot.Reset();
         }
 
-        public void RegisterBasket(TeamSide scoringTeam, int points)
+        public void RegisterBasket(TeamSide scoringTeam, int points, PlayerController shooter)
         {
             if (State != GameState.Playing) return;
 
+            UpdateStreaksOnMake(scoringTeam, shooter);
             AddPoints(scoringTeam, points);
 
             // Clock stops; the other team will inbound under the basket.
@@ -158,6 +159,58 @@ namespace MarioBasketball.Core
             StateChanged?.Invoke(State);
             SetClocksRunning(false);
             _stateTimer = basketMadePause;
+        }
+
+        /// <summary>A field-goal miss (rim time-out or a block) — break the
+        /// shooter's make streak. Being on fire is unaffected (only the opponent
+        /// scoring puts the fire out).</summary>
+        public void OnShotMissed(PlayerController shooter)
+        {
+            if (shooter == null || shooter.Character == null) return;
+            shooter.Character.ConsecutiveMakes = 0;
+            shooter.Character.OpponentScoredDuringRun = false;
+        }
+
+        /// <summary>
+        /// Heat-check bookkeeping on a made basket. On fire after 6 makes in a
+        /// row, or 3 in a row with no opponent basket in between. A teammate
+        /// scoring breaks your run; an opponent scoring only blocks the 3-path
+        /// and puts out the opponents' fire.
+        /// </summary>
+        void UpdateStreaksOnMake(TeamSide scoringTeam, PlayerController shooter)
+        {
+            foreach (var p in TeamFor(scoringTeam).onCourt)
+            {
+                var c = p != null ? p.Character : null;
+                if (c == null) continue;
+                if (p == shooter)
+                {
+                    if (c.ConsecutiveMakes == 0) c.OpponentScoredDuringRun = false; // fresh run
+                    c.ConsecutiveMakes++;
+                }
+                else
+                {
+                    c.ConsecutiveMakes = 0; // a teammate scored — your run is over
+                    c.OpponentScoredDuringRun = false;
+                }
+            }
+
+            if (shooter != null && shooter.Character != null)
+            {
+                var sc = shooter.Character;
+                if (sc.ConsecutiveMakes >= 6 || (sc.ConsecutiveMakes >= 3 && !sc.OpponentScoredDuringRun))
+                    sc.SetOnFire(true);
+            }
+
+            // The opponents were just scored on: their fire is out, and any run
+            // they have can no longer reach on-fire via the 3-in-a-row path.
+            foreach (var o in TeamFor(Opponent(scoringTeam)).onCourt)
+            {
+                var c = o != null ? o.Character : null;
+                if (c == null) continue;
+                c.OpponentScoredDuringRun = true;
+                c.SetOnFire(false);
+            }
         }
 
         /// <summary>

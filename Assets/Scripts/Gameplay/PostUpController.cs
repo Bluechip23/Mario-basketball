@@ -216,6 +216,7 @@ namespace MarioBasketball.Gameplay
                         // Spun into trouble — stripped.
                         gm.ball.PickUp(_defender);
                         gm.OnPossessionGained(_defender);
+                        gm.OnShotMissed(_pc); // lost it — streak broken
                         End();
                         return;
                     }
@@ -238,6 +239,7 @@ namespace MarioBasketball.Gameplay
                 {
                     Vector3 away = transform.position - hoop.AimPoint; away.y = 0f;
                     gm.ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, shovePower * 0.6f);
+                    gm.OnShotMissed(_pc); // blocked → streak broken
                     End();
                     return;
                 }
@@ -245,7 +247,9 @@ namespace MarioBasketball.Gameplay
 
             float t = Mathf.Clamp01((quality - 1f) / 9f);
             float spread = Mathf.Lerp(maxSpread, minSpread, t);
-            gm.ball.Shoot(hoop.AimPoint, _pc.team, 2, moveFlightTime, spread);
+            if (_pc.Character != null && _pc.Character.OnFire && Random.value < _pc.onFireMakeBonus)
+                spread = minSpread; // heat check
+            gm.ball.Shoot(hoop.AimPoint, _pc.team, 2, moveFlightTime, spread, _pc);
             End();
         }
 

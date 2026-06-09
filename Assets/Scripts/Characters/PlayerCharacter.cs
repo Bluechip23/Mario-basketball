@@ -52,6 +52,15 @@ namespace MarioBasketball.Characters
         public float EnergyFraction => maxEnergy > 0f ? energy / maxEnergy : 0f;
         public bool OnFire { get; private set; }
 
+        // Heat-check streak state, driven by GameManager:
+        /// <summary>This player's consecutive made shots (broken by a miss or a
+        /// teammate scoring).</summary>
+        public int ConsecutiveMakes;
+        /// <summary>Whether an opponent has scored during the current make run
+        /// (disqualifies the 3-in-a-row path to on-fire; the 6-in-a-row path
+        /// ignores it).</summary>
+        public bool OpponentScoredDuringRun;
+
         bool _movingThisFrame;
         bool _sprintingThisFrame;
 

@@ -48,13 +48,13 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   - making **6 shots in a row regardless** of what the opponent does.
 - The streak is **per-player**: **no other teammate can score** during it
   (a teammate's basket breaks it). A miss also breaks the streak.
-- While on fire: the player gets a **stat increase**, but **stamina drains**
-  and **does not refill to full** — being on fire *mitigates* the stamina
-  penalty rather than removing it.
-- **Open questions (need owner input):** exactly which stats get boosted and by
-  how much; what ends the on-fire state (opponent scores? a miss? a timer?).
-  Current code exposes tunable knobs and a `SetOnFire` hook but does **not**
-  yet decide these — see Implementation status.
+- While on fire: **+2 to all stats**, and **+30% chance the shot just goes in**
+  (applied *after* the block check — being on fire doesn't help you avoid a
+  block, it only helps the ball drop). Stamina drains and **does not refill to
+  full** — being on fire mitigates the stamina penalty rather than removing it.
+- **On fire ends when the opposing team scores** (chosen rule; a miss does not
+  put it out). Implemented in `GameManager` (streak bookkeeping) + the +30%
+  make in `PlayerController`/`PostUpController`.
 
 ### Hidden stats / traits
 - Characters can have **hidden traits** not shown on the stat sheet.
@@ -203,6 +203,12 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   auto-resolve (2 attempts) with make% scaling off the shooter's **Mid Range**;
   the fouling team inbounds afterward. The AI fouls occasionally on the ball.
   (No fouling out; team fouls accumulate over the whole game — tunable.)
+- **On fire** (heat-check streaks): a player ignites on **3 makes in a row with
+  no opponent basket between**, or **6 in a row regardless**; a teammate scoring
+  or your own miss breaks the run. While lit: **+2 to all stats** and **+30%**
+  the shot drops (after the block check). It goes out when the **opponent
+  scores**. Per-player shot attribution via the ball's `Shooter`; the HUD flags
+  who's hot.
 - **Post-up** (`PostUpController`): hold Post Up to turn your back to the basket
   and start a **back-down battle** — offense taps Back Down (worth their
   **Power**), the defender resists (human taps the same button; AI resists from
@@ -245,8 +251,6 @@ Lineups are chosen on the pre-match **team select** screen (see below).
       rotations, better cut timing, contest jump animations.
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
 - [ ] Post-up polish: animations, distinct move feel, jump-to-contest timing.
-- [ ] On-fire streak tracker (needs per-player shot attribution; needs owner
-      decisions on boost magnitude and exit condition).
 - [ ] Rebound catch-radius contests (Rebounds stat); steals/blocks polish.
 - [ ] Dribble moves, speed burst as distinct mechanic, defensive stance.
 - [ ] Passing: tap-loft vs hold-hard, teammate icon targeting.

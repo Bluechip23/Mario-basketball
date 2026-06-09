@@ -94,6 +94,22 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
 - Implemented in `PlayerCharacter`: `GetEffective(stat)` scales the raw stat by
   the current energy fraction (and adds the on-fire bonus).
 
+### Shooting model (`ShotMath`)
+Shots resolve as an explicit **make probability**, not pure aim: base make% from
+the relevant scoring stat (1-10 → ~28-85%), then modifiers add/subtract:
+- **Distance falloff within the zone** — deeper = lower make%. Threes lose ~4%
+  per foot beyond 1 ft past the arc; mid-range ~2%/ft past the paint; inside
+  ~1.5%/ft. So a corner three beats a deep heave, and an elbow jumper beats a
+  long two.
+- **Deep-Three Specialist** (Peach) instead *gains* on step-backs:
+  `+(e^(-0.1543·(x−4.5)²)·10)%` for x = feet behind the line (1-8; 9-10 ft hold
+  the 8 ft value), peaking ~+10% around 4.5 ft, until she's finally penalised
+  past ~10 ft.
+- **Contest** (Perimeter/Post Defense, by proximity) subtracts up to ~35%.
+- **On fire** adds +30% (after the block roll).
+Blocks are a separate roll *before* the make check, so on-fire never helps you
+avoid a block. All knobs are public statics on `ShotMath`.
+
 ### Stat interactions
 Some stats reinforce or gate one another. Example from the spec:
 - **Power vs Post Defense.** A defender with high **Power** but low **Post
@@ -142,9 +158,11 @@ burst · Dribble move · Timeout.
 | Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 6 | 3 | 6 |
 | Daisy       | 7 | 7 | 5 | 8 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
 
-All hidden traits are currently `None`. The stat system supports diverse
-archetypes — Bowser the immobile bruiser, Toad the tiny handle/motor guard,
-Diddy/Yoshi the perimeter speedsters, Peach/Boo the no-strength snipers, etc.
+Hidden traits: **Peach = Deep-Three Specialist** (she gains make% stepping back
+behind the arc — see Shooting below); everyone else is `None` for now. The stat
+system supports diverse archetypes — Bowser the immobile bruiser, Toad the tiny
+handle/motor guard, Diddy/Yoshi the perimeter speedsters, Boo the no-strength
+sniper, etc.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 

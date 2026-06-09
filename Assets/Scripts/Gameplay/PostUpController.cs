@@ -47,8 +47,6 @@ namespace MarioBasketball.Gameplay
 
         [Header("Post moves")]
         public float moveFlightTime = 0.9f;
-        public float maxSpread = 1.4f;
-        public float minSpread = 0.05f;
         public float dropStepLungeLeverage = 2f;
         public float blockBaseChance = 0.05f;
         public float blockStatScale = 0.05f;
@@ -245,11 +243,10 @@ namespace MarioBasketball.Gameplay
                 }
             }
 
-            float t = Mathf.Clamp01((quality - 1f) / 9f);
-            float spread = Mathf.Lerp(maxSpread, minSpread, t);
-            if (_pc.Character != null && _pc.Character.OnFire && Random.value < _pc.onFireMakeBonus)
-                spread = minSpread; // heat check
-            gm.ball.Shoot(hoop.AimPoint, _pc.team, 2, moveFlightTime, spread, _pc);
+            bool onFire = _pc.Character != null && _pc.Character.OnFire;
+            float makeChance = ShotMath.MakeChanceFromQuality(quality, onFire);
+            bool make = Random.value < makeChance;
+            gm.ball.Shoot(hoop.AimPoint, _pc.team, 2, moveFlightTime, ShotMath.AimOffset(make), _pc);
             End();
         }
 

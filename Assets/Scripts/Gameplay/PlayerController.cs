@@ -40,17 +40,13 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Within this radius a shot uses Inside Scoring, not Mid Range.")]
         public float paintRadius = 2.5f;
 
-        [Header("Shooting (accuracy mapped from the relevant scoring stat)")]
+        [Header("Shooting")]
+        [Tooltip("Make odds, distance falloff and contest live in ShotMath.")]
         public float shotFlightTime = 1.1f;
-        public float maxShotSpread = 1.2f;
-        public float minShotSpread = 0.05f;
         public float passPower = 9f;
-        [Tooltip("Extra chance an on-fire shot just goes in (after the block check).")]
-        [Range(0f, 1f)] public float onFireMakeBonus = 0.30f;
 
-        [Header("Contest / block (defense on a shot)")]
+        [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
-        public float contestMaxSpread = 1.6f;
         public float blockRange = 1.1f;
         public float blockBaseChance = 0.04f;
         public float blockStatScale = 0.05f;
@@ -307,41 +303,32 @@ namespace MarioBasketball.Gameplay
                 distance <= paintRadius ? StatType.InsideScoring :
                 StatType.MidRange;
 
-            float stat = Effective(shotStat, 5f);
-            float t = Mathf.Clamp01((stat - 1f) / 9f);
-            float spread = Mathf.Lerp(maxShotSpread, minShotSpread, t);
-
             PlayerController defender = NearestOpponentTo(transform.position);
+
+            // Block check first — unaffected by being on fire.
             if (defender != null)
             {
                 float dd = HorizontalDistance(defender.transform.position, transform.position);
-                if (dd < contestRange)
+                if (dd < blockRange)
                 {
                     float closeness = 1f - dd / contestRange;
-                    bool outside = shotStat == StatType.ThreePoint || shotStat == StatType.MidRange;
-                    float defStat = defender.EffectiveStat(outside ? StatType.PerimeterDefense : StatType.PostDefense);
-                    spread += contestMaxSpread * closeness * Mathf.Clamp01(defStat / 10f);
-
-                    if (dd < blockRange)
+                    float blk = defender.EffectiveStat(StatType.Blocks);
+                    float stat = Effective(shotStat, 5f);
+                    float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - stat), 0f, blockMaxChance) * closeness;
+                    if (Random.value < chance)
                     {
-                        float blk = defender.EffectiveStat(StatType.Blocks);
-                        float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - stat), 0f, blockMaxChance) * closeness;
-                        if (Random.value < chance)
-                        {
-                            Vector3 away = transform.position - aim; away.y = 0f;
-                            Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
-                            GameManager.Instance.OnShotMissed(this); // blocked → streak broken
-                            return;
-                        }
+                        Vector3 away = transform.position - aim; away.y = 0f;
+                        Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
+                        GameManager.Instance.OnShotMissed(this); // blocked → streak broken
+                        return;
                     }
                 }
             }
 
-            // On fire: a flat extra chance the ball just drops (block already resolved).
-            if (_character != null && _character.OnFire && Random.value < onFireMakeBonus)
-                spread = Mathf.Min(spread, minShotSpread);
-
-            Ball.Shoot(aim, team, points, shotFlightTime, spread, this);
+            bool onFire = _character != null && _character.OnFire;
+            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire);
+            bool make = Random.value < makeChance;
+            Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);
         }
 
         public void TriggerPass()

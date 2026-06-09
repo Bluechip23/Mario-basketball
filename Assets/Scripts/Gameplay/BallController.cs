@@ -96,11 +96,12 @@ namespace MarioBasketball.Gameplay
         }
 
         /// <summary>
-        /// Launch the ball on an arc that lands on <paramref name="target"/>.
-        /// Uses a fixed flight time so the arc reads well regardless of range;
-        /// <paramref name="spread"/> adds a little horizontal miss.
+        /// Launch the ball on an arc toward <paramref name="target"/> plus an
+        /// <paramref name="aimOffset"/> (small for a made shot, off-rim for a
+        /// miss — see <see cref="ShotMath"/>). Fixed flight time so the arc
+        /// reads well regardless of range.
         /// </summary>
-        public void Shoot(Vector3 target, TeamSide team, int points, float flightTime, float spread, PlayerController shooter)
+        public void Shoot(Vector3 target, TeamSide team, int points, float flightTime, Vector3 aimOffset, PlayerController shooter)
         {
             MarkReleased();
             ShooterTeam = team;
@@ -113,8 +114,7 @@ namespace MarioBasketball.Gameplay
             GoLive();
 
             Vector3 start = transform.position;
-            Vector3 offset = new Vector3(Random.Range(-spread, spread), 0f, Random.Range(-spread, spread));
-            Vector3 to = (target + offset) - start;
+            Vector3 to = (target + aimOffset) - start;
 
             float t = Mathf.Max(0.1f, flightTime);
             Vector3 velocity;

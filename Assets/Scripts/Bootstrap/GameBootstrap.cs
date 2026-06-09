@@ -50,8 +50,20 @@ namespace MarioBasketball.Bootstrap
 
             BuildCamera(null); // overview framing until the match starts
 
-            var select = gameObject.AddComponent<TeamSelectMenu>();
-            select.bootstrap = this;
+            // Menu flow: MainMenu (shown) → TeamSelect (exhibition) or
+            // CreatePlayer. The latter two start disabled; MainMenu enables them.
+            var teamSelect = gameObject.AddComponent<TeamSelectMenu>();
+            teamSelect.bootstrap = this;
+            teamSelect.enabled = false;
+
+            var createPlayer = gameObject.AddComponent<CreatePlayerMenu>();
+            createPlayer.enabled = false;
+
+            var main = gameObject.AddComponent<MainMenu>();
+            main.teamSelect = teamSelect;
+            main.createPlayer = createPlayer;
+            teamSelect.mainMenu = main;
+            createPlayer.mainMenu = main;
         }
 
         /// <summary>

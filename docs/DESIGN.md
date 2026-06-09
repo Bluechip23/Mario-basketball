@@ -214,10 +214,17 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   Defense** + leverage + **Blocks**. You can still **pass out** of the post
   (kicks to the most open teammate). The AI both posts up and defends the post.
 - **Dive for loose balls** (Dive button): a lunge with extended pickup reach.
+- **Start menu + Create-a-Player** (`MainMenu`, `CreatePlayerMenu`): the start
+  menu routes to an exhibition game or to Create-a-Player, which offers a
+  **Journey Character** (limited stats — a 10-point budget with escalating costs:
+  reach 1-3 = 1 each, 4-5 = 2, 6-8 = 3, 9 = 4, 10 = 5; earns more in story mode,
+  not yet built) or a **Standard Player** (unlimited stats, exhibition only),
+  each with an info box. Created players are saved (`CreatedPlayerStore`,
+  PlayerPrefs) and appear in team select. (Journey/Story mode itself is a stub.)
 - **Team select** (`TeamSelectMenu`): pre-match screen to draft five characters
-  per side from the roster (first home pick is the player you control), with
-  randomize and sensible defaults; `GameBootstrap.StartMatch` then spawns the
-  game. Restart returns here.
+  per side from the roster — library characters plus created players — (first
+  home pick is the player you control), with randomize and sensible defaults;
+  `GameBootstrap.StartMatch` then spawns the game. Restart returns to the menu.
 - **Pause menu** (`PauseMenu`, Esc / Start): freezes the game and inputs;
   Resume / **Stats** (full stat sheet for all ten players) / Restart / Quit.
 - **Player switching** (`PlayerSwitchManager`): exactly one human-controlled

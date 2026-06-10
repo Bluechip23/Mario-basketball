@@ -80,6 +80,13 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Max make% lost to an air-adjust (mitigated by Inside Scoring).")]
         [Range(0f, 1f)] public float maxAdjustPenalty = 0.35f;
 
+        [Header("Alley-oop")]
+        [Tooltip("A loft to a teammate within this of the rim becomes an alley-oop.")]
+        public float oopRange = 3.0f;
+        public float oopFlightTime = 1.0f;
+        [Tooltip("Make% bonus on an alley-oop finish (it's a high-percentage play).")]
+        [Range(0f, 1f)] public float alleyOopBonus = 0.2f;
+
         [Header("Dribble move (Ball Handling vs Perimeter Defense)")]
         public float dribbleRange = 2.0f;
         public float dribbleCooldownTime = 0.8f;
@@ -490,7 +497,7 @@ namespace MarioBasketball.Gameplay
         /// <summary>Resolve a dunk or layup: a block roll first (reduced by an
         /// air-adjust, and resisted by Power on dunks), then a make roll. A dunk
         /// scores off the Dunk stat, a layup off Inside Scoring.</summary>
-        void FinishShot(bool isDunk, bool adjusted)
+        void FinishShot(bool isDunk, bool adjusted, float makeBonus = 0f)
         {
             if (!HasBall) return;
             var gm = GameManager.Instance;
@@ -525,6 +532,7 @@ namespace MarioBasketball.Gameplay
             float over = isDunk ? finisherStat : -1f; // dunk uses Dunk as the scoring stat
             float makeChance = ShotMath.MakeChance(this, StatType.InsideScoring, HorizontalDistance(transform.position, aim), defender, onFire, over);
             if (adjusted) makeChance -= AdjustPenalty();
+            makeChance += makeBonus;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, 2, finishFlightTime, ShotMath.AimOffset(make), this);
@@ -631,8 +639,33 @@ namespace MarioBasketball.Gameplay
             // Aim with the right stick to direct it to a specific teammate
             // (icons); otherwise pass to whoever's most open.
             var mate = IsAimingPass ? TargetedTeammate(_passAim) : FindOpenTeammate();
-            if (mate != null) PassToTeammate(mate, fromPost, hard);
-            else Ball.Pass(transform.forward, passPower);
+            if (mate == null) { Ball.Pass(transform.forward, passPower); return; }
+
+            // A loft to a teammate near the rim is an alley-oop.
+            if (!hard && IsOopTarget(mate)) ThrowOop(mate, fromPost);
+            else PassToTeammate(mate, fromPost, hard);
+        }
+
+        bool IsOopTarget(PlayerController mate)
+        {
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            return hoop != null && HorizontalDistance(mate.transform.position, hoop.AimPoint) <= oopRange;
+        }
+
+        void ThrowOop(PlayerController mate, bool fromPost)
+        {
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            if (hoop == null) { PassToTeammate(mate, fromPost, false); return; }
+
+            // Lob to a high point near the rim, led slightly toward the cutter.
+            Vector3 target = Vector3.Lerp(hoop.AimPoint, mate.transform.position, 0.35f);
+            target.y = hoop.AimPoint.y; // rim height — the cutter jumps to meet it
+            float err = PassError(PassBallHandling(fromPost));
+            Vector2 j = Random.insideUnitCircle * err;
+            target += new Vector3(j.x, 0f, j.y);
+            Ball.PassTo(target, oopFlightTime, alleyOop: true);
         }
 
         void PassToSlot(int index)
@@ -646,16 +679,28 @@ namespace MarioBasketball.Gameplay
         /// Smooth Passer throws with Ball Handling counted as 8 (10 out of a post).</summary>
         void PassToTeammate(PlayerController mate, bool fromPost, bool hard)
         {
-            float bh;
-            if (_character != null && _character.stats != null && _character.stats.hiddenTrait == HiddenTrait.SmoothPasser)
-                bh = _character.GetEffectiveFor(fromPost ? 10 : 8);
-            else
-                bh = Effective(StatType.BallHandling, 5f);
-
-            float err = Mathf.Lerp(passErrorMax, passErrorMin, Mathf.Clamp01((bh - 1f) / 9f));
+            float err = PassError(PassBallHandling(fromPost));
             Vector2 j = Random.insideUnitCircle * err;
             Vector3 dest = mate.transform.position + new Vector3(j.x, 0.6f, j.y);
             Ball.PassTo(dest, hard ? hardPassTime : loftPassTime);
+        }
+
+        float PassBallHandling(bool fromPost)
+        {
+            if (_character != null && _character.stats != null && _character.stats.hiddenTrait == HiddenTrait.SmoothPasser)
+                return _character.GetEffectiveFor(fromPost ? 10 : 8);
+            return Effective(StatType.BallHandling, 5f);
+        }
+
+        float PassError(float bh) => Mathf.Lerp(passErrorMax, passErrorMin, Mathf.Clamp01((bh - 1f) / 9f));
+
+        /// <summary>Catch an alley-oop and finish it immediately (GameManager calls
+        /// this when a teammate snags an oop near the rim).</summary>
+        public void CatchAlleyOop()
+        {
+            if (!HasBall) return;
+            bool dunk = Effective(StatType.Dunk, 5f) >= dunkThreshold;
+            FinishShot(dunk, adjusted: false, makeBonus: alleyOopBonus);
         }
 
         /// <summary>The index-th on-court teammate (excluding self) — for icon passing.</summary>

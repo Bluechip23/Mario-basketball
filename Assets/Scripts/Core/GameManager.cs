@@ -175,9 +175,18 @@ namespace MarioBasketball.Core
 
             if (best != null)
             {
+                // Alley-oop: a teammate catching the lob near the rim finishes it.
+                bool oop = ball.IsAlleyOop && best.team == ball.PassingTeam && NearOwnRim(best);
                 ball.PickUp(best);
                 OnPossessionGained(best);
+                if (oop) best.CatchAlleyOop();
             }
+        }
+
+        bool NearOwnRim(PlayerController p)
+        {
+            Hoop hoop = GetAttackingHoop(p.team);
+            return hoop != null && Horizontal(p.transform.position, hoop.AimPoint) <= reboundBaseRadius + 3f;
         }
 
         PlayerController BestRebounderOn(TeamState team, Vector3 ballPos, ref float bestScore, PlayerController best)

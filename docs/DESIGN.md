@@ -78,6 +78,14 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   Rebounds. (Wario's Smooth Passer trait throws as Ball Handling 8, 10 out of
   a post.)
 
+### Alley-oops
+A **loft** thrown to a teammate **near the rim** (within `oopRange`) becomes an
+alley-oop: the ball lobs high to the rim, the cutter rises to meet it (the
+height-aware catch lets them get up over a grounded defender), and on the catch
+they **finish immediately** — a dunk if they're a dunker — with an `alleyOopBonus`
+to the make. The AI cuts and goes up for oops; a defender can still pick the lob
+or block the finish.
+
 ### Dribble move (Ball Handling vs Perimeter Defense)
 With the ball, **B** attempts a dribble move against the nearest defender. Win
 (Ball Handling vs Perimeter Defense) and the defender's **ankles break** — they

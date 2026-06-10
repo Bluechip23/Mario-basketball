@@ -50,6 +50,9 @@ namespace MarioBasketball.Gameplay
         public bool IsPass { get; private set; }
         /// <summary>The team that threw the in-flight pass.</summary>
         public TeamSide PassingTeam { get; private set; }
+        /// <summary>True while a lob is an alley-oop — a teammate catching it near
+        /// the rim finishes immediately.</summary>
+        public bool IsAlleyOop { get; private set; }
 
         Rigidbody _rb;
         Vector3 _centreCourt;
@@ -97,7 +100,7 @@ namespace MarioBasketball.Gameplay
             {
                 // An uncaught pass eventually becomes a plain loose ball.
                 _passTimer -= Time.deltaTime;
-                if (_passTimer <= 0f) IsPass = false;
+                if (_passTimer <= 0f) { IsPass = false; IsAlleyOop = false; }
             }
         }
 
@@ -117,6 +120,7 @@ namespace MarioBasketball.Gameplay
             State = BallState.Held;
             IsRebound = false;
             IsPass = false;
+            IsAlleyOop = false;
             _rb.isKinematic = true;
             _rb.detectCollisions = false;
         }
@@ -157,13 +161,14 @@ namespace MarioBasketball.Gameplay
         /// loose ball — a teammate (or a defender) can pick it off.
         /// <paramref name="flightTime"/> shapes it: short = a fast, flat bullet
         /// through the lane; long = a slow lob that arcs over defenders.</summary>
-        public void PassTo(Vector3 target, float flightTime = 0.5f)
+        public void PassTo(Vector3 target, float flightTime = 0.5f, bool alleyOop = false)
         {
             TeamSide thrower = Holder != null ? Holder.team : ShooterTeam;
             MarkReleased();
             PendingPoints = 0;
             State = BallState.Free;
             IsPass = true;            // intercept with Steals until it goes stale
+            IsAlleyOop = alleyOop;
             PassingTeam = thrower;
             _passTimer = passLiveTime;
             GoLive();
@@ -197,6 +202,7 @@ namespace MarioBasketball.Gameplay
             _shotPending = false;
             IsRebound = false;
             IsPass = false;
+            IsAlleyOop = false;
             GoLive();
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
@@ -210,6 +216,7 @@ namespace MarioBasketball.Gameplay
             _shotPending = false; // resolved as a make
             IsRebound = false;
             IsPass = false;
+            IsAlleyOop = false;
             State = BallState.Free;
         }
 
@@ -220,6 +227,7 @@ namespace MarioBasketball.Gameplay
             _shotPending = false;
             IsRebound = false;
             IsPass = false;
+            IsAlleyOop = false;
             Holder = null;
         }
 

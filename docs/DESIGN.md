@@ -113,8 +113,16 @@ avoid a block. All knobs are public statics on `ShotMath`.
 **Shot timing (jump shots).** Mid-range and three-point shots use a hold-and-
 release meter (`PlayerController`): press to rise into the jump, release at the
 apex for a **perfect** shot (full make%); mistiming multiplies make% down toward
-`minTimingMultiplier`. Layups/dunks (inside) fire instantly. The AI always
-releases perfectly.
+`minTimingMultiplier`. The AI always releases perfectly.
+
+**Inside finishing (dunk / layup).** Inside the paint, hold Shoot to **go up**
+and glide to the rim. It's a **dunk** if effective Dunk ≥ `dunkThreshold`
+(scores off the **Dunk** stat, with **Power** resisting blocks), otherwise a
+**layup** (off **Inside Scoring**). In the air you can **L1 air-adjust** — it
+dodges the block (block chance ×`adjustBlockReduction`) but costs make%, fully
+mitigated at **Inside Scoring** 10 — or **pass** out of the air to the most open
+teammate. Release (or auto after `finishAirTime`) to commit. The AI finishes
+immediately without adjusting.
 
 ### Stat interactions
 Some stats reinforce or gate one another. Example from the spec:

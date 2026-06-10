@@ -65,6 +65,10 @@ namespace MarioBasketball.UI
                     GUI.Box(new Rect(20, 160, 220, 14), GUIContent.none);
                     GUI.Box(new Rect(20, 160, 220 * Mathf.Clamp01(human.EnergyFraction), 14), GUIContent.none);
 
+                    if (humanPc.IsFinishing)
+                        GUI.Label(new Rect((Screen.width - 320) / 2f, Screen.height - 232f, 320f, 22f),
+                            "In the air — L1 adjust  ·  X pass", _mid);
+
                     if (humanPc.IsShooting)
                     {
                         // Shot meter: fill rises; hit the marker for a perfect release.
@@ -90,7 +94,8 @@ namespace MarioBasketball.UI
 
             GUI.Label(new Rect(20, Screen.height - 176, 860, 176),
                 "CONTROLLER  —  Move: L-stick   Turbo: LT   Jump/Contest: Y   Pause: Start\n" +
-                "With ball:  Shoot A (hold+release at the marker for jumpers)   Pass X   Post up (hold) RB   Dive B\n" +
+                "With ball:  Shoot A (jumpers: release at marker; inside: hold to dunk/layup, L1 adjusts, X passes)\n" +
+                "            Pass X   Post up (hold) RB   Dive B\n" +
                 "Posting (hold RB):  Hook Y   Drop step A   Spin B   Fake LB   Back down RT   Pass X\n" +
                 "Defense:  Switch A/LB   Steal X   Push/foul or bump RT   Jump/Block Y\n" +
                 "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +

@@ -226,6 +226,9 @@ namespace MarioBasketball.AI
         {
             StatType stat = ShotStatFor(dist);
             float statEff = _pc.EffectiveStat(stat);
+            // Inside, a dunker finishes off Dunk — value the better of the two.
+            if (stat == StatType.InsideScoring)
+                statEff = Mathf.Max(statEff, _pc.EffectiveStat(StatType.Dunk));
             float openness = Mathf.Clamp(nearestDef - 1f, 0f, 3f);
             return statEff + openness;
         }

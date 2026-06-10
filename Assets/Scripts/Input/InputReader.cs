@@ -18,6 +18,7 @@ namespace MarioBasketball.InputControl
     public class InputReader
     {
         public Vector2 Move { get; private set; }
+        public Vector2 PassAim { get; private set; }
         public bool SprintHeld { get; private set; }
         public bool PostUpHeld { get; private set; }
 
@@ -34,6 +35,7 @@ namespace MarioBasketball.InputControl
         public event Action FakePressed;
 
         readonly InputAction _move;
+        readonly InputAction _passAim;
         readonly InputAction _sprint;
         readonly InputAction _postUp;
         readonly InputAction _shoot;
@@ -56,6 +58,15 @@ namespace MarioBasketball.InputControl
                 .With("Left", "<Keyboard>/a")
                 .With("Right", "<Keyboard>/d");
             _move.AddBinding("<Gamepad>/leftStick");
+
+            // Pass aim: right stick (or IJKL) points at a teammate to direct a pass.
+            _passAim = new InputAction("PassAim", InputActionType.Value, expectedControlType: "Vector2");
+            _passAim.AddCompositeBinding("2DVector")
+                .With("Up", "<Keyboard>/i")
+                .With("Down", "<Keyboard>/k")
+                .With("Left", "<Keyboard>/j")
+                .With("Right", "<Keyboard>/l");
+            _passAim.AddBinding("<Gamepad>/rightStick");
 
             _sprint = new InputAction("Sprint", InputActionType.Button, "<Keyboard>/leftShift");
             _sprint.AddBinding("<Gamepad>/leftTrigger");
@@ -109,14 +120,14 @@ namespace MarioBasketball.InputControl
 
         public void Enable()
         {
-            _move.Enable(); _sprint.Enable(); _postUp.Enable();
+            _move.Enable(); _passAim.Enable(); _sprint.Enable(); _postUp.Enable();
             _shoot.Enable(); _pass.Enable(); _jump.Enable(); _steal.Enable(); _dive.Enable();
             _backDown.Enable(); _hook.Enable(); _dropStep.Enable(); _spin.Enable(); _fake.Enable();
         }
 
         public void Disable()
         {
-            _move.Disable(); _sprint.Disable(); _postUp.Disable();
+            _move.Disable(); _passAim.Disable(); _sprint.Disable(); _postUp.Disable();
             _shoot.Disable(); _pass.Disable(); _jump.Disable(); _steal.Disable(); _dive.Disable();
             _backDown.Disable(); _hook.Disable(); _dropStep.Disable(); _spin.Disable(); _fake.Disable();
         }
@@ -125,6 +136,7 @@ namespace MarioBasketball.InputControl
         public void Tick()
         {
             Move = _move.ReadValue<Vector2>();
+            PassAim = _passAim.ReadValue<Vector2>();
             SprintHeld = _sprint.IsPressed();
             PostUpHeld = _postUp.IsPressed();
         }

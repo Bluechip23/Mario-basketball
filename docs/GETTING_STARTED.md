@@ -60,6 +60,7 @@ bindings exist as a fallback.
 | **Shoot** — jumper: hold + release at apex; inside: hold to dunk/layup | A (✕) | Space |
 | **Air-adjust** a dunk/layup (or post fake) | LB (L1) | C |
 | **Pass** (to most open teammate) | X (□) | E |
+| **Directed pass** — aim a teammate then press Pass | Right stick + X | IJKL + E |
 | **Jump / contest / rebound** | Y (△) | Left Ctrl |
 | **Steal** | X (□) — when you have no ball | F |
 | **Switch player** (defense) | A (✕) or LB (L1) | Q |

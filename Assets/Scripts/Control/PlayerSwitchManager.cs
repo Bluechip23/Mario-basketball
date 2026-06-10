@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using MarioBasketball.Core;
 using MarioBasketball.Gameplay;
-using MarioBasketball.CameraControl;
 
 namespace MarioBasketball.Control
 {
@@ -15,17 +14,16 @@ namespace MarioBasketball.Control
     ///   <item><b>On defense / loose ball</b> the Switch button (Q / left
     ///   shoulder) hands control to the on-court teammate nearest the ball.</item>
     /// </list>
-    /// It also moves the camera to the controlled player, keeps
-    /// <see cref="GameManager.humanPlayer"/> pointed at them (so the HUD
-    /// follows), recovers control if the current player is subbed out, and
-    /// shows a marker at their feet.
+    /// It keeps <see cref="GameManager.humanPlayer"/> pointed at the controlled
+    /// player (so the HUD follows), recovers control if they are subbed out,
+    /// and shows a gold ring marker at their feet (the camera itself tracks the
+    /// ball, NBA-Street-style).
     /// </summary>
     public class PlayerSwitchManager : MonoBehaviour
     {
         public TeamSide humanSide = TeamSide.Home;
         public PlayerController initial;
 
-        CameraRig _camera;
         PlayerController _current;
         InputAction _switch;
         GameObject _marker;
@@ -49,8 +47,6 @@ namespace MarioBasketball.Control
 
         void Start()
         {
-            var cam = Camera.main;
-            if (cam != null) _camera = cam.GetComponent<CameraRig>();
             _marker = CreateMarker();
             if (initial != null) SetControl(initial);
         }
@@ -102,7 +98,8 @@ namespace MarioBasketball.Control
             if (_current != null) _current.SetHumanControlled(false);
             _current = p;
             p.SetHumanControlled(true);
-            if (_camera != null) _camera.target = p.transform;
+            // The sideline camera tracks the ball, not the controlled player —
+            // the gold ring is what shows who you have.
             if (GameManager.Instance != null) GameManager.Instance.humanPlayer = p;
         }
 

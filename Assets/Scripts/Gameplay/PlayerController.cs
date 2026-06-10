@@ -88,7 +88,16 @@ namespace MarioBasketball.Gameplay
         public float pushKnockLooseBase = 0.2f;
         public float pushKnockLooseScale = 0.06f;
 
-        public Vector3 BallHoldPoint => transform.position + transform.forward * 0.55f + Vector3.up * 0.4f;
+        /// <summary>Where the carried ball sits — out in front, hip height,
+        /// scaled to the character's body size.</summary>
+        public Vector3 BallHoldPoint
+        {
+            get
+            {
+                float h = _cc != null ? _cc.height : 1.9f;
+                return transform.position + transform.forward * (0.29f * h) + Vector3.up * (0.21f * h);
+            }
+        }
 
         public PlayerCharacter Character => _character;
         public PostUpController Post => _post;
@@ -239,6 +248,9 @@ namespace MarioBasketball.Gameplay
 
         public void Teleport(Vector3 position)
         {
+            // Spots are authored for ~2 m players; keep taller bodies above the
+            // floor (centre must sit at half the controller height).
+            position.y = Mathf.Max(position.y, _cc.height / 2f + 0.05f);
             bool was = _cc.enabled;
             _cc.enabled = false;
             transform.position = position;

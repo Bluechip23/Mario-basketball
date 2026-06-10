@@ -64,8 +64,10 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   designed with the roster.
 
 ### Passing
-- **Tap** pass button → **loft pass**; **hold** → **hard pass**. *(tap/hold split
-  not yet implemented — passes are a single lead pass for now.)*
+- **Tap** pass button → **loft pass**: slow, high arc that **sails over
+  defenders' heads** (the loose-ball contest respects the ball's height) but
+  hangs in the air longer. **Hold** (≥ `passHoldThreshold`, 0.25 s) → **hard
+  pass**: fast and flat, but it travels through the **steal lane**.
 - **Directed / icon passing (wired):** **hold LB** to bring up teammate **icons**
   labelled with face buttons (A/B), then press one to pass to that teammate; or
   push the **right stick** toward a teammate and press Pass. With neither, Pass

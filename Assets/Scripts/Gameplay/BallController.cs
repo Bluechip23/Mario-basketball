@@ -154,8 +154,10 @@ namespace MarioBasketball.Gameplay
         }
 
         /// <summary>A directed pass that leads to <paramref name="target"/> as a
-        /// loose ball — a teammate (or a defender) can pick it off.</summary>
-        public void PassTo(Vector3 target)
+        /// loose ball — a teammate (or a defender) can pick it off.
+        /// <paramref name="flightTime"/> shapes it: short = a fast, flat bullet
+        /// through the lane; long = a slow lob that arcs over defenders.</summary>
+        public void PassTo(Vector3 target, float flightTime = 0.5f)
         {
             TeamSide thrower = Holder != null ? Holder.team : ShooterTeam;
             MarkReleased();
@@ -168,10 +170,11 @@ namespace MarioBasketball.Gameplay
 
             Vector3 start = transform.position;
             Vector3 to = target - start;
-            float t = 0.5f; // quick, flat pass
+            float t = Mathf.Max(0.15f, flightTime);
             Vector3 velocity;
             velocity.x = to.x / t;
             velocity.z = to.z / t;
+            // Gravity solve: a longer flight time naturally arcs higher.
             velocity.y = (to.y - 0.5f * Physics.gravity.y * t * t) / t;
             _rb.linearVelocity = velocity;
         }

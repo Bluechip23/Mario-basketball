@@ -98,7 +98,7 @@ namespace MarioBasketball.UI
             GUI.Label(new Rect(20, Screen.height - 176, 860, 176),
                 "CONTROLLER  —  Move: L-stick   Turbo: LT   Jump/Contest: Y   Pause: Start\n" +
                 "With ball:  Shoot A (jumpers: release at marker; inside: hold to dunk/layup, L1 adjusts, X passes)\n" +
-                "            Pass X (Right stick aims; or hold LB then A/B for a teammate)   Dribble move B   Post up (hold) RB\n" +
+                "            Pass X: tap = loft, hold = hard (Right stick aims; or hold LB then A/B)   Dribble move B   Post up RB\n" +
                 "Posting (hold RB):  Hook Y   Drop step A   Spin B   Fake LB   Back down RT   Pass X\n" +
                 "Defense:  Switch A/LB   Steal X   Push/foul or bump RT   Jump/Block Y\n" +
                 "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +

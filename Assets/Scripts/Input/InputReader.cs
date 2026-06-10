@@ -27,6 +27,7 @@ namespace MarioBasketball.InputControl
         public event Action ShootPressed;
         public event Action ShootReleased;
         public event Action PassPressed;
+        public event Action PassReleased;
         public event Action JumpPressed;
         public event Action StealPressed;
         public event Action DivePressed;
@@ -110,6 +111,7 @@ namespace MarioBasketball.InputControl
             _shoot.performed += _ => ShootPressed?.Invoke();
             _shoot.canceled += _ => ShootReleased?.Invoke();
             _pass.performed += _ => PassPressed?.Invoke();
+            _pass.canceled += _ => PassReleased?.Invoke();
             _jump.performed += _ => JumpPressed?.Invoke();
             _steal.performed += _ => StealPressed?.Invoke();
             _dive.performed += _ => DivePressed?.Invoke();

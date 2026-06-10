@@ -189,6 +189,11 @@ namespace MarioBasketball.Core
                 float dist = Horizontal(p.transform.position, ballPos);
                 if (dist > ReboundCatchRadius(p)) continue;
 
+                // Vertical reach: a lofted pass sails over a defender's head
+                // (their centre is at half height; arms add roughly the rest).
+                float reachTop = p.transform.position.y + p.BodyHeight;
+                if (ballPos.y > reachTop) continue;
+
                 float score = GrabStat(p) + reboundHeightScore * p.BodyHeight
                             + (p.IsAirborne ? reboundJumpScore : 0f)
                             + (p.IsDiving ? reboundJumpScore * 0.5f : 0f)

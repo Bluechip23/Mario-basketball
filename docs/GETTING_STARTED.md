@@ -59,7 +59,7 @@ bindings exist as a fallback.
 | Turbo / speed burst | LT (L2) | Left Shift |
 | **Shoot** — jumper: hold + release at apex; inside: hold to dunk/layup | A (✕) | Space |
 | **Air-adjust** a dunk/layup (or post fake) | LB (L1) | C |
-| **Pass** (to most open teammate) | X (□) | E |
+| **Pass** — tap: loft (arcs over defenders) · hold: hard (fast, flat) | X (□) | E |
 | **Directed pass** — right stick aims, or **hold LB and press the teammate's button (A/B)** | RStick+X / hold LB then A·B | IJKL+E / hold C then A·B |
 | **Dribble move** (break the defender down) | B (○) with the ball | X |
 | **Jump / contest / rebound** | Y (△) | Left Ctrl |

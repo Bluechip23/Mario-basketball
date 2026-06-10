@@ -43,6 +43,12 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Make odds, distance falloff and contest live in ShotMath.")]
         public float shotFlightTime = 1.1f;
         public float passPower = 9f;
+        [Tooltip("Hold Pass at least this long for a hard pass; shorter is a loft.")]
+        public float passHoldThreshold = 0.25f;
+        [Tooltip("Flight time of a tapped loft pass (slow, arcs over defenders).")]
+        public float loftPassTime = 0.85f;
+        [Tooltip("Flight time of a held hard pass (fast, flat, stealable).")]
+        public float hardPassTime = 0.28f;
         [Tooltip("Right-stick magnitude needed to aim a directed pass.")]
         public float passAimDeadzone = 0.5f;
         [Tooltip("Lead-pass spread (m) at Ball Handling 1 / 10 — low handles miss.")]
@@ -181,6 +187,8 @@ namespace MarioBasketball.Gameplay
         bool _iconHeld;
         float _dribbleCooldown;
         float _dribbleBoostTimer;
+        bool _passCharging;
+        float _passChargeTime;
 
         void Awake()
         {
@@ -225,7 +233,8 @@ namespace MarioBasketball.Gameplay
             _input = new InputReader();
             _input.ShootPressed += OnShootPressed;
             _input.ShootReleased += OnShootReleased;
-            _input.PassPressed += TriggerPass;
+            _input.PassPressed += OnPassPressed;
+            _input.PassReleased += OnPassReleased;
             _input.JumpPressed += TriggerJump;
             _input.StealPressed += TriggerSteal;
             _input.DivePressed += TriggerDive;
@@ -242,7 +251,8 @@ namespace MarioBasketball.Gameplay
             if (_input == null) return;
             _input.ShootPressed -= OnShootPressed;
             _input.ShootReleased -= OnShootReleased;
-            _input.PassPressed -= TriggerPass;
+            _input.PassPressed -= OnPassPressed;
+            _input.PassReleased -= OnPassReleased;
             _input.JumpPressed -= TriggerJump;
             _input.StealPressed -= TriggerSteal;
             _input.DivePressed -= TriggerDive;
@@ -273,6 +283,11 @@ namespace MarioBasketball.Gameplay
             if (_pushCooldown > 0f) _pushCooldown -= dt;
             if (_dribbleCooldown > 0f) _dribbleCooldown -= dt;
             if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
+            if (_passCharging)
+            {
+                _passChargeTime += dt;
+                if (IsStunned || !HasBall) _passCharging = false; // lost it mid-windup
+            }
 
             if (isHuman && _input != null)
             {
@@ -587,7 +602,26 @@ namespace MarioBasketball.Gameplay
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);
         }
 
-        public void TriggerPass()
+        /// <summary>AI pass entry — throws a loft immediately.</summary>
+        public void TriggerPass() => ReleasePass(hard: false);
+
+        // Human passing: tap → loft (slow, arcs over defenders); hold past
+        // passHoldThreshold → hard pass (fast, flat, lives in the steal lane).
+        void OnPassPressed()
+        {
+            if (MatchPause.IsPaused || IsStunned || !HasBall || _passCharging) return;
+            _passCharging = true;
+            _passChargeTime = 0f;
+        }
+
+        void OnPassReleased()
+        {
+            if (!_passCharging) return;
+            _passCharging = false;
+            ReleasePass(hard: _passChargeTime >= passHoldThreshold);
+        }
+
+        void ReleasePass(bool hard)
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
             bool fromPost = IsPosting;
@@ -597,20 +631,20 @@ namespace MarioBasketball.Gameplay
             // Aim with the right stick to direct it to a specific teammate
             // (icons); otherwise pass to whoever's most open.
             var mate = IsAimingPass ? TargetedTeammate(_passAim) : FindOpenTeammate();
-            if (mate != null) PassToTeammate(mate, fromPost);
+            if (mate != null) PassToTeammate(mate, fromPost, hard);
             else Ball.Pass(transform.forward, passPower);
         }
 
         void PassToSlot(int index)
         {
             var mate = TeammateSlot(index);
-            if (mate != null) PassToTeammate(mate, fromPost: false);
+            if (mate != null) PassToTeammate(mate, fromPost: false, hard: false);
         }
 
         /// <summary>Lead pass to a teammate; Ball Handling sets the accuracy, so
         /// a weak handler's pass lands off-target (and can be picked off). A
         /// Smooth Passer throws with Ball Handling counted as 8 (10 out of a post).</summary>
-        void PassToTeammate(PlayerController mate, bool fromPost)
+        void PassToTeammate(PlayerController mate, bool fromPost, bool hard)
         {
             float bh;
             if (_character != null && _character.stats != null && _character.stats.hiddenTrait == HiddenTrait.SmoothPasser)
@@ -621,7 +655,7 @@ namespace MarioBasketball.Gameplay
             float err = Mathf.Lerp(passErrorMax, passErrorMin, Mathf.Clamp01((bh - 1f) / 9f));
             Vector2 j = Random.insideUnitCircle * err;
             Vector3 dest = mate.transform.position + new Vector3(j.x, 0.6f, j.y);
-            Ball.PassTo(dest);
+            Ball.PassTo(dest, hard ? hardPassTime : loftPassTime);
         }
 
         /// <summary>The index-th on-court teammate (excluding self) — for icon passing.</summary>

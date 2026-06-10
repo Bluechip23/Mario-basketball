@@ -65,7 +65,8 @@ namespace MarioBasketball.UI
                     GUI.Box(new Rect(20, 160, 220, 14), GUIContent.none);
                     GUI.Box(new Rect(20, 160, 220 * Mathf.Clamp01(human.EnergyFraction), 14), GUIContent.none);
 
-                    if (humanPc.IsAimingPass) DrawPassIcons(gm, humanPc);
+                    if (humanPc.IconPassActive) DrawIconButtons(gm, humanPc);
+                    else if (humanPc.IsAimingPass) DrawPassIcons(gm, humanPc);
 
                     if (humanPc.IsFinishing)
                         GUI.Label(new Rect((Screen.width - 320) / 2f, Screen.height - 232f, 320f, 22f),
@@ -97,12 +98,30 @@ namespace MarioBasketball.UI
             GUI.Label(new Rect(20, Screen.height - 176, 860, 176),
                 "CONTROLLER  —  Move: L-stick   Turbo: LT   Jump/Contest: Y   Pause: Start\n" +
                 "With ball:  Shoot A (jumpers: release at marker; inside: hold to dunk/layup, L1 adjusts, X passes)\n" +
-                "            Pass X (aim a teammate with the Right stick to direct it)   Post up (hold) RB   Dive B\n" +
+                "            Pass X (Right stick aims; or hold LB then A/B for a teammate)   Dribble move B   Post up (hold) RB\n" +
                 "Posting (hold RB):  Hook Y   Drop step A   Spin B   Fake LB   Back down RT   Pass X\n" +
                 "Defense:  Switch A/LB   Steal X   Push/foul or bump RT   Jump/Block Y\n" +
                 "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +
                 "You control the gold-ringed player; on offense control follows the ball.",
                 _small);
+        }
+
+        // LB held: label the on-court teammates with the face button that passes to them.
+        void DrawIconButtons(GameManager gm, PlayerController human)
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return;
+            string[] labels = { "A", "B" };
+            int i = 0;
+            foreach (var mate in gm.TeamFor(human.team).onCourt)
+            {
+                if (mate == null || mate == human || !mate.enabled) continue;
+                if (i >= labels.Length) break;
+                Vector3 sp = cam.WorldToScreenPoint(mate.transform.position + Vector3.up * (mate.BodyHeight + 0.4f));
+                if (sp.z > 0f)
+                    GUI.Label(new Rect(sp.x - 30f, Screen.height - sp.y - 14f, 60f, 24f), $"[{labels[i]}]", _mid);
+                i++;
+            }
         }
 
         void DrawPassIcons(GameManager gm, PlayerController human)

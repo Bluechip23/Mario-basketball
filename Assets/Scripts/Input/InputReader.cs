@@ -21,6 +21,8 @@ namespace MarioBasketball.InputControl
         public Vector2 PassAim { get; private set; }
         public bool SprintHeld { get; private set; }
         public bool PostUpHeld { get; private set; }
+        /// <summary>LB held — bring up teammate pass icons.</summary>
+        public bool IconHeld { get; private set; }
 
         public event Action ShootPressed;
         public event Action ShootReleased;
@@ -139,6 +141,7 @@ namespace MarioBasketball.InputControl
             PassAim = _passAim.ReadValue<Vector2>();
             SprintHeld = _sprint.IsPressed();
             PostUpHeld = _postUp.IsPressed();
+            IconHeld = _fake.IsPressed(); // LB / C held = pass-icon modifier
         }
     }
 }

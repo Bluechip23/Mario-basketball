@@ -33,6 +33,8 @@ namespace MarioBasketball.Gameplay
         public float releaseLockDuration = 0.4f;
         [Tooltip("A missed shot becomes a live (grabbable) rebound once it falls below this height.")]
         public float reboundHeight = 2.2f;
+        [Tooltip("How long a thrown pass stays an 'in-flight pass' (Steals to intercept) before becoming a true loose ball (Rebounds).")]
+        public float passLiveTime = 1.4f;
 
         public BallState State { get; private set; } = BallState.Free;
         public PlayerController Holder { get; private set; }
@@ -43,6 +45,11 @@ namespace MarioBasketball.Gameplay
         /// <summary>True while the current loose ball is a missed-shot rebound
         /// (vs. a steal/pass scramble) — used for offensive-rebound bonuses.</summary>
         public bool IsRebound { get; private set; }
+        /// <summary>True while a thrown pass is in flight (intercept with Steals,
+        /// not Rebounds). Reverts to a true loose ball after <see cref="passLiveTime"/>.</summary>
+        public bool IsPass { get; private set; }
+        /// <summary>The team that threw the in-flight pass.</summary>
+        public TeamSide PassingTeam { get; private set; }
 
         Rigidbody _rb;
         Vector3 _centreCourt;
@@ -86,7 +93,15 @@ namespace MarioBasketball.Gameplay
                     State = BallState.Free;
                 }
             }
+            else if (State == BallState.Free && IsPass)
+            {
+                // An uncaught pass eventually becomes a plain loose ball.
+                _passTimer -= Time.deltaTime;
+                if (_passTimer <= 0f) IsPass = false;
+            }
         }
+
+        float _passTimer;
 
         /// <summary>Whether <paramref name="player"/> may scoop up this loose ball.</summary>
         public bool CanBePickedUpBy(PlayerController player)
@@ -101,6 +116,7 @@ namespace MarioBasketball.Gameplay
             Holder = player;
             State = BallState.Held;
             IsRebound = false;
+            IsPass = false;
             _rb.isKinematic = true;
             _rb.detectCollisions = false;
         }
@@ -141,9 +157,13 @@ namespace MarioBasketball.Gameplay
         /// loose ball — a teammate (or a defender) can pick it off.</summary>
         public void PassTo(Vector3 target)
         {
+            TeamSide thrower = Holder != null ? Holder.team : ShooterTeam;
             MarkReleased();
             PendingPoints = 0;
             State = BallState.Free;
+            IsPass = true;            // intercept with Steals until it goes stale
+            PassingTeam = thrower;
+            _passTimer = passLiveTime;
             GoLive();
 
             Vector3 start = transform.position;
@@ -173,6 +193,7 @@ namespace MarioBasketball.Gameplay
             PendingPoints = 0;
             _shotPending = false;
             IsRebound = false;
+            IsPass = false;
             GoLive();
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
@@ -185,6 +206,7 @@ namespace MarioBasketball.Gameplay
             PendingPoints = 0;
             _shotPending = false; // resolved as a make
             IsRebound = false;
+            IsPass = false;
             State = BallState.Free;
         }
 
@@ -194,6 +216,7 @@ namespace MarioBasketball.Gameplay
             _releaseLockTimer = releaseLockDuration;
             _shotPending = false;
             IsRebound = false;
+            IsPass = false;
             Holder = null;
         }
 

@@ -40,6 +40,10 @@ namespace MarioBasketball.AI
         public float smotheredDistance = 1.6f;
         public float passCooldown = 1.0f;
 
+        [Header("Dribble move")]
+        public float dribbleGuardDistance = 1.6f;
+        [Range(0f, 1f)] public float dribbleChance = 0.01f;
+
         [Header("Defense")]
         public float onBallGap = 1.0f;
         public float offBallGap = 1.3f;
@@ -166,6 +170,10 @@ namespace MarioBasketball.AI
                     return;
                 }
             }
+
+            // Tightly guarded on the perimeter → try to break the defender down.
+            if (nearestDef < dribbleGuardDistance && dist > _pc.paintRadius && Random.value < dribbleChance)
+                _pc.AttemptDribbleMove();
 
             MoveTo(aim, sprint: dist > 5f);
         }

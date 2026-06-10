@@ -39,6 +39,11 @@ namespace MarioBasketball.Characters
 
         public HiddenTrait hiddenTrait = HiddenTrait.None;
 
+        /// <summary>Visual/physical height in metres — presentation, not a
+        /// gameplay stat. NBA-Street-style exaggeration is encouraged (Bowser
+        /// towers, Toad is tiny). Drives the body capsule and controller size.</summary>
+        [Range(1f, 2.8f)] public float heightMeters = 1.9f;
+
         /// <summary>Read a stat by its <see cref="StatType"/>.</summary>
         public int Get(StatType stat)
         {
@@ -79,6 +84,7 @@ namespace MarioBasketball.Characters
             postDefense      = Mathf.Clamp(postDefense, Min, Max);
             perimeterDefense = Mathf.Clamp(perimeterDefense, Min, Max);
             stamina          = Mathf.Clamp(stamina, Min, Max);
+            heightMeters     = Mathf.Clamp(heightMeters, 1f, 2.8f);
         }
 
         /// <summary>A deep copy, so runtime tweaks never mutate shared data.</summary>

@@ -139,6 +139,22 @@ burst · Dribble move · Timeout.
 > adjust, defensive stance, teammate-icon passing, dribble moves.
 > See `docs/GETTING_STARTED.md` for the full map.
 
+## Presentation (NBA Street Vol 1 target)
+
+The current look targets **NBA Street Vol 1**: an elevated **sideline camera**,
+fairly low and close so players read big on screen, panning along the court
+with the **ball** (not the controlled player — the gold ring marks control);
+the court runs left-right with a hoop at each side of the screen. Tunables on
+`CameraRig` (sideX/height/FOV/pan range).
+
+Player bodies have **exaggerated, per-character sizes** via
+`CharacterStats.heightMeters` (visual capsule + collider scale with it):
+Bowser 2.6 m, DK 2.45, Waluigi 2.35, Piranha Plant 2.1, Wario 2.0,
+Yoshi 1.95, Luigi/Peach/Birdo 1.9, Daisy 1.85, Mario 1.8, Diddy 1.5,
+Boo 1.4, Toad 1.25, Baby Mario 1.15.
+> Heights are a first pass by the implementer for the NBA-Street feel —
+> **owner should review/adjust** (they're presentation, not gameplay stats).
+
 ## Roster
 
 > **Characters are designed collaboratively. Do not invent or tweak characters

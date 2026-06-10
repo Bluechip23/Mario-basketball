@@ -88,10 +88,12 @@ namespace MarioBasketball.Bootstrap
             gm.homeSubEntry = new Vector3(0f, 1.1f, -4f);
             gm.awaySubEntry = new Vector3(0f, 1.1f, 4f);
 
+            // NBA-Street-style sideline camera tracks the ball (the action),
+            // not the controlled player — the gold ring marks who you control.
             if (Camera.main != null)
             {
                 var rig = Camera.main.GetComponent<CameraRig>();
-                if (rig != null && gm.humanPlayer != null) rig.target = gm.humanPlayer.transform;
+                if (rig != null && gm.ball != null) rig.target = gm.ball.transform;
             }
 
             var switcher = gameObject.AddComponent<MarioBasketball.Control.PlayerSwitchManager>();
@@ -130,17 +132,28 @@ namespace MarioBasketball.Bootstrap
 
         PlayerController BuildPlayer(CharacterStats stats, Vector3 pos, TeamSide side, Color color, bool isHuman, bool benched)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.name = $"{side}_{stats.characterName}";
+            float h = stats.heightMeters;
+
+            // Root carries physics/logic; an unscaled root keeps the
+            // CharacterController honest while the visual capsule is scaled to
+            // the character's height (NBA-Street-style big/small bodies).
+            var go = new GameObject($"{side}_{stats.characterName}");
             go.SetActive(false); // configure before Awake/OnEnable run
+            pos.y = h / 2f + 0.05f;
             go.transform.position = pos;
-            Tint(go, color);
-            Destroy(go.GetComponent<CapsuleCollider>()); // CharacterController replaces it
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            body.name = "Body";
+            Destroy(body.GetComponent<Collider>()); // CharacterController replaces it
+            body.transform.SetParent(go.transform, false);
+            // A capsule primitive is 2 m tall and 1 m wide at scale 1.
+            body.transform.localScale = new Vector3(0.45f * h, h / 2f, 0.45f * h);
+            Tint(body, color);
 
             var cc = go.AddComponent<CharacterController>();
             cc.center = Vector3.zero;
-            cc.height = 2f;
-            cc.radius = 0.4f;
+            cc.height = h;
+            cc.radius = Mathf.Min(0.225f * h, h / 2f - 0.01f);
 
             var character = go.AddComponent<PlayerCharacter>();
             character.stats = stats;
@@ -309,12 +322,14 @@ namespace MarioBasketball.Bootstrap
                 cam = camGo.AddComponent<Camera>();
                 camGo.AddComponent<AudioListener>();
             }
-            // Overview framing used before a target exists (team select / pre-match).
-            cam.transform.position = new Vector3(0f, 14f, -20f);
+            // Sideline overview before a target exists (team select / pre-match).
+            cam.transform.position = new Vector3(-(courtWidth / 2f + 6f), 7f, 0f);
             cam.transform.LookAt(new Vector3(0f, 1f, 0f));
 
             var rig = cam.GetComponent<CameraRig>();
             if (rig == null) rig = cam.gameObject.AddComponent<CameraRig>();
+            rig.sideX = -(courtWidth / 2f + 3.5f);
+            rig.zRange = courtLength / 2f - 6f;
             rig.target = target;
         }
 

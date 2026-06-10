@@ -43,11 +43,14 @@ namespace MarioBasketball.Gameplay
         public static float BaseFromStat(float statEff)
             => Mathf.Lerp(BaseMin, BaseMax, Mathf.Clamp01((statEff - 1f) / 9f));
 
-        /// <summary>Make probability for a jump shot from a court position.</summary>
+        /// <summary>Make probability for a jump shot from a court position.
+        /// <paramref name="statOverride"/> (&gt;= 0) replaces the effective
+        /// scoring stat — used by traits like quick catch-and-shoot.</summary>
         public static float MakeChance(PlayerController shooter, StatType zone, float distMeters,
-                                       PlayerController defender, bool onFire)
+                                       PlayerController defender, bool onFire, float statOverride = -1f)
         {
-            float p = BaseFromStat(shooter.EffectiveStat(zone));
+            float statEff = statOverride >= 0f ? statOverride : shooter.EffectiveStat(zone);
+            float p = BaseFromStat(statEff);
             p += DistanceModifier(shooter, zone, distMeters);
             p -= ContestPenalty(shooter, defender, zone);
             if (onFire) p += OnFireBonus;

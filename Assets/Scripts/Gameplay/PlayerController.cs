@@ -53,6 +53,8 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float minTimingMultiplier = 0.35f;
         [Tooltip("Auto-release this long after the apex if the button is still held.")]
         public float shotAutoReleaseAfterApex = 0.45f;
+        [Tooltip("Catch-and-shoot window for the quick-catch shooter trait.")]
+        public float quickCatchWindow = 0.3f;
 
         [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
@@ -128,6 +130,9 @@ namespace MarioBasketball.Gameplay
         bool _shooting;
         float _shotCharge;
         float _apexTime;
+        bool _pendingQuickCatch;
+        bool _hadBall;
+        float _catchTime = -10f;
 
         void Awake()
         {
@@ -229,7 +234,17 @@ namespace MarioBasketball.Gameplay
             AdvanceShotMeter(dt);
             Move();
             TryPickUpLooseBall();
+
+            // Track when this player gains the ball (for catch-and-shoot timing).
+            bool has = HasBall;
+            if (has && !_hadBall) _catchTime = Time.time;
+            _hadBall = has;
         }
+
+        bool QuickCatchReady() =>
+            _character != null && _character.stats != null
+            && _character.stats.hiddenTrait == HiddenTrait.QuickCatchShooter
+            && (Time.time - _catchTime) <= quickCatchWindow;
 
         void AdvanceShotMeter(float dt)
         {
@@ -336,7 +351,7 @@ namespace MarioBasketball.Gameplay
         public void TriggerShoot()
         {
             if (MatchPause.IsPaused || IsStunned || IsPosting) return;
-            ExecuteShot(1f);
+            ExecuteShot(1f, QuickCatchReady());
         }
 
         // Human shooting: press to rise into the jump, release near the apex.
@@ -347,9 +362,11 @@ namespace MarioBasketball.Gameplay
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
+            bool quick = QuickCatchReady(); // captured at the catch, before the jump
             float distance = HorizontalDistance(transform.position, hoop.AimPoint);
-            if (distance <= paintRadius) { ExecuteShot(1f); return; } // layup/dunk: no timing
+            if (distance <= paintRadius) { ExecuteShot(1f, quick); return; } // layup/dunk: no timing
 
+            _pendingQuickCatch = quick;
             _shooting = true;
             _shotCharge = 0f;
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // jump
@@ -367,15 +384,16 @@ namespace MarioBasketball.Gameplay
             float timing = error <= perfectReleaseWindow
                 ? 1f
                 : Mathf.Clamp(1f - (error - perfectReleaseWindow) * timingFalloffPerSec, minTimingMultiplier, 1f);
-            ExecuteShot(timing);
+            ExecuteShot(timing, _pendingQuickCatch);
         }
 
         /// <summary>
         /// Resolve a shot: block roll first (unaffected by timing or on fire),
         /// then a make roll using <see cref="ShotMath"/> scaled by the release
-        /// <paramref name="timingMultiplier"/> (1 = perfect).
+        /// <paramref name="timingMultiplier"/> (1 = perfect). A quick catch-and-
+        /// shoot three overrides the 3-Point rating to a 10.
         /// </summary>
-        void ExecuteShot(float timingMultiplier)
+        void ExecuteShot(float timingMultiplier, bool quickCatch)
         {
             if (!HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
@@ -392,6 +410,11 @@ namespace MarioBasketball.Gameplay
 
             PlayerController defender = NearestOpponentTo(transform.position);
 
+            // Quick catch-and-shoot trait: a three taken right off the catch
+            // shoots as if 3-Point were 10.
+            bool quickThree = quickCatch && shotStat == StatType.ThreePoint && _character != null;
+            float shotStatValue = quickThree ? _character.GetEffectiveFor(10) : Effective(shotStat, 5f);
+
             // Block check first — unaffected by timing or being on fire.
             if (defender != null)
             {
@@ -400,8 +423,7 @@ namespace MarioBasketball.Gameplay
                 {
                     float closeness = 1f - dd / contestRange;
                     float blk = defender.EffectiveStat(StatType.Blocks);
-                    float stat = Effective(shotStat, 5f);
-                    float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - stat), 0f, blockMaxChance) * closeness;
+                    float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - shotStatValue), 0f, blockMaxChance) * closeness;
                     if (Random.value < chance)
                     {
                         Vector3 away = transform.position - aim; away.y = 0f;
@@ -413,7 +435,8 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _character != null && _character.OnFire;
-            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire) * timingMultiplier;
+            float statOverride = quickThree ? shotStatValue : -1f;
+            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, statOverride) * timingMultiplier;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);

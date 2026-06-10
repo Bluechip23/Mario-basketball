@@ -22,6 +22,7 @@ namespace MarioBasketball.InputControl
         public bool PostUpHeld { get; private set; }
 
         public event Action ShootPressed;
+        public event Action ShootReleased;
         public event Action PassPressed;
         public event Action JumpPressed;
         public event Action StealPressed;
@@ -94,6 +95,7 @@ namespace MarioBasketball.InputControl
             _fake.AddBinding("<Gamepad>/leftShoulder"); // LB
 
             _shoot.performed += _ => ShootPressed?.Invoke();
+            _shoot.canceled += _ => ShootReleased?.Invoke();
             _pass.performed += _ => PassPressed?.Invoke();
             _jump.performed += _ => JumpPressed?.Invoke();
             _steal.performed += _ => StealPressed?.Invoke();

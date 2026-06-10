@@ -48,13 +48,13 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   - making **6 shots in a row regardless** of what the opponent does.
 - The streak is **per-player**: **no other teammate can score** during it
   (a teammate's basket breaks it). A miss also breaks the streak.
-- While on fire: the player gets a **stat increase**, but **stamina drains**
-  and **does not refill to full** — being on fire *mitigates* the stamina
-  penalty rather than removing it.
-- **Open questions (need owner input):** exactly which stats get boosted and by
-  how much; what ends the on-fire state (opponent scores? a miss? a timer?).
-  Current code exposes tunable knobs and a `SetOnFire` hook but does **not**
-  yet decide these — see Implementation status.
+- While on fire: **+2 to all stats**, and **+30% chance the shot just goes in**
+  (applied *after* the block check — being on fire doesn't help you avoid a
+  block, it only helps the ball drop). Stamina drains and **does not refill to
+  full** — being on fire mitigates the stamina penalty rather than removing it.
+- **On fire ends when the opposing team scores** (chosen rule; a miss does not
+  put it out). Implemented in `GameManager` (streak bookkeeping) + the +30%
+  make in `PlayerController`/`PostUpController`.
 
 ### Hidden stats / traits
 - Characters can have **hidden traits** not shown on the stat sheet.
@@ -93,6 +93,28 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
 - A higher **Stamina** stat makes energy fade **more slowly**.
 - Implemented in `PlayerCharacter`: `GetEffective(stat)` scales the raw stat by
   the current energy fraction (and adds the on-fire bonus).
+
+### Shooting model (`ShotMath`)
+Shots resolve as an explicit **make probability**, not pure aim: base make% from
+the relevant scoring stat (1-10 → ~28-85%), then modifiers add/subtract:
+- **Distance falloff within the zone** — deeper = lower make%. Threes lose ~4%
+  per foot beyond 1 ft past the arc; mid-range ~2%/ft past the paint; inside
+  ~1.5%/ft. So a corner three beats a deep heave, and an elbow jumper beats a
+  long two.
+- **Deep-Three Specialist** (Peach) instead *gains* on step-backs:
+  `+(e^(-0.1543·(x−4.5)²)·10)%` for x = feet behind the line (1-8; 9-10 ft hold
+  the 8 ft value), peaking ~+10% around 4.5 ft, until she's finally penalised
+  past ~10 ft.
+- **Contest** (Perimeter/Post Defense, by proximity) subtracts up to ~35%.
+- **On fire** adds +30% (after the block roll).
+Blocks are a separate roll *before* the make check, so on-fire never helps you
+avoid a block. All knobs are public statics on `ShotMath`.
+
+**Shot timing (jump shots).** Mid-range and three-point shots use a hold-and-
+release meter (`PlayerController`): press to rise into the jump, release at the
+apex for a **perfect** shot (full make%); mistiming multiplies make% down toward
+`minTimingMultiplier`. Layups/dunks (inside) fire instantly. The AI always
+releases perfectly.
 
 ### Stat interactions
 Some stats reinforce or gate one another. Example from the spec:
@@ -142,9 +164,11 @@ burst · Dribble move · Timeout.
 | Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 6 | 3 | 6 |
 | Daisy       | 7 | 7 | 5 | 8 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
 
-All hidden traits are currently `None`. The stat system supports diverse
-archetypes — Bowser the immobile bruiser, Toad the tiny handle/motor guard,
-Diddy/Yoshi the perimeter speedsters, Peach/Boo the no-strength snipers, etc.
+Hidden traits: **Peach = Deep-Three Specialist** (she gains make% stepping back
+behind the arc — see Shooting below); everyone else is `None` for now. The stat
+system supports diverse archetypes — Bowser the immobile bruiser, Toad the tiny
+handle/motor guard, Diddy/Yoshi the perimeter speedsters, Boo the no-strength
+sniper, etc.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 
@@ -203,6 +227,12 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   auto-resolve (2 attempts) with make% scaling off the shooter's **Mid Range**;
   the fouling team inbounds afterward. The AI fouls occasionally on the ball.
   (No fouling out; team fouls accumulate over the whole game — tunable.)
+- **On fire** (heat-check streaks): a player ignites on **3 makes in a row with
+  no opponent basket between**, or **6 in a row regardless**; a teammate scoring
+  or your own miss breaks the run. While lit: **+2 to all stats** and **+30%**
+  the shot drops (after the block check). It goes out when the **opponent
+  scores**. Per-player shot attribution via the ball's `Shooter`; the HUD flags
+  who's hot.
 - **Post-up** (`PostUpController`): hold Post Up to turn your back to the basket
   and start a **back-down battle** — offense taps Back Down (worth their
   **Power**), the defender resists (human taps the same button; AI resists from
@@ -214,10 +244,17 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   Defense** + leverage + **Blocks**. You can still **pass out** of the post
   (kicks to the most open teammate). The AI both posts up and defends the post.
 - **Dive for loose balls** (Dive button): a lunge with extended pickup reach.
+- **Start menu + Create-a-Player** (`MainMenu`, `CreatePlayerMenu`): the start
+  menu routes to an exhibition game or to Create-a-Player, which offers a
+  **Journey Character** (limited stats — a 10-point budget with escalating costs:
+  reach 1-3 = 1 each, 4-5 = 2, 6-8 = 3, 9 = 4, 10 = 5; earns more in story mode,
+  not yet built) or a **Standard Player** (unlimited stats, exhibition only),
+  each with an info box. Created players are saved (`CreatedPlayerStore`,
+  PlayerPrefs) and appear in team select. (Journey/Story mode itself is a stub.)
 - **Team select** (`TeamSelectMenu`): pre-match screen to draft five characters
-  per side from the roster (first home pick is the player you control), with
-  randomize and sensible defaults; `GameBootstrap.StartMatch` then spawns the
-  game. Restart returns here.
+  per side from the roster — library characters plus created players — (first
+  home pick is the player you control), with randomize and sensible defaults;
+  `GameBootstrap.StartMatch` then spawns the game. Restart returns to the menu.
 - **Pause menu** (`PauseMenu`, Esc / Start): freezes the game and inputs;
   Resume / **Stats** (full stat sheet for all ten players) / Restart / Quit.
 - **Player switching** (`PlayerSwitchManager`): exactly one human-controlled
@@ -238,8 +275,6 @@ Lineups are chosen on the pre-match **team select** screen (see below).
       rotations, better cut timing, contest jump animations.
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
 - [ ] Post-up polish: animations, distinct move feel, jump-to-contest timing.
-- [ ] On-fire streak tracker (needs per-player shot attribution; needs owner
-      decisions on boost magnitude and exit condition).
 - [ ] Rebound catch-radius contests (Rebounds stat); steals/blocks polish.
 - [ ] Dribble moves, speed burst as distinct mechanic, defensive stance.
 - [ ] Passing: tap-loft vs hold-hard, teammate icon targeting.

@@ -43,6 +43,10 @@ namespace MarioBasketball.UI
                     GUI.Label(new Rect(20, 110, 760, 26),
                         $"FREE THROW — {gm.FreeThrowShooter.Character.stats.characterName}  ({gm.FreeThrowsRemaining} left)", _mid);
 
+                string onFire = OnFireNames(gm);
+                if (!string.IsNullOrEmpty(onFire))
+                    GUI.Label(new Rect(Screen.width - 340, 14, 320, 26), $"ON FIRE: {onFire}", _mid);
+
                 if (gm.State == GameState.GameOver)
                 {
                     string winner = gm.HomeScore == gm.AwayScore ? "TIE" :
@@ -61,6 +65,18 @@ namespace MarioBasketball.UI
                     GUI.Box(new Rect(20, 160, 220, 14), GUIContent.none);
                     GUI.Box(new Rect(20, 160, 220 * Mathf.Clamp01(human.EnergyFraction), 14), GUIContent.none);
 
+                    if (humanPc.IsShooting)
+                    {
+                        // Shot meter: fill rises; hit the marker for a perfect release.
+                        const float mw = 240f, mh = 16f;
+                        float mx = (Screen.width - mw) / 2f, my = Screen.height - 210f;
+                        GUI.Box(new Rect(mx, my, mw, mh), GUIContent.none);
+                        GUI.Box(new Rect(mx, my, mw * humanPc.ShotChargeFraction, mh), GUIContent.none);
+                        float markX = mx + mw * humanPc.ShotPerfectFraction;
+                        GUI.Box(new Rect(markX - 2f, my - 4f, 4f, mh + 8f), GUIContent.none);
+                        GUI.Label(new Rect(mx, my - 22f, mw, 20f), "Release at the marker!", _small);
+                    }
+
                     if (humanPc.IsPosting && humanPc.Post != null)
                     {
                         float lev = Mathf.Clamp(humanPc.Post.Leverage, -humanPc.Post.maxLeverage, humanPc.Post.maxLeverage);
@@ -74,12 +90,30 @@ namespace MarioBasketball.UI
 
             GUI.Label(new Rect(20, Screen.height - 176, 860, 176),
                 "CONTROLLER  —  Move: L-stick   Turbo: LT   Jump/Contest: Y   Pause: Start\n" +
-                "With ball:  Shoot A   Pass X   Post up (hold) RB   Dive (loose ball) B\n" +
+                "With ball:  Shoot A (hold+release at the marker for jumpers)   Pass X   Post up (hold) RB   Dive B\n" +
                 "Posting (hold RB):  Hook Y   Drop step A   Spin B   Fake LB   Back down RT   Pass X\n" +
                 "Defense:  Switch A/LB   Steal X   Push/foul or bump RT   Jump/Block Y\n" +
                 "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +
                 "You control the gold-ringed player; on offense control follows the ball.",
                 _small);
+        }
+
+        static string OnFireNames(GameManager gm)
+        {
+            string result = "";
+            AppendOnFire(gm.Home, ref result);
+            AppendOnFire(gm.Away, ref result);
+            return result;
+        }
+
+        static void AppendOnFire(TeamState team, ref string result)
+        {
+            foreach (var p in team.onCourt)
+            {
+                if (p == null || p.Character == null || !p.Character.OnFire) continue;
+                if (result.Length > 0) result += ", ";
+                result += p.Character.stats.characterName;
+            }
         }
     }
 }

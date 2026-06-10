@@ -47,8 +47,6 @@ namespace MarioBasketball.Gameplay
 
         [Header("Post moves")]
         public float moveFlightTime = 0.9f;
-        public float maxSpread = 1.4f;
-        public float minSpread = 0.05f;
         public float dropStepLungeLeverage = 2f;
         public float blockBaseChance = 0.05f;
         public float blockStatScale = 0.05f;
@@ -216,6 +214,7 @@ namespace MarioBasketball.Gameplay
                         // Spun into trouble — stripped.
                         gm.ball.PickUp(_defender);
                         gm.OnPossessionGained(_defender);
+                        gm.OnShotMissed(_pc); // lost it — streak broken
                         End();
                         return;
                     }
@@ -238,14 +237,16 @@ namespace MarioBasketball.Gameplay
                 {
                     Vector3 away = transform.position - hoop.AimPoint; away.y = 0f;
                     gm.ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, shovePower * 0.6f);
+                    gm.OnShotMissed(_pc); // blocked → streak broken
                     End();
                     return;
                 }
             }
 
-            float t = Mathf.Clamp01((quality - 1f) / 9f);
-            float spread = Mathf.Lerp(maxSpread, minSpread, t);
-            gm.ball.Shoot(hoop.AimPoint, _pc.team, 2, moveFlightTime, spread);
+            bool onFire = _pc.Character != null && _pc.Character.OnFire;
+            float makeChance = ShotMath.MakeChanceFromQuality(quality, onFire);
+            bool make = Random.value < makeChance;
+            gm.ball.Shoot(hoop.AimPoint, _pc.team, 2, moveFlightTime, ShotMath.AimOffset(make), _pc);
             End();
         }
 

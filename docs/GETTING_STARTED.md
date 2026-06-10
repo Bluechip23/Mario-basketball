@@ -33,9 +33,14 @@ There is **no committed scene** — the playable court is built at runtime by
    "Game Bootstrap").
 4. Press **Play**.
 
-You'll first see the **Team Select** screen over the empty court: draft five
-characters for each side (your first HOME pick — marked ★ — is the player you
-control), then **Start Game**. The match spawns and tips off.
+You'll first see the **start menu**: **Exhibition Game** or **Create a Player**
+(Journey/Story mode is stubbed as "coming soon"). Create-a-Player offers a
+**Journey Character** (limited stats, a 10-point budget that gets pricier as a
+stat climbs — 1-3 cost 1 each, 4-5 cost 2, 6-8 cost 3, 9 costs 4, 10 costs 5)
+or a **Standard Player** (unlimited stats, exhibition only); both are saved and
+show up in team select. **Exhibition Game** opens **Team Select**: draft five
+characters per side (your first HOME pick — marked ★ — is the player you
+control), then **Start Game** and it tips off.
 
 > Tip: save that scene as `Assets/Scenes/Sandbox.unity` so you can just press
 > Play next time. (Scenes aren't committed yet to avoid binary merge pain on
@@ -52,7 +57,7 @@ bindings exist as a fallback.
 |--------|---------|----------|
 | Move | Left stick | WASD |
 | Turbo / speed burst | LT (L2) | Left Shift |
-| **Shoot** | A (✕) | Space |
+| **Shoot** (jump shots: hold, release at apex) | A (✕) | Space |
 | **Pass** (to most open teammate) | X (□) | E |
 | **Jump / contest / rebound** | Y (△) | Left Ctrl |
 | **Steal** | X (□) — when you have no ball | F |

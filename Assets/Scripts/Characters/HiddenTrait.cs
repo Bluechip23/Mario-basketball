@@ -18,6 +18,13 @@ namespace MarioBasketball.Characters
         /// 3-Point (and Mid Range) only fire at full effectiveness on a
         /// catch-and-shoot; pulling up off the dribble incurs a heavy penalty.
         /// </summary>
-        CatchAndShootOnly
+        CatchAndShootOnly,
+
+        /// <summary>
+        /// Doesn't suffer the usual deep-three penalty — actually <i>gains</i>
+        /// make% stepping back behind the arc (peaking a few feet out) before
+        /// finally falling off way out. See <c>ShotMath</c> (Peach).
+        /// </summary>
+        DeepThreeSpecialist
     }
 }

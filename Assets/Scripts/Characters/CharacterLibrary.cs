@@ -62,7 +62,7 @@ namespace MarioBasketball.Characters
             speed = 6, ballHandling = 6, threePoint = 8, midRange = 6,
             insideScoring = 5, postOffense = 5, dunk = 5, power = 3,
             rebounds = 3, blocks = 3, steals = 6, postDefense = 3,
-            perimeterDefense = 6, stamina = 8, hiddenTrait = HiddenTrait.None
+            perimeterDefense = 6, stamina = 8, hiddenTrait = HiddenTrait.DeepThreeSpecialist
         };
 
         /// <summary>Toad — elite handle and motor, crafty finisher, but tiny and

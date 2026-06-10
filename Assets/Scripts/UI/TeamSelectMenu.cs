@@ -14,10 +14,11 @@ namespace MarioBasketball.UI
     public class TeamSelectMenu : MonoBehaviour
     {
         public GameBootstrap bootstrap;
+        public MainMenu mainMenu;
 
         const int TeamSize = 5;
 
-        IReadOnlyList<CharacterStats> _roster;
+        List<CharacterStats> _roster = new List<CharacterStats>();
         readonly List<int> _home = new List<int>();
         readonly List<int> _away = new List<int>();
         bool _editingAway;
@@ -28,9 +29,16 @@ namespace MarioBasketball.UI
         GUIStyle _row;
         GUIStyle _button;
 
-        void Awake()
+        void OnEnable()
         {
-            _roster = CharacterLibrary.All();
+            // Rebuild the pool each time so freshly created players appear.
+            _roster = new List<CharacterStats>(CharacterLibrary.All());
+            foreach (var created in CreatedPlayerStore.All())
+                if (created != null && created.stats != null) _roster.Add(created.stats);
+
+            _home.Clear();
+            _away.Clear();
+            _editingAway = false;
             Prefill(_home, "Mario", "Luigi", "Peach", "Toad", "Diddy Kong");
             Prefill(_away, "Bowser", "Donkey Kong", "Waluigi", "Yoshi", "Boo");
         }
@@ -96,11 +104,18 @@ namespace MarioBasketball.UI
             GUILayout.EndScrollView();
 
             GUILayout.Space(6);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Back", _button, GUILayout.Height(46), GUILayout.Width(120)))
+            {
+                enabled = false;
+                if (mainMenu != null) mainMenu.Show();
+            }
             bool ready = _home.Count == TeamSize && _away.Count == TeamSize;
             GUI.enabled = ready;
             if (GUILayout.Button(ready ? "START GAME" : "Pick 5 per team to start", _button, GUILayout.Height(46)))
                 StartGame();
             GUI.enabled = true;
+            GUILayout.EndHorizontal();
 
             GUILayout.EndArea();
         }

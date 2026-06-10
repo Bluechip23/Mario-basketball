@@ -25,6 +25,19 @@ namespace MarioBasketball.Characters
         /// make% stepping back behind the arc (peaking a few feet out) before
         /// finally falling off way out. See <c>ShotMath</c> (Peach).
         /// </summary>
-        DeepThreeSpecialist
+        DeepThreeSpecialist,
+
+        /// <summary>
+        /// Catch-and-shoot sniper: shooting a three within a short window of
+        /// catching the ball treats 3-Point as a 10. See <c>PlayerController</c>
+        /// (Piranha Plant).
+        /// </summary>
+        QuickCatchShooter,
+
+        /// <summary>
+        /// Crashes the offensive glass — Rebounds counts as 9 while on offense.
+        /// Engages once live rebounding lands (Wario).
+        /// </summary>
+        OffensiveRebounder
     }
 }

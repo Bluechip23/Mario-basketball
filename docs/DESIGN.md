@@ -113,8 +113,16 @@ avoid a block. All knobs are public statics on `ShotMath`.
 **Shot timing (jump shots).** Mid-range and three-point shots use a hold-and-
 release meter (`PlayerController`): press to rise into the jump, release at the
 apex for a **perfect** shot (full make%); mistiming multiplies make% down toward
-`minTimingMultiplier`. Layups/dunks (inside) fire instantly. The AI always
-releases perfectly.
+`minTimingMultiplier`. The AI always releases perfectly.
+
+**Inside finishing (dunk / layup).** Inside the paint, hold Shoot to **go up**
+and glide to the rim. It's a **dunk** if effective Dunk ≥ `dunkThreshold`
+(scores off the **Dunk** stat, with **Power** resisting blocks), otherwise a
+**layup** (off **Inside Scoring**). In the air you can **L1 air-adjust** — it
+dodges the block (block chance ×`adjustBlockReduction`) but costs make%, fully
+mitigated at **Inside Scoring** 10 — or **pass** out of the air to the most open
+teammate. Release (or auto after `finishAirTime`) to commit. The AI finishes
+immediately without adjusting.
 
 ### Stat interactions
 Some stats reinforce or gate one another. Example from the spec:
@@ -147,11 +155,20 @@ with the **ball** (not the controlled player — the gold ring marks control);
 the court runs left-right with a hoop at each side of the screen. Tunables on
 `CameraRig` (sideX/height/FOV/pan range).
 
+Each character has a **placeholder silhouette model** (`CharacterModelBuilder`)
+assembled from primitives + a procedural cone — color-coded with the team
+**jersey** and signature features (Bowser's shell/horns, Toad's mushroom cap,
+Peach's dress/crown, Yoshi's snout/tail, Boo's floating ghost, Piranha Plant's
+pipe/bulb, plumber caps/'staches, etc.). Clearly dev-art, swappable for authored
+models later. The team jersey distinguishes sides; the gold ring marks who you
+control.
+
 Player bodies have **exaggerated, per-character sizes** via
-`CharacterStats.heightMeters` (visual capsule + collider scale with it):
-Bowser 2.6 m, DK 2.45, Waluigi 2.35, Piranha Plant 2.1, Wario 2.0,
-Yoshi 1.95, Luigi/Peach/Birdo 1.9, Daisy 1.85, Mario 1.8, Diddy 1.5,
-Boo 1.4, Toad 1.25, Baby Mario 1.15.
+`CharacterStats.heightMeters` (the model + collider scale with it):
+Bowser 2.6 m, DK 2.45, Waluigi 2.35, Kritter 2.15, Piranha Plant 2.1,
+Wario 2.0, Yoshi 1.95, Luigi/Peach/Birdo 1.9, Daisy 1.85, Mario 1.8,
+Koopa 1.7, Shyguy 1.55, Diddy 1.5, Monty Mole 1.45, Boo 1.4, Toad 1.25,
+Baby Mario 1.15.
 > Heights are a first pass by the implementer for the NBA-Street feel —
 > **owner should review/adjust** (they're presentation, not gameplay stats).
 
@@ -164,27 +181,33 @@ Boo 1.4, Toad 1.25, Baby Mario 1.15.
 
 | Character | Spd | BH | 3PT | Mid | Ins | PostO | Dunk | Pow | Reb | Blk | Stl | PostD | PerD | Sta |
 |-----------|----|----|-----|-----|-----|-------|------|-----|-----|-----|-----|-------|------|-----|
-| Bowser      | 2 | 2 | 1 | 2 | 10 | 9 | 3 | 10 | 5 | 5 | 8 | 7 | 1 | 4 |
-| Donkey Kong | 7 | 2 | 1 | 1 | 5  | 5 | 10| 9  | 8 | 8 | 8 | 8 | 7 | 7 |
-| Mario       | 7 | 7 | 7 | 8 | 7  | 7 | 7 | 6  | 6 | 6 | 6 | 4 | 6 | 7 |
-| Luigi       | 7 | 5 | 6 | 6 | 8  | 6 | 8 | 6  | 7 | 7 | 7 | 7 | 8 | 8 |
-| Peach       | 6 | 6 | 8 | 6 | 5  | 5 | 5 | 3  | 3 | 3 | 6 | 3 | 6 | 8 |
+| Bowser      | 2 | 2 | 1 | 2 | 10 | 9 | 3 | 10 | 5 | 5 | 8 | 7 | 2 | 4 |
+| Donkey Kong | 7 | 2 | 1 | 1 | 4  | 4 | 10| 9  | 9 | 8 | 8 | 8 | 7 | 7 |
+| Mario       | 7 | 8 | 7 | 8 | 8  | 7 | 7 | 6  | 7 | 6 | 6 | 4 | 6 | 8 |
+| Luigi       | 7 | 5 | 3 | 6 | 7  | 6 | 8 | 6  | 7 | 8 | 8 | 8 | 8 | 8 |
+| Peach       | 6 | 6 | 8 | 6 | 4  | 5 | 5 | 3  | 3 | 3 | 8 | 3 | 6 | 8 |
 | Toad        | 8 | 10| 5 | 5 | 8  | 2 | 1 | 3  | 3 | 1 | 7 | 1 | 6 | 9 |
 | Waluigi     | 6 | 3 | 3 | 3 | 7  | 9 | 6 | 6  | 7 | 8 | 8 | 8 | 1 | 6 |
-| Diddy Kong  | 10| 7 | 2 | 3 | 4  | 1 | 6 | 6  | 6 | 5 | 8 | 3 | 9 | 8 |
-| Yoshi       | 10| 2 | 2 | 1 | 2  | 2 | 8 | 7  | 7 | 7 | 8 | 7 | 9 | 10|
-| Birdo       | 9 | 5 | 8 | 8 | 6  | 6 | 7 | 6  | 5 | 5 | 7 | 7 | 7 | 9 |
+| Diddy Kong  | 10| 7 | 2 | 3 | 6  | 6 | 4 | 6  | 6 | 5 | 8 | 3 | 9 | 8 |
+| Yoshi       | 10| 1 | 1 | 1 | 2  | 1 | 7 | 7  | 7 | 7 | 8 | 7 | 9 | 10|
+| Birdo       | 9 | 6 | 8 | 8 | 7  | 4 | 7 | 6  | 5 | 5 | 4 | 3 | 3 | 9 |
 | Boo         | 3 | 1 | 10| 6 | 2  | 1 | 1 | 1  | 4 | 2 | 9 | 4 | 4 | 6 |
 | Baby Mario  | 7 | 8 | 3 | 6 | 8  | 8 | 2 | 5  | 3 | 3 | 6 | 2 | 6 | 8 |
 | Wario       | 4 | 8 | 7 | 10| 6  | 7 | 5 | 8  | 7 | 5 | 8 | 6 | 5 | 6 |
-| Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 6 | 3 | 6 |
-| Daisy       | 7 | 7 | 5 | 8 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
+| Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 7 | 3 | 6 |
+| Daisy       | 7 | 7 | 5 | 9 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
+| Monty Mole  | 7 | 4 | 5 | 5 | 5  | 3 | 3 | 7  | 7 | 7 | 4 | 3 | 10| 8 |
+| Koopa       | 6 | 10| 5 | 5 | 5  | 3 | 3 | 8  | 6 | 5 | 6 | 3 | 7 | 8 |
+| Kritter     | 6 | 1 | 1 | 2 | 5  | 3 | 4 | 8  | 8 | 10| 3 | 10| 4 | 8 |
+| Shyguy      | 6 | 6 | 8 | 8 | 8  | 7 | 4 | 5  | 6 | 6 | 5 | 3 | 5 | 2 |
 
-Hidden traits: **Peach = Deep-Three Specialist** (she gains make% stepping back
-behind the arc — see Shooting below); everyone else is `None` for now. The stat
-system supports diverse archetypes — Bowser the immobile bruiser, Toad the tiny
-handle/motor guard, Diddy/Yoshi the perimeter speedsters, Boo the no-strength
-sniper, etc.
+Hidden traits (wired):
+- **Peach — Deep-Three Specialist**: gains make% stepping back behind the arc
+  (see Shooting).
+- **Piranha Plant — Quick-Catch Shooter**: a three taken within
+  `quickCatchWindow` (0.3 s) of catching the ball shoots as if 3-Point were 10.
+- **Wario — Offensive Rebounder**: Rebounds counts as 9 on his own missed-shot
+  boards (live with the rebounding system). Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 
@@ -243,6 +266,14 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   auto-resolve (2 attempts) with make% scaling off the shooter's **Mid Range**;
   the fouling team inbounds afterward. The AI fouls occasionally on the ball.
   (No fouling out; team fouls accumulate over the whole game — tunable.)
+- **Rebounding / loose balls** (`GameManager.ResolveLooseBall`): a missed shot
+  becomes a live ball as it falls (below `reboundHeight`), then it's a **contest**
+  — every on-court player within their **catch radius** competes and the highest
+  **rebound score** wins it. Catch radius and score scale with **Rebounds**,
+  body **height**, and whether the player is **jumping** or **diving** (so go up
+  for the board); the release lockout still stops the shooter insta-grabbing.
+  **Wario's Offensive Rebounder** trait now activates — Rebounds counts as 9 on
+  his own missed-shot boards. The AI crashes and jumps for boards too.
 - **On fire** (heat-check streaks): a player ignites on **3 makes in a row with
   no opponent basket between**, or **6 in a row regardless**; a teammate scoring
   or your own miss breaks the run. While lit: **+2 to all stats** and **+30%**

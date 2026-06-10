@@ -34,7 +34,6 @@ namespace MarioBasketball.Gameplay
         public float jumpHeight = 1.4f;
 
         [Header("Ball handling")]
-        public float pickupRadius = 1.2f;
         [Tooltip("Distance from the basket beyond which a make is worth 3.")]
         public float threePointDistance = 6.75f;
         [Tooltip("Within this radius a shot uses Inside Scoring, not Mid Range.")]
@@ -53,6 +52,22 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float minTimingMultiplier = 0.35f;
         [Tooltip("Auto-release this long after the apex if the button is still held.")]
         public float shotAutoReleaseAfterApex = 0.45f;
+        [Tooltip("Catch-and-shoot window for the quick-catch shooter trait.")]
+        public float quickCatchWindow = 0.3f;
+
+        [Header("Inside finishing (dunk / layup)")]
+        [Tooltip("Time in the air before an unheld finish auto-resolves.")]
+        public float finishAirTime = 0.45f;
+        public float finishApproachSpeed = 4f;
+        public float finishFlightTime = 0.5f;
+        [Tooltip("Effective Dunk at/above this goes up for a dunk; below, a layup.")]
+        public float dunkThreshold = 6f;
+        [Tooltip("Dunk block resistance per point of Power.")]
+        public float dunkPowerBlockResist = 0.3f;
+        [Tooltip("Block chance multiplier when the shot is air-adjusted.")]
+        [Range(0f, 1f)] public float adjustBlockReduction = 0.4f;
+        [Tooltip("Max make% lost to an air-adjust (mitigated by Inside Scoring).")]
+        [Range(0f, 1f)] public float maxAdjustPenalty = 0.35f;
 
         [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
@@ -74,7 +89,6 @@ namespace MarioBasketball.Gameplay
         [Header("Dive / shove")]
         public float diveDuration = 0.5f;
         public float diveSpeed = 9f;
-        public float diveReachBonus = 1.0f;
         public float diveBallSeekRange = 6f;
         public float shoveDuration = 0.35f;
 
@@ -104,6 +118,12 @@ namespace MarioBasketball.Gameplay
         public bool HasBall => Ball != null && Ball.Holder == this;
         public bool IsPosting => _post != null && _post.IsPosting;
         public bool IsStunned => _stunTimer > 0f;
+        /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
+        public bool IsFinishing => _finishing;
+        /// <summary>Physical body height (m), drives rebound reach.</summary>
+        public float BodyHeight => _cc != null ? _cc.height : 1.8f;
+        public bool IsAirborne => _cc != null && !_cc.isGrounded;
+        public bool IsDiving => _diveTimer > 0f;
         public bool IsShooting => _shooting;
         /// <summary>How full the shot meter is (0-1) for the jump in progress.</summary>
         public float ShotChargeFraction => _shooting ? Mathf.Clamp01(_shotCharge / ShotMeterDuration) : 0f;
@@ -128,6 +148,13 @@ namespace MarioBasketball.Gameplay
         bool _shooting;
         float _shotCharge;
         float _apexTime;
+        bool _pendingQuickCatch;
+        bool _hadBall;
+        float _catchTime = -10f;
+        bool _finishing;
+        float _finishTimer;
+        bool _finishIsDunk;
+        bool _finishAdjusted;
 
         void Awake()
         {
@@ -161,6 +188,7 @@ namespace MarioBasketball.Gameplay
                 _moveIntent = Vector2.zero;
                 _sprintIntent = false;
                 _shooting = false;
+                _finishing = false;
                 if (IsPosting) _post.End();
             }
         }
@@ -227,9 +255,21 @@ namespace MarioBasketball.Gameplay
             }
 
             AdvanceShotMeter(dt);
+            AdvanceFinish(dt);
             Move();
-            TryPickUpLooseBall();
+            // Loose balls / rebounds are resolved centrally (GameManager) so it's
+            // a Rebounds + height + jump contest, not a first-come grab.
+
+            // Track when this player gains the ball (for catch-and-shoot timing).
+            bool has = HasBall;
+            if (has && !_hadBall) _catchTime = Time.time;
+            _hadBall = has;
         }
+
+        bool QuickCatchReady() =>
+            _character != null && _character.stats != null
+            && _character.stats.hiddenTrait == HiddenTrait.QuickCatchShooter
+            && (Time.time - _catchTime) <= quickCatchWindow;
 
         void AdvanceShotMeter(float dt)
         {
@@ -237,6 +277,14 @@ namespace MarioBasketball.Gameplay
             if (IsStunned || !HasBall) { _shooting = false; return; } // lost the ball / knocked
             _shotCharge += dt;
             if (_shotCharge >= ShotMeterDuration) ReleaseJumpShot(); // held too long → late shot
+        }
+
+        void AdvanceFinish(float dt)
+        {
+            if (!_finishing) return;
+            if (IsStunned || !HasBall) { _finishing = false; return; }
+            _finishTimer += dt;
+            if (_finishTimer >= finishAirTime) ResolveFinish(); // committed at the rim
         }
 
         void HandlePostHold()
@@ -284,6 +332,13 @@ namespace MarioBasketball.Gameplay
                 horizontal = _diveDir * diveSpeed;
                 _character?.ReportActivity(true, true);
             }
+            else if (_finishing)
+            {
+                // Glide toward the rim while up for the dunk/layup.
+                Vector3 toRim = RimDirection();
+                horizontal = toRim.sqrMagnitude > 0.01f ? toRim.normalized * finishApproachSpeed : Vector3.zero;
+                _character?.ReportActivity(true, false);
+            }
             else
             {
                 Vector3 dir = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
@@ -317,39 +372,29 @@ namespace MarioBasketball.Gameplay
 
         BallController Ball => GameManager.Instance != null ? GameManager.Instance.ball : null;
 
-        void TryPickUpLooseBall()
-        {
-            if (GameManager.Instance == null || GameManager.Instance.State != GameState.Playing) return;
-            var ball = Ball;
-            if (ball == null || !ball.CanBePickedUpBy(this)) return;
-            float reach = _diveTimer > 0f ? pickupRadius + diveReachBonus : pickupRadius;
-            if (Vector3.Distance(transform.position, ball.transform.position) <= reach)
-            {
-                ball.PickUp(this);
-                GameManager.Instance.OnPossessionGained(this);
-            }
-        }
-
         // ---- Actions (input events or AI brain) ----------------------------
 
-        /// <summary>Immediate shot with perfect timing — used by the AI.</summary>
+        /// <summary>Immediate shot with perfect timing — used by the AI. Inside
+        /// the paint it finishes (dunk/layup) with no air-adjust.</summary>
         public void TriggerShoot()
         {
             if (MatchPause.IsPaused || IsStunned || IsPosting) return;
-            ExecuteShot(1f);
+            if (InsideRange()) FinishShot(Effective(StatType.Dunk, 5f) >= dunkThreshold, adjusted: false);
+            else ExecuteShot(1f, QuickCatchReady());
         }
 
-        // Human shooting: press to rise into the jump, release near the apex.
-        // Layups/dunks (inside) fire instantly; only jump shots use the meter.
+        // Human shooting: hold to rise, release to commit. Jump shots use the
+        // release-timing meter; inside (dunk/layup) goes up for a finish you can
+        // air-adjust (L1) or pass out of.
         void OnShootPressed()
         {
-            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _shooting) return;
+            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _shooting || _finishing) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
-            float distance = HorizontalDistance(transform.position, hoop.AimPoint);
-            if (distance <= paintRadius) { ExecuteShot(1f); return; } // layup/dunk: no timing
+            if (InsideRange()) { StartFinish(); return; }
 
+            _pendingQuickCatch = QuickCatchReady(); // captured at the catch, before the jump
             _shooting = true;
             _shotCharge = 0f;
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // jump
@@ -358,6 +403,91 @@ namespace MarioBasketball.Gameplay
         void OnShootReleased()
         {
             if (_shooting) ReleaseJumpShot();
+            else if (_finishing) ResolveFinish();
+        }
+
+        bool InsideRange()
+        {
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            return hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= paintRadius;
+        }
+
+        Vector3 RimDirection()
+        {
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            if (hoop == null) return Vector3.zero;
+            Vector3 d = hoop.AimPoint - transform.position; d.y = 0f;
+            return d;
+        }
+
+        // ---- Inside finishing (dunk / layup) -------------------------------
+
+        void StartFinish()
+        {
+            _finishing = true;
+            _finishTimer = 0f;
+            _finishAdjusted = false;
+            _finishIsDunk = Effective(StatType.Dunk, 5f) >= dunkThreshold;
+            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // go up
+        }
+
+        void ResolveFinish()
+        {
+            if (!_finishing) return;
+            _finishing = false;
+            FinishShot(_finishIsDunk, _finishAdjusted);
+        }
+
+        /// <summary>Resolve a dunk or layup: a block roll first (reduced by an
+        /// air-adjust, and resisted by Power on dunks), then a make roll. A dunk
+        /// scores off the Dunk stat, a layup off Inside Scoring.</summary>
+        void FinishShot(bool isDunk, bool adjusted)
+        {
+            if (!HasBall) return;
+            var gm = GameManager.Instance;
+            Hoop hoop = gm.GetAttackingHoop(team);
+            if (hoop == null) return;
+
+            Vector3 aim = hoop.AimPoint;
+            float finisherStat = isDunk ? Effective(StatType.Dunk, 5f) : Effective(StatType.InsideScoring, 5f);
+            PlayerController defender = NearestOpponentTo(transform.position);
+
+            if (defender != null)
+            {
+                float dd = HorizontalDistance(defender.transform.position, transform.position);
+                if (dd < blockRange)
+                {
+                    float closeness = 1f - dd / contestRange;
+                    float blk = defender.EffectiveStat(StatType.Blocks);
+                    float resist = isDunk ? Effective(StatType.Power, 5f) * dunkPowerBlockResist : 0f;
+                    float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - finisherStat - resist), 0f, blockMaxChance) * closeness;
+                    if (adjusted) chance *= adjustBlockReduction; // contort away from the block
+                    if (Random.value < chance)
+                    {
+                        Vector3 away = transform.position - aim; away.y = 0f;
+                        Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
+                        GameManager.Instance.OnShotMissed(this);
+                        return;
+                    }
+                }
+            }
+
+            bool onFire = _character != null && _character.OnFire;
+            float over = isDunk ? finisherStat : -1f; // dunk uses Dunk as the scoring stat
+            float makeChance = ShotMath.MakeChance(this, StatType.InsideScoring, HorizontalDistance(transform.position, aim), defender, onFire, over);
+            if (adjusted) makeChance -= AdjustPenalty();
+            makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
+            bool make = Random.value < makeChance;
+            Ball.Shoot(aim, team, 2, finishFlightTime, ShotMath.AimOffset(make), this);
+        }
+
+        /// <summary>Make% lost to an air-adjust — fully mitigated at Inside 10.</summary>
+        float AdjustPenalty()
+        {
+            float inside = Effective(StatType.InsideScoring, 5f);
+            return maxAdjustPenalty * (1f - Mathf.Clamp01((inside - 1f) / 9f));
         }
 
         void ReleaseJumpShot()
@@ -367,15 +497,16 @@ namespace MarioBasketball.Gameplay
             float timing = error <= perfectReleaseWindow
                 ? 1f
                 : Mathf.Clamp(1f - (error - perfectReleaseWindow) * timingFalloffPerSec, minTimingMultiplier, 1f);
-            ExecuteShot(timing);
+            ExecuteShot(timing, _pendingQuickCatch);
         }
 
         /// <summary>
         /// Resolve a shot: block roll first (unaffected by timing or on fire),
         /// then a make roll using <see cref="ShotMath"/> scaled by the release
-        /// <paramref name="timingMultiplier"/> (1 = perfect).
+        /// <paramref name="timingMultiplier"/> (1 = perfect). A quick catch-and-
+        /// shoot three overrides the 3-Point rating to a 10.
         /// </summary>
-        void ExecuteShot(float timingMultiplier)
+        void ExecuteShot(float timingMultiplier, bool quickCatch)
         {
             if (!HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
@@ -392,6 +523,11 @@ namespace MarioBasketball.Gameplay
 
             PlayerController defender = NearestOpponentTo(transform.position);
 
+            // Quick catch-and-shoot trait: a three taken right off the catch
+            // shoots as if 3-Point were 10.
+            bool quickThree = quickCatch && shotStat == StatType.ThreePoint && _character != null;
+            float shotStatValue = quickThree ? _character.GetEffectiveFor(10) : Effective(shotStat, 5f);
+
             // Block check first — unaffected by timing or being on fire.
             if (defender != null)
             {
@@ -400,8 +536,7 @@ namespace MarioBasketball.Gameplay
                 {
                     float closeness = 1f - dd / contestRange;
                     float blk = defender.EffectiveStat(StatType.Blocks);
-                    float stat = Effective(shotStat, 5f);
-                    float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - stat), 0f, blockMaxChance) * closeness;
+                    float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - shotStatValue), 0f, blockMaxChance) * closeness;
                     if (Random.value < chance)
                     {
                         Vector3 away = transform.position - aim; away.y = 0f;
@@ -413,7 +548,8 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _character != null && _character.OnFire;
-            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire) * timingMultiplier;
+            float statOverride = quickThree ? shotStatValue : -1f;
+            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, statOverride) * timingMultiplier;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);
@@ -422,7 +558,8 @@ namespace MarioBasketball.Gameplay
         public void TriggerPass()
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
-            if (IsPosting) _post.End(); // kick out of the post
+            if (IsPosting) _post.End();   // kick out of the post
+            _finishing = false;           // or dump it off out of the air
             // Pass to the most open teammate (a blind outlet if nobody's open).
             var mate = FindOpenTeammate();
             if (mate != null) Ball.PassTo(mate.transform.position + Vector3.up * 0.6f);
@@ -540,7 +677,13 @@ namespace MarioBasketball.Gameplay
         void TriggerHook() => TriggerPostMove(PostMove.Hook);
         void TriggerDropStep() => TriggerPostMove(PostMove.DropStep);
         void TriggerSpin() => TriggerPostMove(PostMove.Spin);
-        void TriggerFake() => TriggerPostMove(PostMove.Fake);
+
+        // L1: air-adjust while finishing, otherwise the post fake.
+        void TriggerFake()
+        {
+            if (_finishing) { _finishAdjusted = true; return; }
+            TriggerPostMove(PostMove.Fake);
+        }
 
         public void TriggerPostMove(PostMove move)
         {

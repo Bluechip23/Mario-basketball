@@ -125,10 +125,13 @@ namespace MarioBasketball.Characters
         /// The in-game value of a stat after stamina scaling and the on-fire
         /// bonus. This is what gameplay systems should consume.
         /// </summary>
-        public float GetEffective(StatType stat)
+        public float GetEffective(StatType stat) => GetEffectiveFor(stats.Get(stat));
+
+        /// <summary>Apply the same stamina + on-fire scaling to an arbitrary base
+        /// rating (used by traits that override a stat, e.g. quick catch-and-shoot).</summary>
+        public float GetEffectiveFor(float rawStat)
         {
-            float raw = stats.Get(stat);
-            float value = raw * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f);
+            float value = rawStat * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f);
             return Mathf.Clamp(value, 0f, CharacterStats.Max + onFireStatBonus);
         }
 

@@ -43,6 +43,19 @@ namespace MarioBasketball.Core
         [Range(0f, 1f)] public float freeThrowMinPct = 0.4f;  // at Mid Range 1
         [Range(0f, 1f)] public float freeThrowMaxPct = 0.95f; // at Mid Range 10
 
+        [Header("Rebounding / loose balls")]
+        [Tooltip("Base catch radius; grows with Rebounds, height, jumping and diving.")]
+        public float reboundBaseRadius = 1.0f;
+        public float reboundRadiusPerStat = 0.06f;
+        public float reboundHeightRadius = 0.25f;
+        public float reboundJumpReach = 0.7f;
+        public float reboundDiveReach = 1.0f;
+        public float reboundHeightScore = 1.5f;
+        public float reboundJumpScore = 2.0f;
+        public float reboundRandom = 1.5f;
+        [Tooltip("Wario's offensive-rebound trait rating.")]
+        public int offensiveReboundRating = 9;
+
         [Header("Scene references (auto-wired by GameBootstrap)")]
         public BallController ball;
         public PlayerController humanPlayer;
@@ -138,6 +151,80 @@ namespace MarioBasketball.Core
             // Inbounding the ball to the possessing team makes it live.
             if (State == GameState.Inbounding && player.team == Possession)
                 ResumePlay();
+        }
+
+        // ---- Rebounding / loose balls --------------------------------------
+
+        /// <summary>
+        /// Resolve a loose ball as a contest: any on-court player within their
+        /// effective catch radius competes, and the highest rebound score wins.
+        /// Catch radius and score scale with <b>Rebounds</b>, body <b>height</b>,
+        /// and whether the player is jumping or diving; missed-shot rebounds give
+        /// an offensive-rebound bonus to the trait holder.
+        /// </summary>
+        void ResolveLooseBall()
+        {
+            if (ball == null || ball.State != BallController.BallState.Free) return;
+
+            Vector3 ballPos = ball.transform.position;
+            PlayerController best = null;
+            float bestScore = float.NegativeInfinity;
+
+            best = BestRebounderOn(Home, ballPos, ref bestScore, best);
+            best = BestRebounderOn(Away, ballPos, ref bestScore, best);
+
+            if (best != null)
+            {
+                ball.PickUp(best);
+                OnPossessionGained(best);
+            }
+        }
+
+        PlayerController BestRebounderOn(TeamState team, Vector3 ballPos, ref float bestScore, PlayerController best)
+        {
+            foreach (var p in team.onCourt)
+            {
+                if (p == null || !p.enabled || !ball.CanBePickedUpBy(p)) continue;
+
+                float dist = Horizontal(p.transform.position, ballPos);
+                if (dist > ReboundCatchRadius(p)) continue;
+
+                float score = ReboundRating(p) + reboundHeightScore * p.BodyHeight
+                            + (p.IsAirborne ? reboundJumpScore : 0f)
+                            + (p.IsDiving ? reboundJumpScore * 0.5f : 0f)
+                            - dist
+                            + UnityEngine.Random.value * reboundRandom;
+
+                if (score > bestScore) { bestScore = score; best = p; }
+            }
+            return best;
+        }
+
+        float ReboundCatchRadius(PlayerController p)
+        {
+            float reb = p.Character != null ? p.Character.GetEffective(StatType.Rebounds) : 5f;
+            float r = reboundBaseRadius + reboundRadiusPerStat * reb
+                    + reboundHeightRadius * Mathf.Max(0f, p.BodyHeight - 1.6f);
+            if (p.IsAirborne) r += reboundJumpReach;
+            if (p.IsDiving) r += reboundDiveReach;
+            return r;
+        }
+
+        float ReboundRating(PlayerController p)
+        {
+            if (p.Character == null) return 5f;
+            float reb = p.Character.GetEffective(StatType.Rebounds);
+            // Wario-style offensive rebounding on a missed-shot board.
+            if (ball.IsRebound && p.team == ball.ShooterTeam
+                && p.Character.stats != null && p.Character.stats.hiddenTrait == HiddenTrait.OffensiveRebounder)
+                reb = Mathf.Max(reb, p.Character.GetEffectiveFor(offensiveReboundRating));
+            return reb;
+        }
+
+        static float Horizontal(Vector3 a, Vector3 b)
+        {
+            a.y = 0f; b.y = 0f;
+            return Vector3.Distance(a, b);
         }
 
         /// <summary>A live shot touched the rim — the attempt counts; reset clock.</summary>
@@ -297,7 +384,8 @@ namespace MarioBasketball.Core
             {
                 case GameState.Playing:
                     if (Clock.Tick(dt)) { OnQuarterExpired(); return; }
-                    if (Shot.Tick(dt)) { Turnover(Opponent(Possession)); }
+                    if (Shot.Tick(dt)) { Turnover(Opponent(Possession)); break; }
+                    ResolveLooseBall();
                     break;
 
                 case GameState.TipOff:

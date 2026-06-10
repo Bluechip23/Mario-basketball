@@ -226,6 +226,9 @@ namespace MarioBasketball.AI
         {
             StatType stat = ShotStatFor(dist);
             float statEff = _pc.EffectiveStat(stat);
+            // Inside, a dunker finishes off Dunk — value the better of the two.
+            if (stat == StatType.InsideScoring)
+                statEff = Mathf.Max(statEff, _pc.EffectiveStat(StatType.Dunk));
             float openness = Mathf.Clamp(nearestDef - 1f, 0f, 3f);
             return statEff + openness;
         }
@@ -326,9 +329,16 @@ namespace MarioBasketball.AI
         void ChaseLooseBall(GameManager gm, BallController ball)
         {
             if (IsClosestTeammateTo(gm, ball.transform.position))
+            {
                 MoveTo(ball.transform.position, sprint: true);
+                // Go up for the board when we're on top of it.
+                if (HDist(transform.position, ball.transform.position) < 1.6f)
+                    _pc.TriggerJump();
+            }
             else
+            {
                 _pc.SetMoveIntent(Vector2.zero, false);
+            }
         }
 
         Vector3 DefendedHoop(GameManager gm)

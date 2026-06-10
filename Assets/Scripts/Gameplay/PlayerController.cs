@@ -34,7 +34,6 @@ namespace MarioBasketball.Gameplay
         public float jumpHeight = 1.4f;
 
         [Header("Ball handling")]
-        public float pickupRadius = 1.2f;
         [Tooltip("Distance from the basket beyond which a make is worth 3.")]
         public float threePointDistance = 6.75f;
         [Tooltip("Within this radius a shot uses Inside Scoring, not Mid Range.")]
@@ -76,7 +75,6 @@ namespace MarioBasketball.Gameplay
         [Header("Dive / shove")]
         public float diveDuration = 0.5f;
         public float diveSpeed = 9f;
-        public float diveReachBonus = 1.0f;
         public float diveBallSeekRange = 6f;
         public float shoveDuration = 0.35f;
 
@@ -106,6 +104,10 @@ namespace MarioBasketball.Gameplay
         public bool HasBall => Ball != null && Ball.Holder == this;
         public bool IsPosting => _post != null && _post.IsPosting;
         public bool IsStunned => _stunTimer > 0f;
+        /// <summary>Physical body height (m), drives rebound reach.</summary>
+        public float BodyHeight => _cc != null ? _cc.height : 1.8f;
+        public bool IsAirborne => _cc != null && !_cc.isGrounded;
+        public bool IsDiving => _diveTimer > 0f;
         public bool IsShooting => _shooting;
         /// <summary>How full the shot meter is (0-1) for the jump in progress.</summary>
         public float ShotChargeFraction => _shooting ? Mathf.Clamp01(_shotCharge / ShotMeterDuration) : 0f;
@@ -233,7 +235,8 @@ namespace MarioBasketball.Gameplay
 
             AdvanceShotMeter(dt);
             Move();
-            TryPickUpLooseBall();
+            // Loose balls / rebounds are resolved centrally (GameManager) so it's
+            // a Rebounds + height + jump contest, not a first-come grab.
 
             // Track when this player gains the ball (for catch-and-shoot timing).
             bool has = HasBall;
@@ -331,19 +334,6 @@ namespace MarioBasketball.Gameplay
         }
 
         BallController Ball => GameManager.Instance != null ? GameManager.Instance.ball : null;
-
-        void TryPickUpLooseBall()
-        {
-            if (GameManager.Instance == null || GameManager.Instance.State != GameState.Playing) return;
-            var ball = Ball;
-            if (ball == null || !ball.CanBePickedUpBy(this)) return;
-            float reach = _diveTimer > 0f ? pickupRadius + diveReachBonus : pickupRadius;
-            if (Vector3.Distance(transform.position, ball.transform.position) <= reach)
-            {
-                ball.PickUp(this);
-                GameManager.Instance.OnPossessionGained(this);
-            }
-        }
 
         // ---- Actions (input events or AI brain) ----------------------------
 

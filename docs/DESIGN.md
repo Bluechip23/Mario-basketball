@@ -198,8 +198,8 @@ Hidden traits (wired):
   (see Shooting).
 - **Piranha Plant — Quick-Catch Shooter**: a three taken within
   `quickCatchWindow` (0.3 s) of catching the ball shoots as if 3-Point were 10.
-- **Wario — Offensive Rebounder** (defined, *not yet active*): Rebounds = 9 on
-  offense; engages when live rebounding lands. Everyone else `None`.
+- **Wario — Offensive Rebounder**: Rebounds counts as 9 on his own missed-shot
+  boards (live with the rebounding system). Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 
@@ -258,6 +258,14 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   auto-resolve (2 attempts) with make% scaling off the shooter's **Mid Range**;
   the fouling team inbounds afterward. The AI fouls occasionally on the ball.
   (No fouling out; team fouls accumulate over the whole game — tunable.)
+- **Rebounding / loose balls** (`GameManager.ResolveLooseBall`): a missed shot
+  becomes a live ball as it falls (below `reboundHeight`), then it's a **contest**
+  — every on-court player within their **catch radius** competes and the highest
+  **rebound score** wins it. Catch radius and score scale with **Rebounds**,
+  body **height**, and whether the player is **jumping** or **diving** (so go up
+  for the board); the release lockout still stops the shooter insta-grabbing.
+  **Wario's Offensive Rebounder** trait now activates — Rebounds counts as 9 on
+  his own missed-shot boards. The AI crashes and jumps for boards too.
 - **On fire** (heat-check streaks): a player ignites on **3 makes in a row with
   no opponent basket between**, or **6 in a row regardless**; a teammate scoring
   or your own miss breaks the run. While lit: **+2 to all stats** and **+30%**

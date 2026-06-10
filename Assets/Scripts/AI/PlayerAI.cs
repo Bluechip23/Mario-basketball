@@ -326,9 +326,16 @@ namespace MarioBasketball.AI
         void ChaseLooseBall(GameManager gm, BallController ball)
         {
             if (IsClosestTeammateTo(gm, ball.transform.position))
+            {
                 MoveTo(ball.transform.position, sprint: true);
+                // Go up for the board when we're on top of it.
+                if (HDist(transform.position, ball.transform.position) < 1.6f)
+                    _pc.TriggerJump();
+            }
             else
+            {
                 _pc.SetMoveIntent(Vector2.zero, false);
+            }
         }
 
         Vector3 DefendedHoop(GameManager gm)

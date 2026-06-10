@@ -31,6 +31,8 @@ namespace MarioBasketball.Gameplay
         public float dribbleSpeed = 6f;
         [Tooltip("Seconds the releaser can't re-grab after shooting/passing.")]
         public float releaseLockDuration = 0.4f;
+        [Tooltip("A missed shot becomes a live (grabbable) rebound once it falls below this height.")]
+        public float reboundHeight = 2.2f;
 
         public BallState State { get; private set; } = BallState.Free;
         public PlayerController Holder { get; private set; }
@@ -38,6 +40,9 @@ namespace MarioBasketball.Gameplay
         public TeamSide ShooterTeam { get; private set; }
         /// <summary>Who launched the current shot (for streak attribution).</summary>
         public PlayerController Shooter { get; private set; }
+        /// <summary>True while the current loose ball is a missed-shot rebound
+        /// (vs. a steal/pass scramble) — used for offensive-rebound bonuses.</summary>
+        public bool IsRebound { get; private set; }
 
         Rigidbody _rb;
         Vector3 _centreCourt;
@@ -65,16 +70,20 @@ namespace MarioBasketball.Gameplay
             }
             else if (State == BallState.Shot)
             {
-                // After a while a missed shot becomes a loose ball again.
+                // A miss becomes a live rebound as soon as it falls back down
+                // (a make passes through the score zone, higher up, first).
                 _shotTimer -= Time.deltaTime;
-                if (_shotTimer <= 0f)
+                bool comingDown = _rb.linearVelocity.y < 0f && transform.position.y < reboundHeight;
+                if (_shotPending && (comingDown || _shotTimer <= 0f))
                 {
                     State = BallState.Free;
-                    if (_shotPending)
-                    {
-                        _shotPending = false; // it didn't go in → a miss
-                        if (GameManager.Instance != null) GameManager.Instance.OnShotMissed(Shooter);
-                    }
+                    IsRebound = true;
+                    _shotPending = false; // it didn't go in → a miss
+                    if (GameManager.Instance != null) GameManager.Instance.OnShotMissed(Shooter);
+                }
+                else if (_shotTimer <= 0f)
+                {
+                    State = BallState.Free;
                 }
             }
         }
@@ -91,6 +100,7 @@ namespace MarioBasketball.Gameplay
         {
             Holder = player;
             State = BallState.Held;
+            IsRebound = false;
             _rb.isKinematic = true;
             _rb.detectCollisions = false;
         }
@@ -162,6 +172,7 @@ namespace MarioBasketball.Gameplay
             State = BallState.Free;
             PendingPoints = 0;
             _shotPending = false;
+            IsRebound = false;
             GoLive();
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
@@ -173,6 +184,7 @@ namespace MarioBasketball.Gameplay
         {
             PendingPoints = 0;
             _shotPending = false; // resolved as a make
+            IsRebound = false;
             State = BallState.Free;
         }
 
@@ -181,6 +193,7 @@ namespace MarioBasketball.Gameplay
             _recentReleaser = Holder;
             _releaseLockTimer = releaseLockDuration;
             _shotPending = false;
+            IsRebound = false;
             Holder = null;
         }
 

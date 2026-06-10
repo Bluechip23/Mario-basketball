@@ -30,7 +30,6 @@ namespace MarioBasketball.Bootstrap
 
         static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
         static readonly Color AwayColor = new Color(0.15f, 0.35f, 0.9f);
-        static readonly Color HumanColor = new Color(1.0f, 0.78f, 0.1f);
 
         Material _lineMat;
         Hoop _hoopNeg;
@@ -116,7 +115,7 @@ namespace MarioBasketball.Bootstrap
             {
                 bool isHuman = hasHuman && i == 0; // first pick is the human starter
                 var pos = new Vector3(xs[i], 1.1f, 4f * halfSign);
-                var pc = BuildPlayer(roster[i], pos, side, isHuman ? HumanColor : color, isHuman, benched: false);
+                var pc = BuildPlayer(roster[i], pos, side, color, benched: false);
                 team.onCourt.Add(pc);
                 if (isHuman) gm.humanPlayer = pc;
             }
@@ -125,30 +124,23 @@ namespace MarioBasketball.Bootstrap
             for (int i = 0; i < 2; i++)
             {
                 var pos = new Vector3(benchX, 1.1f, -2f + i * 2f);
-                var pc = BuildPlayer(roster[3 + i], pos, side, color, isHuman: false, benched: true);
+                var pc = BuildPlayer(roster[3 + i], pos, side, color, benched: true);
                 team.bench.Add(pc);
             }
         }
 
-        PlayerController BuildPlayer(CharacterStats stats, Vector3 pos, TeamSide side, Color color, bool isHuman, bool benched)
+        PlayerController BuildPlayer(CharacterStats stats, Vector3 pos, TeamSide side, Color jersey, bool benched)
         {
             float h = stats.heightMeters;
 
-            // Root carries physics/logic; an unscaled root keeps the
-            // CharacterController honest while the visual capsule is scaled to
-            // the character's height (NBA-Street-style big/small bodies).
+            // Root carries physics/logic; the visual model is built under it,
+            // scaled to the character's height (NBA-Street-style big/small bodies).
             var go = new GameObject($"{side}_{stats.characterName}");
             go.SetActive(false); // configure before Awake/OnEnable run
             pos.y = h / 2f + 0.05f;
             go.transform.position = pos;
 
-            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            body.name = "Body";
-            Destroy(body.GetComponent<Collider>()); // CharacterController replaces it
-            body.transform.SetParent(go.transform, false);
-            // A capsule primitive is 2 m tall and 1 m wide at scale 1.
-            body.transform.localScale = new Vector3(0.45f * h, h / 2f, 0.45f * h);
-            Tint(body, color);
+            MarioBasketball.Presentation.CharacterModelBuilder.Build(go.transform, stats, h, jersey);
 
             var cc = go.AddComponent<CharacterController>();
             cc.center = Vector3.zero;

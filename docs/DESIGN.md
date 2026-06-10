@@ -147,8 +147,16 @@ with the **ball** (not the controlled player — the gold ring marks control);
 the court runs left-right with a hoop at each side of the screen. Tunables on
 `CameraRig` (sideX/height/FOV/pan range).
 
+Each character has a **placeholder silhouette model** (`CharacterModelBuilder`)
+assembled from primitives + a procedural cone — color-coded with the team
+**jersey** and signature features (Bowser's shell/horns, Toad's mushroom cap,
+Peach's dress/crown, Yoshi's snout/tail, Boo's floating ghost, Piranha Plant's
+pipe/bulb, plumber caps/'staches, etc.). Clearly dev-art, swappable for authored
+models later. The team jersey distinguishes sides; the gold ring marks who you
+control.
+
 Player bodies have **exaggerated, per-character sizes** via
-`CharacterStats.heightMeters` (visual capsule + collider scale with it):
+`CharacterStats.heightMeters` (the model + collider scale with it):
 Bowser 2.6 m, DK 2.45, Waluigi 2.35, Piranha Plant 2.1, Wario 2.0,
 Yoshi 1.95, Luigi/Peach/Birdo 1.9, Daisy 1.85, Mario 1.8, Diddy 1.5,
 Boo 1.4, Toad 1.25, Baby Mario 1.15.

@@ -43,6 +43,11 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Make odds, distance falloff and contest live in ShotMath.")]
         public float shotFlightTime = 1.1f;
         public float passPower = 9f;
+        [Tooltip("Right-stick magnitude needed to aim a directed pass.")]
+        public float passAimDeadzone = 0.5f;
+        [Tooltip("Lead-pass spread (m) at Ball Handling 1 / 10 — low handles miss.")]
+        public float passErrorMax = 1.3f;
+        public float passErrorMin = 0.05f;
 
         [Header("Shot timing (jump shots only; layups/dunks are instant)")]
         [Tooltip("Release within this many seconds of the jump's apex for a perfect shot.")]
@@ -120,6 +125,10 @@ namespace MarioBasketball.Gameplay
         public bool IsStunned => _stunTimer > 0f;
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
+        /// <summary>The human is aiming a directed pass (right stick pushed).</summary>
+        public bool IsAimingPass => _passAim.magnitude >= passAimDeadzone && HasBall;
+        /// <summary>The teammate currently targeted by the pass aim (for icons).</summary>
+        public PlayerController PassTarget => IsAimingPass ? TargetedTeammate(_passAim) : null;
         /// <summary>Physical body height (m), drives rebound reach.</summary>
         public float BodyHeight => _cc != null ? _cc.height : 1.8f;
         public bool IsAirborne => _cc != null && !_cc.isGrounded;
@@ -155,6 +164,7 @@ namespace MarioBasketball.Gameplay
         float _finishTimer;
         bool _finishIsDunk;
         bool _finishAdjusted;
+        Vector2 _passAim;
 
         void Awake()
         {
@@ -250,6 +260,7 @@ namespace MarioBasketball.Gameplay
             {
                 _input.Tick();
                 _moveIntent = _input.Move;
+                _passAim = _input.PassAim;
                 _sprintIntent = _input.SprintHeld;
                 HandlePostHold();
             }
@@ -560,10 +571,55 @@ namespace MarioBasketball.Gameplay
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
             if (IsPosting) _post.End();   // kick out of the post
             _finishing = false;           // or dump it off out of the air
-            // Pass to the most open teammate (a blind outlet if nobody's open).
-            var mate = FindOpenTeammate();
-            if (mate != null) Ball.PassTo(mate.transform.position + Vector3.up * 0.6f);
+
+            // Aim with the right stick to direct it to a specific teammate
+            // (icons); otherwise pass to whoever's most open.
+            var mate = IsAimingPass ? TargetedTeammate(_passAim) : FindOpenTeammate();
+            if (mate != null) PassToTeammate(mate);
             else Ball.Pass(transform.forward, passPower);
+        }
+
+        /// <summary>Lead pass to a teammate; Ball Handling sets the accuracy, so
+        /// a weak handler's pass lands off-target (and can be picked off).</summary>
+        void PassToTeammate(PlayerController mate)
+        {
+            float bh = Effective(StatType.BallHandling, 5f);
+            float err = Mathf.Lerp(passErrorMax, passErrorMin, Mathf.Clamp01((bh - 1f) / 9f));
+            Vector2 j = Random.insideUnitCircle * err;
+            Vector3 dest = mate.transform.position + new Vector3(j.x, 0.6f, j.y);
+            Ball.PassTo(dest);
+        }
+
+        /// <summary>Teammate whose on-screen direction best matches the aim.</summary>
+        PlayerController TargetedTeammate(Vector2 aim)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null || aim.sqrMagnitude < 0.0001f) return null;
+            Vector2 a = aim.normalized;
+            Camera cam = Camera.main;
+            Vector2 from = ScreenOf(cam, transform.position);
+
+            PlayerController best = null;
+            float bestDot = 0.25f; // require some alignment
+            foreach (var mate in gm.TeamFor(team).onCourt)
+            {
+                if (mate == null || mate == this || !mate.enabled) continue;
+                Vector2 dir = ScreenOf(cam, mate.transform.position) - from;
+                if (dir.sqrMagnitude < 1f) continue;
+                float dot = Vector2.Dot(dir.normalized, a);
+                if (dot > bestDot) { bestDot = dot; best = mate; }
+            }
+            return best;
+        }
+
+        static Vector2 ScreenOf(Camera cam, Vector3 world)
+        {
+            if (cam != null)
+            {
+                Vector3 sp = cam.WorldToScreenPoint(world);
+                return new Vector2(sp.x, sp.y);
+            }
+            return new Vector2(world.x, world.z); // fallback: world plane
         }
 
         /// <summary>A directed pass to a teammate (used by the AI).</summary>

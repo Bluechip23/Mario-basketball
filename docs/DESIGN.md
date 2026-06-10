@@ -64,9 +64,13 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   designed with the roster.
 
 ### Passing
-- **Tap** pass button → **loft pass**; **hold** → **hard pass**.
-- A button brings up **teammate icons** to direct passes to a specific player.
-- Governed by **Ball Handling** (pass success).
+- **Tap** pass button → **loft pass**; **hold** → **hard pass**. *(tap/hold split
+  not yet implemented — passes are a single lead pass for now.)*
+- **Directed passing (wired):** push the **right stick** toward a teammate to
+  bring up **icons** and target them, then press Pass; with no aim, Pass goes to
+  the most open teammate.
+- Governed by **Ball Handling**: a weak handler's lead pass lands off-target
+  (and can be picked off by the loose-ball contest).
 
 ## Stats (1-10)
 

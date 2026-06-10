@@ -40,6 +40,14 @@ namespace MarioBasketball.AI
         public float smotheredDistance = 1.6f;
         public float passCooldown = 1.0f;
 
+        [Header("Dribble move")]
+        public float dribbleGuardDistance = 1.6f;
+        [Range(0f, 1f)] public float dribbleChance = 0.01f;
+
+        [Header("Alley-oop catch")]
+        public float oopChaseRange = 6f;
+        public float oopJumpDistance = 2.2f;
+
         [Header("Defense")]
         public float onBallGap = 1.0f;
         public float offBallGap = 1.3f;
@@ -98,6 +106,19 @@ namespace MarioBasketball.AI
 
             var ball = gm.ball;
             if (ball == null) return;
+
+            // Cut to the rim and rise to catch an incoming alley-oop.
+            if (ball.State == BallController.BallState.Free && ball.IsAlleyOop && ball.PassingTeam == _pc.team)
+            {
+                Hoop hoop = gm.GetAttackingHoop(_pc.team);
+                if (hoop != null && IsClosestTeammateTo(gm, hoop.AimPoint)
+                    && HDist(transform.position, hoop.AimPoint) <= oopChaseRange)
+                {
+                    MoveTo(hoop.AimPoint, sprint: true);
+                    if (HDist(transform.position, hoop.AimPoint) < oopJumpDistance) _pc.TriggerJump();
+                    return;
+                }
+            }
 
             if (ball.State == BallController.BallState.Free)
             {
@@ -166,6 +187,10 @@ namespace MarioBasketball.AI
                     return;
                 }
             }
+
+            // Tightly guarded on the perimeter → try to break the defender down.
+            if (nearestDef < dribbleGuardDistance && dist > _pc.paintRadius && Random.value < dribbleChance)
+                _pc.AttemptDribbleMove();
 
             MoveTo(aim, sprint: dist > 5f);
         }

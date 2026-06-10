@@ -36,8 +36,13 @@ namespace MarioBasketball.Characters
 
         /// <summary>
         /// Crashes the offensive glass — Rebounds counts as 9 while on offense.
-        /// Engages once live rebounding lands (Wario).
         /// </summary>
-        OffensiveRebounder
+        OffensiveRebounder,
+
+        /// <summary>
+        /// Gifted passer: passes throw with Ball Handling counted as 8 (10 when
+        /// passing out of a post-up), regardless of the real rating (Wario).
+        /// </summary>
+        SmoothPasser
     }
 }

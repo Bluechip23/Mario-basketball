@@ -43,6 +43,12 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Make odds, distance falloff and contest live in ShotMath.")]
         public float shotFlightTime = 1.1f;
         public float passPower = 9f;
+        [Tooltip("Hold Pass at least this long for a hard pass; shorter is a loft.")]
+        public float passHoldThreshold = 0.25f;
+        [Tooltip("Flight time of a tapped loft pass (slow, arcs over defenders).")]
+        public float loftPassTime = 0.85f;
+        [Tooltip("Flight time of a held hard pass (fast, flat, stealable).")]
+        public float hardPassTime = 0.28f;
         [Tooltip("Right-stick magnitude needed to aim a directed pass.")]
         public float passAimDeadzone = 0.5f;
         [Tooltip("Lead-pass spread (m) at Ball Handling 1 / 10 — low handles miss.")]
@@ -73,6 +79,23 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float adjustBlockReduction = 0.4f;
         [Tooltip("Max make% lost to an air-adjust (mitigated by Inside Scoring).")]
         [Range(0f, 1f)] public float maxAdjustPenalty = 0.35f;
+
+        [Header("Alley-oop")]
+        [Tooltip("A loft to a teammate within this of the rim becomes an alley-oop.")]
+        public float oopRange = 3.0f;
+        public float oopFlightTime = 1.0f;
+        [Tooltip("Make% bonus on an alley-oop finish (it's a high-percentage play).")]
+        [Range(0f, 1f)] public float alleyOopBonus = 0.2f;
+
+        [Header("Dribble move (Ball Handling vs Perimeter Defense)")]
+        public float dribbleRange = 2.0f;
+        public float dribbleCooldownTime = 0.8f;
+        public float dribbleBoostTime = 0.7f;
+        public float dribbleBoostMult = 1.5f;
+        [Tooltip("How long the beaten defender is frozen on a successful move.")]
+        public float ankleStun = 0.9f;
+        public float dribbleBaseChance = 0.45f;
+        public float dribbleStatScale = 0.06f;
 
         [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
@@ -129,6 +152,9 @@ namespace MarioBasketball.Gameplay
         public bool IsAimingPass => _passAim.magnitude >= passAimDeadzone && HasBall;
         /// <summary>The teammate currently targeted by the pass aim (for icons).</summary>
         public PlayerController PassTarget => IsAimingPass ? TargetedTeammate(_passAim) : null;
+        /// <summary>Holding the icon-pass modifier (LB) with the ball — show
+        /// teammate icons and pass to one via a face button.</summary>
+        public bool IconPassActive => _iconHeld && HasBall && !IsPosting && !IsFinishing;
         /// <summary>Physical body height (m), drives rebound reach.</summary>
         public float BodyHeight => _cc != null ? _cc.height : 1.8f;
         public bool IsAirborne => _cc != null && !_cc.isGrounded;
@@ -165,6 +191,11 @@ namespace MarioBasketball.Gameplay
         bool _finishIsDunk;
         bool _finishAdjusted;
         Vector2 _passAim;
+        bool _iconHeld;
+        float _dribbleCooldown;
+        float _dribbleBoostTimer;
+        bool _passCharging;
+        float _passChargeTime;
 
         void Awake()
         {
@@ -209,7 +240,8 @@ namespace MarioBasketball.Gameplay
             _input = new InputReader();
             _input.ShootPressed += OnShootPressed;
             _input.ShootReleased += OnShootReleased;
-            _input.PassPressed += TriggerPass;
+            _input.PassPressed += OnPassPressed;
+            _input.PassReleased += OnPassReleased;
             _input.JumpPressed += TriggerJump;
             _input.StealPressed += TriggerSteal;
             _input.DivePressed += TriggerDive;
@@ -226,7 +258,8 @@ namespace MarioBasketball.Gameplay
             if (_input == null) return;
             _input.ShootPressed -= OnShootPressed;
             _input.ShootReleased -= OnShootReleased;
-            _input.PassPressed -= TriggerPass;
+            _input.PassPressed -= OnPassPressed;
+            _input.PassReleased -= OnPassReleased;
             _input.JumpPressed -= TriggerJump;
             _input.StealPressed -= TriggerSteal;
             _input.DivePressed -= TriggerDive;
@@ -255,6 +288,13 @@ namespace MarioBasketball.Gameplay
             if (_diveTimer > 0f) _diveTimer -= dt;
             if (_shoveTimer > 0f) _shoveTimer -= dt;
             if (_pushCooldown > 0f) _pushCooldown -= dt;
+            if (_dribbleCooldown > 0f) _dribbleCooldown -= dt;
+            if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
+            if (_passCharging)
+            {
+                _passChargeTime += dt;
+                if (IsStunned || !HasBall) _passCharging = false; // lost it mid-windup
+            }
 
             if (isHuman && _input != null)
             {
@@ -262,6 +302,7 @@ namespace MarioBasketball.Gameplay
                 _moveIntent = _input.Move;
                 _passAim = _input.PassAim;
                 _sprintIntent = _input.SprintHeld;
+                _iconHeld = _input.IconHeld;
                 HandlePostHold();
             }
 
@@ -359,6 +400,7 @@ namespace MarioBasketball.Gameplay
                 float baseSpeed = Mathf.Lerp(minMoveSpeed, maxMoveSpeed, Mathf.Clamp01((speedStat - 1f) / 9f));
                 bool sprinting = _sprintIntent && dir.sqrMagnitude > 0.01f;
                 float speed = baseSpeed * (sprinting ? sprintMultiplier : 1f);
+                if (_dribbleBoostTimer > 0f) speed *= dribbleBoostMult; // separation after a move
                 _character?.ReportActivity(dir.sqrMagnitude > 0.01f, sprinting);
 
                 horizontal = dir * speed;
@@ -400,6 +442,7 @@ namespace MarioBasketball.Gameplay
         void OnShootPressed()
         {
             if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _shooting || _finishing) return;
+            if (IconPassActive) { PassToSlot(0); return; } // LB + A → pass to teammate 1
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
@@ -454,7 +497,7 @@ namespace MarioBasketball.Gameplay
         /// <summary>Resolve a dunk or layup: a block roll first (reduced by an
         /// air-adjust, and resisted by Power on dunks), then a make roll. A dunk
         /// scores off the Dunk stat, a layup off Inside Scoring.</summary>
-        void FinishShot(bool isDunk, bool adjusted)
+        void FinishShot(bool isDunk, bool adjusted, float makeBonus = 0f)
         {
             if (!HasBall) return;
             var gm = GameManager.Instance;
@@ -489,6 +532,7 @@ namespace MarioBasketball.Gameplay
             float over = isDunk ? finisherStat : -1f; // dunk uses Dunk as the scoring stat
             float makeChance = ShotMath.MakeChance(this, StatType.InsideScoring, HorizontalDistance(transform.position, aim), defender, onFire, over);
             if (adjusted) makeChance -= AdjustPenalty();
+            makeChance += makeBonus;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, 2, finishFlightTime, ShotMath.AimOffset(make), this);
@@ -566,28 +610,112 @@ namespace MarioBasketball.Gameplay
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);
         }
 
-        public void TriggerPass()
+        /// <summary>AI pass entry — throws a loft immediately.</summary>
+        public void TriggerPass() => ReleasePass(hard: false);
+
+        // Human passing: tap → loft (slow, arcs over defenders); hold past
+        // passHoldThreshold → hard pass (fast, flat, lives in the steal lane).
+        void OnPassPressed()
+        {
+            if (MatchPause.IsPaused || IsStunned || !HasBall || _passCharging) return;
+            _passCharging = true;
+            _passChargeTime = 0f;
+        }
+
+        void OnPassReleased()
+        {
+            if (!_passCharging) return;
+            _passCharging = false;
+            ReleasePass(hard: _passChargeTime >= passHoldThreshold);
+        }
+
+        void ReleasePass(bool hard)
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
+            bool fromPost = IsPosting;
             if (IsPosting) _post.End();   // kick out of the post
             _finishing = false;           // or dump it off out of the air
 
             // Aim with the right stick to direct it to a specific teammate
             // (icons); otherwise pass to whoever's most open.
             var mate = IsAimingPass ? TargetedTeammate(_passAim) : FindOpenTeammate();
-            if (mate != null) PassToTeammate(mate);
-            else Ball.Pass(transform.forward, passPower);
+            if (mate == null) { Ball.Pass(transform.forward, passPower); return; }
+
+            // A loft to a teammate near the rim is an alley-oop.
+            if (!hard && IsOopTarget(mate)) ThrowOop(mate, fromPost);
+            else PassToTeammate(mate, fromPost, hard);
+        }
+
+        bool IsOopTarget(PlayerController mate)
+        {
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            return hoop != null && HorizontalDistance(mate.transform.position, hoop.AimPoint) <= oopRange;
+        }
+
+        void ThrowOop(PlayerController mate, bool fromPost)
+        {
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            if (hoop == null) { PassToTeammate(mate, fromPost, false); return; }
+
+            // Lob to a high point near the rim, led slightly toward the cutter.
+            Vector3 target = Vector3.Lerp(hoop.AimPoint, mate.transform.position, 0.35f);
+            target.y = hoop.AimPoint.y; // rim height — the cutter jumps to meet it
+            float err = PassError(PassBallHandling(fromPost));
+            Vector2 j = Random.insideUnitCircle * err;
+            target += new Vector3(j.x, 0f, j.y);
+            Ball.PassTo(target, oopFlightTime, alleyOop: true);
+        }
+
+        void PassToSlot(int index)
+        {
+            var mate = TeammateSlot(index);
+            if (mate != null) PassToTeammate(mate, fromPost: false, hard: false);
         }
 
         /// <summary>Lead pass to a teammate; Ball Handling sets the accuracy, so
-        /// a weak handler's pass lands off-target (and can be picked off).</summary>
-        void PassToTeammate(PlayerController mate)
+        /// a weak handler's pass lands off-target (and can be picked off). A
+        /// Smooth Passer throws with Ball Handling counted as 8 (10 out of a post).</summary>
+        void PassToTeammate(PlayerController mate, bool fromPost, bool hard)
         {
-            float bh = Effective(StatType.BallHandling, 5f);
-            float err = Mathf.Lerp(passErrorMax, passErrorMin, Mathf.Clamp01((bh - 1f) / 9f));
+            float err = PassError(PassBallHandling(fromPost));
             Vector2 j = Random.insideUnitCircle * err;
             Vector3 dest = mate.transform.position + new Vector3(j.x, 0.6f, j.y);
-            Ball.PassTo(dest);
+            Ball.PassTo(dest, hard ? hardPassTime : loftPassTime);
+        }
+
+        float PassBallHandling(bool fromPost)
+        {
+            if (_character != null && _character.stats != null && _character.stats.hiddenTrait == HiddenTrait.SmoothPasser)
+                return _character.GetEffectiveFor(fromPost ? 10 : 8);
+            return Effective(StatType.BallHandling, 5f);
+        }
+
+        float PassError(float bh) => Mathf.Lerp(passErrorMax, passErrorMin, Mathf.Clamp01((bh - 1f) / 9f));
+
+        /// <summary>Catch an alley-oop and finish it immediately (GameManager calls
+        /// this when a teammate snags an oop near the rim).</summary>
+        public void CatchAlleyOop()
+        {
+            if (!HasBall) return;
+            bool dunk = Effective(StatType.Dunk, 5f) >= dunkThreshold;
+            FinishShot(dunk, adjusted: false, makeBonus: alleyOopBonus);
+        }
+
+        /// <summary>The index-th on-court teammate (excluding self) — for icon passing.</summary>
+        PlayerController TeammateSlot(int index)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null) return null;
+            int n = 0;
+            foreach (var mate in gm.TeamFor(team).onCourt)
+            {
+                if (mate == null || mate == this || !mate.enabled) continue;
+                if (n == index) return mate;
+                n++;
+            }
+            return null;
         }
 
         /// <summary>Teammate whose on-screen direction best matches the aim.</summary>
@@ -658,11 +786,16 @@ namespace MarioBasketball.Gameplay
             }
         }
 
-        /// <summary>Lunge toward a nearby loose ball with extended reach.</summary>
+        /// <summary>The B button: pass-icon select (LB held), dribble move (with
+        /// the ball), or dive for a loose ball.</summary>
         public void TriggerDive()
         {
-            if (MatchPause.IsPaused || IsStunned || IsPosting || _diveTimer > 0f || !_cc.isGrounded) return;
+            if (MatchPause.IsPaused || IsStunned) return;
+            if (IconPassActive) { PassToSlot(1); return; }  // LB + B → pass to teammate 2
+            if (IsPosting) return;                          // B is Spin while posting
+            if (HasBall) { TriggerDribbleMove(); return; }  // with the ball, it's a dribble move
 
+            if (_diveTimer > 0f || !_cc.isGrounded) return;
             _diveDir = transform.forward;
             var ball = Ball;
             if (ball != null && ball.CanBePickedUpBy(this))
@@ -671,6 +804,46 @@ namespace MarioBasketball.Gameplay
                 if (to.sqrMagnitude > 0.01f && to.magnitude <= diveBallSeekRange) _diveDir = to.normalized;
             }
             _diveTimer = diveDuration;
+        }
+
+        /// <summary>AI hook for a dribble move.</summary>
+        public void AttemptDribbleMove() => TriggerDribbleMove();
+
+        /// <summary>Break the on-ball defender down — Ball Handling vs Perimeter
+        /// Defense. Win → the defender is frozen ("ankles broken") and you get a
+        /// burst of separation; a bad miss can get you stripped.</summary>
+        void TriggerDribbleMove()
+        {
+            if (_dribbleCooldown > 0f || !HasBall || !_cc.isGrounded) return;
+            var def = NearestOpponentTo(transform.position);
+            if (def == null) { _dribbleCooldown = dribbleCooldownTime; return; }
+            if (HorizontalDistance(transform.position, def.transform.position) > dribbleRange)
+            {
+                _dribbleCooldown = dribbleCooldownTime * 0.5f;
+                return;
+            }
+
+            _dribbleCooldown = dribbleCooldownTime;
+            float bh = Effective(StatType.BallHandling, 5f);
+            float pd = def.EffectiveStat(StatType.PerimeterDefense);
+            float chance = Mathf.Clamp(dribbleBaseChance + dribbleStatScale * (bh - pd), 0.05f, 0.95f);
+
+            if (Random.value < chance)
+            {
+                def.Stun(ankleStun);              // broken ankles
+                _dribbleBoostTimer = dribbleBoostTime; // separation
+                if (RimDirection().sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(RimDirection().normalized, Vector3.up);
+            }
+            else
+            {
+                // Overhandled it — a good defender can poke it away.
+                float strip = Mathf.Clamp(0.05f + 0.04f * (pd - bh), 0f, 0.4f);
+                if (Random.value < strip && GameManager.Instance != null && GameManager.Instance.ball != null)
+                {
+                    GameManager.Instance.ball.PickUp(def);
+                    GameManager.Instance.OnPossessionGained(def);
+                }
+            }
         }
 
         public void TriggerBackDown()

@@ -64,13 +64,33 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   designed with the roster.
 
 ### Passing
-- **Tap** pass button → **loft pass**; **hold** → **hard pass**. *(tap/hold split
-  not yet implemented — passes are a single lead pass for now.)*
-- **Directed passing (wired):** push the **right stick** toward a teammate to
-  bring up **icons** and target them, then press Pass; with no aim, Pass goes to
-  the most open teammate.
-- Governed by **Ball Handling**: a weak handler's lead pass lands off-target
-  (and can be picked off by the loose-ball contest).
+- **Tap** pass button → **loft pass**: slow, high arc that **sails over
+  defenders' heads** (the loose-ball contest respects the ball's height) but
+  hangs in the air longer. **Hold** (≥ `passHoldThreshold`, 0.25 s) → **hard
+  pass**: fast and flat, but it travels through the **steal lane**.
+- **Directed / icon passing (wired):** **hold LB** to bring up teammate **icons**
+  labelled with face buttons (A/B), then press one to pass to that teammate; or
+  push the **right stick** toward a teammate and press Pass. With neither, Pass
+  goes to the most open teammate.
+- Governed by **Ball Handling**: a weak handler's lead pass lands off-target.
+  An **in-flight pass can be intercepted with Steals** (a defender jumping the
+  lane); once the ball goes stale it becomes a true loose ball decided by
+  Rebounds. (Wario's Smooth Passer trait throws as Ball Handling 8, 10 out of
+  a post.)
+
+### Alley-oops
+A **loft** thrown to a teammate **near the rim** (within `oopRange`) becomes an
+alley-oop: the ball lobs high to the rim, the cutter rises to meet it (the
+height-aware catch lets them get up over a grounded defender), and on the catch
+they **finish immediately** — a dunk if they're a dunker — with an `alleyOopBonus`
+to the make. The AI cuts and goes up for oops; a defender can still pick the lob
+or block the finish.
+
+### Dribble move (Ball Handling vs Perimeter Defense)
+With the ball, **B** attempts a dribble move against the nearest defender. Win
+(Ball Handling vs Perimeter Defense) and the defender's **ankles break** — they
+freeze briefly and you get a burst of separation; overhandle it against a good
+defender and you can get stripped.
 
 ## Stats (1-10)
 
@@ -186,32 +206,33 @@ Baby Mario 1.15.
 | Character | Spd | BH | 3PT | Mid | Ins | PostO | Dunk | Pow | Reb | Blk | Stl | PostD | PerD | Sta |
 |-----------|----|----|-----|-----|-----|-------|------|-----|-----|-----|-----|-------|------|-----|
 | Bowser      | 2 | 2 | 1 | 2 | 10 | 9 | 3 | 10 | 5 | 5 | 8 | 7 | 2 | 4 |
-| Donkey Kong | 7 | 2 | 1 | 1 | 4  | 4 | 10| 9  | 9 | 8 | 8 | 8 | 7 | 7 |
+| Donkey Kong | 7 | 2 | 1 | 1 | 4  | 4 | 10| 9  | 9 | 8 | 5 | 8 | 7 | 7 |
 | Mario       | 7 | 8 | 7 | 8 | 8  | 7 | 7 | 6  | 7 | 6 | 6 | 4 | 6 | 8 |
 | Luigi       | 7 | 5 | 3 | 6 | 7  | 6 | 8 | 6  | 7 | 8 | 8 | 8 | 8 | 8 |
-| Peach       | 6 | 6 | 8 | 6 | 4  | 5 | 5 | 3  | 3 | 3 | 8 | 3 | 6 | 8 |
+| Peach       | 6 | 6 | 8 | 6 | 4  | 5 | 5 | 3  | 3 | 5 | 6 | 3 | 6 | 8 |
 | Toad        | 8 | 10| 5 | 5 | 8  | 2 | 1 | 3  | 3 | 1 | 7 | 1 | 6 | 9 |
-| Waluigi     | 6 | 3 | 3 | 3 | 7  | 9 | 6 | 6  | 7 | 8 | 8 | 8 | 1 | 6 |
+| Waluigi     | 6 | 3 | 3 | 3 | 8  | 9 | 6 | 6  | 7 | 8 | 6 | 8 | 1 | 6 |
 | Diddy Kong  | 10| 7 | 2 | 3 | 6  | 6 | 4 | 6  | 6 | 5 | 8 | 3 | 9 | 8 |
-| Yoshi       | 10| 1 | 1 | 1 | 2  | 1 | 7 | 7  | 7 | 7 | 8 | 7 | 9 | 10|
+| Yoshi       | 10| 1 | 1 | 1 | 2  | 1 | 6 | 7  | 7 | 6 | 7 | 7 | 9 | 10|
 | Birdo       | 9 | 6 | 8 | 8 | 7  | 4 | 7 | 6  | 5 | 5 | 4 | 3 | 3 | 9 |
 | Boo         | 3 | 1 | 10| 6 | 2  | 1 | 1 | 1  | 4 | 2 | 9 | 4 | 4 | 6 |
 | Baby Mario  | 7 | 8 | 3 | 6 | 8  | 8 | 2 | 5  | 3 | 3 | 6 | 2 | 6 | 8 |
-| Wario       | 4 | 8 | 7 | 10| 6  | 7 | 5 | 8  | 7 | 5 | 8 | 6 | 5 | 6 |
+| Wario       | 4 | 6 | 7 | 10| 6  | 7 | 5 | 8  | 7 | 5 | 6 | 6 | 5 | 6 |
 | Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 7 | 3 | 6 |
 | Daisy       | 7 | 7 | 5 | 9 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
-| Monty Mole  | 7 | 4 | 5 | 5 | 5  | 3 | 3 | 7  | 7 | 7 | 4 | 3 | 10| 8 |
+| Monty Mole  | 7 | 4 | 5 | 5 | 5  | 3 | 3 | 7  | 4 | 7 | 4 | 3 | 10| 8 |
 | Koopa       | 6 | 10| 5 | 5 | 5  | 3 | 3 | 8  | 6 | 5 | 6 | 3 | 7 | 8 |
 | Kritter     | 6 | 1 | 1 | 2 | 5  | 3 | 4 | 8  | 8 | 10| 3 | 10| 4 | 8 |
-| Shyguy      | 6 | 6 | 8 | 8 | 8  | 7 | 4 | 5  | 6 | 6 | 5 | 3 | 5 | 2 |
+| Shyguy      | 6 | 6 | 9 | 9 | 9  | 7 | 4 | 5  | 6 | 6 | 5 | 3 | 5 | 2 |
 
 Hidden traits (wired):
-- **Peach — Deep-Three Specialist**: gains make% stepping back behind the arc
-  (see Shooting).
-- **Piranha Plant — Quick-Catch Shooter**: a three taken within
-  `quickCatchWindow` (0.3 s) of catching the ball shoots as if 3-Point were 10.
-- **Wario — Offensive Rebounder**: Rebounds counts as 9 on his own missed-shot
-  boards (live with the rebounding system). Everyone else `None`.
+- **Peach — Deep-Three Specialist**: gains make% stepping back behind the arc.
+- **Piranha Plant — Quick-Catch Shooter**: a three within `quickCatchWindow`
+  (0.3 s) of catching the ball shoots as if 3-Point were 10.
+- **Waluigi — Offensive Rebounder**: Rebounds counts as 9 on his own missed-shot
+  boards.
+- **Wario — Smooth Passer**: passes throw with Ball Handling counted as 8 (10
+  out of a post-up), despite his real 6. Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 

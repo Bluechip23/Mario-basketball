@@ -175,9 +175,18 @@ namespace MarioBasketball.Core
 
             if (best != null)
             {
+                // Alley-oop: a teammate catching the lob near the rim finishes it.
+                bool oop = ball.IsAlleyOop && best.team == ball.PassingTeam && NearOwnRim(best);
                 ball.PickUp(best);
                 OnPossessionGained(best);
+                if (oop) best.CatchAlleyOop();
             }
+        }
+
+        bool NearOwnRim(PlayerController p)
+        {
+            Hoop hoop = GetAttackingHoop(p.team);
+            return hoop != null && Horizontal(p.transform.position, hoop.AimPoint) <= reboundBaseRadius + 3f;
         }
 
         PlayerController BestRebounderOn(TeamState team, Vector3 ballPos, ref float bestScore, PlayerController best)
@@ -189,7 +198,12 @@ namespace MarioBasketball.Core
                 float dist = Horizontal(p.transform.position, ballPos);
                 if (dist > ReboundCatchRadius(p)) continue;
 
-                float score = ReboundRating(p) + reboundHeightScore * p.BodyHeight
+                // Vertical reach: a lofted pass sails over a defender's head
+                // (their centre is at half height; arms add roughly the rest).
+                float reachTop = p.transform.position.y + p.BodyHeight;
+                if (ballPos.y > reachTop) continue;
+
+                float score = GrabStat(p) + reboundHeightScore * p.BodyHeight
                             + (p.IsAirborne ? reboundJumpScore : 0f)
                             + (p.IsDiving ? reboundJumpScore * 0.5f : 0f)
                             - dist
@@ -202,19 +216,25 @@ namespace MarioBasketball.Core
 
         float ReboundCatchRadius(PlayerController p)
         {
-            float reb = p.Character != null ? p.Character.GetEffective(StatType.Rebounds) : 5f;
-            float r = reboundBaseRadius + reboundRadiusPerStat * reb
+            float r = reboundBaseRadius + reboundRadiusPerStat * GrabStat(p)
                     + reboundHeightRadius * Mathf.Max(0f, p.BodyHeight - 1.6f);
             if (p.IsAirborne) r += reboundJumpReach;
             if (p.IsDiving) r += reboundDiveReach;
             return r;
         }
 
-        float ReboundRating(PlayerController p)
+        /// <summary>The rating that decides who wins a loose ball: a defender
+        /// jumping an <b>in-flight pass</b> uses <b>Steals</b> (an interception);
+        /// otherwise it's <b>Rebounds</b> (with the offensive-rebound bonus on a
+        /// missed-shot board).</summary>
+        float GrabStat(PlayerController p)
         {
             if (p.Character == null) return 5f;
+
+            if (ball.IsPass && p.team != ball.PassingTeam)
+                return p.Character.GetEffective(StatType.Steals); // pick off the pass
+
             float reb = p.Character.GetEffective(StatType.Rebounds);
-            // Wario-style offensive rebounding on a missed-shot board.
             if (ball.IsRebound && p.team == ball.ShooterTeam
                 && p.Character.stats != null && p.Character.stats.hiddenTrait == HiddenTrait.OffensiveRebounder)
                 reb = Mathf.Max(reb, p.Character.GetEffectiveFor(offensiveReboundRating));

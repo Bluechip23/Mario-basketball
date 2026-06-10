@@ -43,7 +43,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Peach() => new CharacterStats
         {
             characterName = "Peach",
-            speed = 6, ballHandling = 6, threePoint = 8, midRange = 6, insideScoring = 4, postOffense = 5, dunk = 5, power = 3, rebounds = 3, blocks = 3, steals = 8, postDefense = 3, perimeterDefense = 6, stamina = 8,
+            speed = 6, ballHandling = 6, threePoint = 8, midRange = 6, insideScoring = 4, postOffense = 5, dunk = 5, power = 3, rebounds = 3, blocks = 5, steals = 6, postDefense = 3, perimeterDefense = 6, stamina = 8,
             hiddenTrait = HiddenTrait.DeepThreeSpecialist, heightMeters = 1.9f
         };
 
@@ -58,7 +58,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Waluigi() => new CharacterStats
         {
             characterName = "Waluigi",
-            speed = 6, ballHandling = 3, threePoint = 3, midRange = 3, insideScoring = 7, postOffense = 9, dunk = 6, power = 6, rebounds = 7, blocks = 8, steals = 8, postDefense = 8, perimeterDefense = 1, stamina = 6,
+            speed = 6, ballHandling = 3, threePoint = 3, midRange = 3, insideScoring = 8, postOffense = 9, dunk = 6, power = 6, rebounds = 7, blocks = 8, steals = 6, postDefense = 8, perimeterDefense = 1, stamina = 6,
             hiddenTrait = HiddenTrait.OffensiveRebounder, heightMeters = 2.35f
         };
 
@@ -72,7 +72,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Yoshi() => new CharacterStats
         {
             characterName = "Yoshi",
-            speed = 10, ballHandling = 1, threePoint = 1, midRange = 1, insideScoring = 2, postOffense = 1, dunk = 6, power = 7, rebounds = 7, blocks = 7, steals = 8, postDefense = 7, perimeterDefense = 9, stamina = 10,
+            speed = 10, ballHandling = 1, threePoint = 1, midRange = 1, insideScoring = 2, postOffense = 1, dunk = 6, power = 7, rebounds = 7, blocks = 6, steals = 7, postDefense = 7, perimeterDefense = 9, stamina = 10,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.95f
         };
 
@@ -101,7 +101,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Wario() => new CharacterStats
         {
             characterName = "Wario",
-            speed = 4, ballHandling = 6, threePoint = 7, midRange = 10, insideScoring = 6, postOffense = 7, dunk = 5, power = 8, rebounds = 7, blocks = 5, steals = 8, postDefense = 6, perimeterDefense = 5, stamina = 6,
+            speed = 4, ballHandling = 6, threePoint = 7, midRange = 10, insideScoring = 6, postOffense = 7, dunk = 5, power = 8, rebounds = 7, blocks = 5, steals = 6, postDefense = 6, perimeterDefense = 5, stamina = 6,
             hiddenTrait = HiddenTrait.SmoothPasser, heightMeters = 2.0f
         };
 

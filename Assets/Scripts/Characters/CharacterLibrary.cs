@@ -123,7 +123,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats MontyMole() => new CharacterStats
         {
             characterName = "Monty Mole",
-            speed = 7, ballHandling = 4, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 7, rebounds = 7, blocks = 7, steals = 4, postDefense = 3, perimeterDefense = 10, stamina = 8,
+            speed = 7, ballHandling = 4, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 7, rebounds = 4, blocks = 7, steals = 4, postDefense = 3, perimeterDefense = 10, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.45f
         };
 
@@ -144,7 +144,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Shyguy() => new CharacterStats
         {
             characterName = "Shyguy",
-            speed = 6, ballHandling = 6, threePoint = 8, midRange = 8, insideScoring = 8, postOffense = 7, dunk = 4, power = 5, rebounds = 6, blocks = 6, steals = 5, postDefense = 3, perimeterDefense = 5, stamina = 2,
+            speed = 6, ballHandling = 6, threePoint = 9, midRange = 9, insideScoring = 9, postOffense = 7, dunk = 4, power = 5, rebounds = 6, blocks = 6, steals = 5, postDefense = 3, perimeterDefense = 5, stamina = 2,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.55f
         };
 

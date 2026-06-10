@@ -220,10 +220,10 @@ Baby Mario 1.15.
 | Wario       | 4 | 6 | 7 | 10| 6  | 7 | 5 | 8  | 7 | 5 | 8 | 6 | 5 | 6 |
 | Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 7 | 3 | 6 |
 | Daisy       | 7 | 7 | 5 | 9 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
-| Monty Mole  | 7 | 4 | 5 | 5 | 5  | 3 | 3 | 7  | 7 | 7 | 4 | 3 | 10| 8 |
+| Monty Mole  | 7 | 4 | 5 | 5 | 5  | 3 | 3 | 7  | 4 | 7 | 4 | 3 | 10| 8 |
 | Koopa       | 6 | 10| 5 | 5 | 5  | 3 | 3 | 8  | 6 | 5 | 6 | 3 | 7 | 8 |
 | Kritter     | 6 | 1 | 1 | 2 | 5  | 3 | 4 | 8  | 8 | 10| 3 | 10| 4 | 8 |
-| Shyguy      | 6 | 6 | 8 | 8 | 8  | 7 | 4 | 5  | 6 | 6 | 5 | 3 | 5 | 2 |
+| Shyguy      | 6 | 6 | 9 | 9 | 9  | 7 | 4 | 5  | 6 | 6 | 5 | 3 | 5 | 2 |
 
 Hidden traits (wired):
 - **Peach — Deep-Three Specialist**: gains make% stepping back behind the arc.

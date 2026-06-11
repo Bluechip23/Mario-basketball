@@ -382,8 +382,12 @@ namespace MarioBasketball.Core
             return true;
         }
 
+        /// <summary>Subs are only allowed during a timeout or a quarter break.</summary>
+        public bool CanSubstitute => State == GameState.Timeout || State == GameState.QuarterBreak;
+
         public void Substitute(TeamSide side, int onCourtIndex, int benchIndex)
         {
+            if (!CanSubstitute) return;
             var team = TeamFor(side);
             var (leaving, entering) = team.Substitute(onCourtIndex, benchIndex);
             if (leaving == null || entering == null) return;
@@ -449,6 +453,11 @@ namespace MarioBasketball.Core
                     if (CountdownDone(dt))
                     {
                         Clock.AdvanceQuarter();
+                        if (Clock.Quarter == 3) // halftime: team fouls reset
+                        {
+                            Home.ResetFouls();
+                            Away.ResetFouls();
+                        }
                         BeginTipOff(ContestTip());
                     }
                     break;

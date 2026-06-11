@@ -32,6 +32,13 @@ namespace MarioBasketball.Gameplay
             if (GameManager.Instance != null)
                 GameManager.Instance.RegisterBasket(ball.ShooterTeam, ball.PendingPoints, ball.Shooter);
 
+            // Snap the net.
+            if (transform.parent != null)
+            {
+                var net = transform.parent.GetComponentInChildren<MarioBasketball.Presentation.NetSwish>();
+                if (net != null) net.Swish();
+            }
+
             ball.OnScored();
         }
     }

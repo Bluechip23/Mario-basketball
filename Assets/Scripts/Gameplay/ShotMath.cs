@@ -115,17 +115,18 @@ namespace MarioBasketball.Gameplay
             return ContestMaxPenalty * closeness * Mathf.Clamp01(defStat / 10f);
         }
 
-        /// <summary>Where the shot lands: dead-centre-ish for a make, off the rim
-        /// for a miss (so the physics matches the rolled outcome).</summary>
+        /// <summary>Where the shot lands: dead-centre-ish for a make, clearly off
+        /// the rim for a miss (outside the score zone + ball radius, so a rolled
+        /// miss clanks iron or airballs instead of dropping anyway).</summary>
         public static Vector3 AimOffset(bool make)
         {
             if (make)
             {
-                Vector2 j = Random.insideUnitCircle * 0.05f;
+                Vector2 j = Random.insideUnitCircle * 0.04f;
                 return new Vector3(j.x, 0f, j.y);
             }
             float ang = Random.value * Mathf.PI * 2f;
-            float r = Random.Range(0.35f, 0.6f);
+            float r = Random.Range(0.5f, 0.85f);
             return new Vector3(Mathf.Cos(ang) * r, 0f, Mathf.Sin(ang) * r);
         }
     }

@@ -45,7 +45,7 @@ namespace MarioBasketball.Core
 
         [Header("Rebounding / loose balls")]
         [Tooltip("Base catch radius; grows with Rebounds, height, jumping and diving.")]
-        public float reboundBaseRadius = 1.0f;
+        public float reboundBaseRadius = 1.2f;
         public float reboundRadiusPerStat = 0.06f;
         public float reboundHeightRadius = 0.25f;
         public float reboundJumpReach = 0.7f;

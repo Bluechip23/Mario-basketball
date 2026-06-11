@@ -209,7 +209,7 @@ Baby Mario 1.15.
 | Bowser      | 2 | 2 | 1 | 2 | 10 | 9 | 3 | 10 | 5 | 5 | 8 | 7 | 2 | 4 |
 | Donkey Kong | 7 | 2 | 1 | 1 | 4  | 4 | 10| 9  | 9 | 8 | 5 | 8 | 7 | 7 |
 | Mario       | 7 | 8 | 7 | 8 | 8  | 7 | 7 | 6  | 7 | 6 | 6 | 4 | 6 | 8 |
-| Luigi       | 7 | 5 | 3 | 6 | 7  | 6 | 8 | 6  | 7 | 8 | 8 | 8 | 8 | 8 |
+| Luigi       | 7 | 5 | 3 | 6 | 7  | 6 | 7 | 6  | 7 | 7 | 6 | 7 | 7 | 8 |
 | Peach       | 6 | 6 | 8 | 6 | 4  | 5 | 5 | 3  | 3 | 5 | 6 | 3 | 6 | 8 |
 | Toad        | 8 | 10| 5 | 5 | 8  | 2 | 1 | 3  | 3 | 1 | 7 | 1 | 6 | 9 |
 | Waluigi     | 6 | 3 | 3 | 3 | 8  | 9 | 6 | 6  | 7 | 8 | 6 | 8 | 1 | 6 |
@@ -222,7 +222,7 @@ Baby Mario 1.15.
 | Piranha Plant | 5 | 3 | 8 | 2 | 3 | 2 | 1 | 6 | 8 | 5 | 4 | 7 | 3 | 6 |
 | Daisy       | 7 | 7 | 5 | 9 | 6  | 3 | 3 | 3  | 3 | 3 | 6 | 3 | 8 | 8 |
 | Monty Mole  | 7 | 4 | 5 | 5 | 5  | 3 | 3 | 7  | 4 | 7 | 4 | 3 | 10| 8 |
-| Koopa       | 6 | 10| 5 | 5 | 5  | 3 | 3 | 8  | 6 | 5 | 6 | 3 | 7 | 8 |
+| Koopa       | 6 | 10| 5 | 5 | 5  | 3 | 3 | 8  | 6 | 5 | 6 | 3 | 7 | 9 |
 | Kritter     | 6 | 1 | 1 | 2 | 5  | 3 | 4 | 8  | 8 | 10| 3 | 10| 4 | 8 |
 | Shyguy      | 6 | 6 | 9 | 9 | 9  | 7 | 4 | 5  | 6 | 6 | 5 | 3 | 5 | 2 |
 
@@ -233,7 +233,10 @@ Hidden traits (wired):
 - **Waluigi — Offensive Rebounder**: Rebounds counts as 9 on his own missed-shot
   boards.
 - **Wario — Smooth Passer**: passes throw with Ball Handling counted as 8 (10
-  out of a post-up), despite his real 6. Everyone else `None`.
+  out of a post-up), despite his real 6.
+- **Koopa — Playmaker**: a teammate who shoots/dunks **directly off his pass**
+  (within ~1 s, before driving/dribbling) gets **+2** to the scoring attribute
+  they use. Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 

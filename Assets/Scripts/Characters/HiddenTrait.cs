@@ -43,6 +43,13 @@ namespace MarioBasketball.Characters
         /// Gifted passer: passes throw with Ball Handling counted as 8 (10 when
         /// passing out of a post-up), regardless of the real rating (Wario).
         /// </summary>
-        SmoothPasser
+        SmoothPasser,
+
+        /// <summary>
+        /// Dimer: a teammate who shoots/dunks directly off this player's pass
+        /// (within ~1 s of the catch, before dribbling) gets +2 to the scoring
+        /// attribute they use (Koopa).
+        /// </summary>
+        Playmaker
     }
 }

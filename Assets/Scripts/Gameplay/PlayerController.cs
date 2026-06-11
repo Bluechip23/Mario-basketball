@@ -65,6 +65,10 @@ namespace MarioBasketball.Gameplay
         public float shotAutoReleaseAfterApex = 0.45f;
         [Tooltip("Catch-and-shoot window for the quick-catch shooter trait.")]
         public float quickCatchWindow = 0.3f;
+        [Tooltip("Window to shoot off a Playmaker's pass for the +2 assist bonus.")]
+        public float assistWindow = 1.0f;
+        [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
+        public float dribbleMoveThreshold = 0.6f;
 
         [Header("Inside finishing (dunk / layup)")]
         [Tooltip("Time in the air before an unheld finish auto-resolves.")]
@@ -171,8 +175,11 @@ namespace MarioBasketball.Gameplay
         public bool IsStunned => _stunTimer > 0f;
         /// <summary>Knocked down (ankle-broken / leveled) — sprawls on the floor.</summary>
         public bool IsFallen => _fallTimer > 0f;
-        /// <summary>Live-dribbling on the floor (ball bounces) vs gathered/shooting.</summary>
+        /// <summary>Actively dribbling: moving with the ball on the floor. Holding
+        /// it while stationary is a palmed/triple-threat (the ball does NOT
+        /// auto-bounce).</summary>
         public bool IsDribbling => HasBall && _cc != null && _cc.isGrounded
+                                   && PlanarSpeed > dribbleMoveThreshold
                                    && !IsShooting && !IsFinishing && !IsPosting && !IsStunned;
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
@@ -228,6 +235,9 @@ namespace MarioBasketball.Gameplay
         bool _passCharging;
         float _passChargeTime;
         float _fallTimer;
+        PlayerController _assistPasser;
+        float _assistTime;
+        bool _assistDribbled;
 
         void Awake()
         {
@@ -349,6 +359,31 @@ namespace MarioBasketball.Gameplay
             bool has = HasBall;
             if (has && !_hadBall) _catchTime = Time.time;
             _hadBall = has;
+
+            // Assist window: voided if it lapses, the ball is gone, or the
+            // receiver puts it on the floor (starts dribbling).
+            if (_assistPasser != null)
+            {
+                if (Time.time - _assistTime > assistWindow || !has) _assistPasser = null;
+                else if (IsDribbling) _assistDribbled = true;
+            }
+        }
+
+        /// <summary>Called when this player catches a pass — records the passer
+        /// for the Playmaker assist bonus.</summary>
+        public void OnCaughtPass(PlayerController passer)
+        {
+            _assistPasser = passer;
+            _assistTime = Time.time;
+            _assistDribbled = false;
+        }
+
+        /// <summary>+2 if shooting directly off a Playmaker's pass (in time, no drive).</summary>
+        int AssistBonus()
+        {
+            if (_assistPasser == null || _assistDribbled || Time.time - _assistTime > assistWindow) return 0;
+            var s = _assistPasser.Character != null ? _assistPasser.Character.stats : null;
+            return (s != null && s.hiddenTrait == HiddenTrait.Playmaker) ? 2 : 0;
         }
 
         bool QuickCatchReady() =>
@@ -567,7 +602,10 @@ namespace MarioBasketball.Gameplay
             if (hoop == null) return;
 
             Vector3 aim = hoop.AimPoint;
-            float finisherStat = isDunk ? Effective(StatType.Dunk, 5f) : Effective(StatType.InsideScoring, 5f);
+            // Dunk scores off Dunk, layup off Inside Scoring; +2 off a Playmaker pass.
+            StatType scoreStat = isDunk ? StatType.Dunk : StatType.InsideScoring;
+            int rawFinish = (_character != null ? _character.stats.Get(scoreStat) : 5) + AssistBonus();
+            float finisherStat = _character != null ? _character.GetEffectiveFor(rawFinish) : 5f;
             PlayerController defender = NearestOpponentTo(transform.position);
 
             if (defender != null)
@@ -591,7 +629,7 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _character != null && _character.OnFire;
-            float over = isDunk ? finisherStat : -1f; // dunk uses Dunk as the scoring stat
+            float over = finisherStat; // already includes the scoring stat + assist
             float makeChance = ShotMath.MakeChance(this, StatType.InsideScoring, HorizontalDistance(transform.position, aim), defender, onFire, over);
             if (adjusted) makeChance -= AdjustPenalty();
             makeChance += makeBonus;
@@ -640,10 +678,12 @@ namespace MarioBasketball.Gameplay
 
             PlayerController defender = NearestOpponentTo(transform.position);
 
-            // Quick catch-and-shoot trait: a three taken right off the catch
-            // shoots as if 3-Point were 10.
-            bool quickThree = quickCatch && shotStat == StatType.ThreePoint && _character != null;
-            float shotStatValue = quickThree ? _character.GetEffectiveFor(10) : Effective(shotStat, 5f);
+            // Effective scoring stat with trait modifiers: quick catch-and-shoot
+            // three counts as 10 (Piranha), and +2 off a Playmaker pass (Koopa).
+            int rawStat = _character != null ? _character.stats.Get(shotStat) : 5;
+            if (quickCatch && shotStat == StatType.ThreePoint) rawStat = 10;
+            rawStat += AssistBonus();
+            float shotStatValue = _character != null ? _character.GetEffectiveFor(rawStat) : 5f;
 
             // Block check first — unaffected by timing or being on fire.
             if (defender != null)
@@ -665,8 +705,7 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _character != null && _character.OnFire;
-            float statOverride = quickThree ? shotStatValue : -1f;
-            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, statOverride) * timingMultiplier;
+            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, shotStatValue) * timingMultiplier;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);

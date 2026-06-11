@@ -60,6 +60,8 @@ namespace MarioBasketball.Gameplay
         public bool IsPass { get; private set; }
         /// <summary>The team that threw the in-flight pass.</summary>
         public TeamSide PassingTeam { get; private set; }
+        /// <summary>The player who threw the in-flight pass (for assist traits).</summary>
+        public PlayerController Passer { get; private set; }
         /// <summary>True while a lob is an alley-oop — a teammate catching it near
         /// the rim finishes immediately.</summary>
         public bool IsAlleyOop { get; private set; }
@@ -85,10 +87,9 @@ namespace MarioBasketball.Gameplay
             if (State == BallState.Held && Holder != null)
             {
                 if (_crossTimer > 0f) _crossTimer -= Time.deltaTime;
-                bool dribbling = Holder.IsDribbling;
-                if (dribbling && !_wasDribbling) _dribbleStart = Time.time; // bounce starts from the hand
-                _wasDribbling = dribbling;
-                if (dribbling)
+                // Bounce only while actively dribbling (or mid-crossover); held
+                // while stationary it's palmed — no auto-bounce.
+                if (Holder.IsDribbling || _crossTimer > 0f)
                     transform.position = DribblePosition();
                 else
                     transform.position = Vector3.Lerp(transform.position, Holder.CarriedBallPoint, followLerp * Time.deltaTime);
@@ -237,6 +238,7 @@ namespace MarioBasketball.Gameplay
         /// through the lane; long = a slow lob that arcs over defenders.</summary>
         public void PassTo(Vector3 target, float flightTime = 0.5f, bool alleyOop = false)
         {
+            PlayerController passer = Holder;
             TeamSide thrower = Holder != null ? Holder.team : ShooterTeam;
             MarkReleased();
             PendingPoints = 0;
@@ -244,6 +246,7 @@ namespace MarioBasketball.Gameplay
             IsPass = true;            // intercept with Steals until it goes stale
             IsAlleyOop = alleyOop;
             PassingTeam = thrower;
+            Passer = passer;
             _passTimer = passLiveTime;
             GoLive();
 

@@ -35,7 +35,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Luigi() => new CharacterStats
         {
             characterName = "Luigi",
-            speed = 7, ballHandling = 5, threePoint = 3, midRange = 6, insideScoring = 7, postOffense = 6, dunk = 8, power = 6, rebounds = 7, blocks = 8, steals = 8, postDefense = 8, perimeterDefense = 8, stamina = 8,
+            speed = 7, ballHandling = 5, threePoint = 3, midRange = 6, insideScoring = 7, postOffense = 6, dunk = 7, power = 6, rebounds = 7, blocks = 7, steals = 6, postDefense = 7, perimeterDefense = 7, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.9f
         };
 
@@ -130,8 +130,8 @@ namespace MarioBasketball.Characters
         public static CharacterStats Koopa() => new CharacterStats
         {
             characterName = "Koopa",
-            speed = 6, ballHandling = 10, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 8, rebounds = 6, blocks = 5, steals = 6, postDefense = 3, perimeterDefense = 7, stamina = 8,
-            hiddenTrait = HiddenTrait.None, heightMeters = 1.7f
+            speed = 6, ballHandling = 10, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 8, rebounds = 6, blocks = 5, steals = 6, postDefense = 3, perimeterDefense = 7, stamina = 9,
+            hiddenTrait = HiddenTrait.Playmaker, heightMeters = 1.7f
         };
 
         public static CharacterStats Kritter() => new CharacterStats

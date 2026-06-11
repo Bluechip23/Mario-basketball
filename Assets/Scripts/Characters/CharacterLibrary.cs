@@ -130,8 +130,8 @@ namespace MarioBasketball.Characters
         public static CharacterStats Koopa() => new CharacterStats
         {
             characterName = "Koopa",
-            speed = 6, ballHandling = 10, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 8, rebounds = 6, blocks = 5, steals = 6, postDefense = 3, perimeterDefense = 7, stamina = 8,
-            hiddenTrait = HiddenTrait.None, heightMeters = 1.7f
+            speed = 6, ballHandling = 10, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 8, rebounds = 6, blocks = 5, steals = 6, postDefense = 3, perimeterDefense = 7, stamina = 9,
+            hiddenTrait = HiddenTrait.Playmaker, heightMeters = 1.7f
         };
 
         public static CharacterStats Kritter() => new CharacterStats

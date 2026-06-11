@@ -177,10 +177,13 @@ namespace MarioBasketball.Core
 
             if (best != null)
             {
-                // Alley-oop: a teammate catching the lob near the rim finishes it.
+                // Capture pass info before PickUp clears it.
                 bool oop = ball.IsAlleyOop && best.team == ball.PassingTeam && NearOwnRim(best);
+                PlayerController passer = (ball.IsPass && best.team == ball.PassingTeam) ? ball.Passer : null;
+
                 ball.PickUp(best);
                 OnPossessionGained(best);
+                if (passer != null) best.OnCaughtPass(passer);
                 if (oop) best.CatchAlleyOop();
             }
         }

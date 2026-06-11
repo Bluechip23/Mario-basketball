@@ -81,7 +81,9 @@ namespace MarioBasketball.Gameplay
             if (State == BallState.Held && Holder != null)
             {
                 if (_crossTimer > 0f) _crossTimer -= Time.deltaTime;
-                if (Holder.IsDribbling)
+                // Bounce only while actively dribbling (or mid-crossover); held
+                // while stationary it's palmed — no auto-bounce.
+                if (Holder.IsDribbling || _crossTimer > 0f)
                     transform.position = DribblePosition();
                 else
                     transform.position = Vector3.Lerp(transform.position, Holder.BallHoldPoint, followLerp * Time.deltaTime);

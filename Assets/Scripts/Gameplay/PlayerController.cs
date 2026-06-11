@@ -67,8 +67,8 @@ namespace MarioBasketball.Gameplay
         public float quickCatchWindow = 0.3f;
         [Tooltip("Window to shoot off a Playmaker's pass for the +2 assist bonus.")]
         public float assistWindow = 1.0f;
-        [Tooltip("Driving/dribbling this far from the catch voids the assist bonus.")]
-        public float assistDriveThreshold = 1.5f;
+        [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
+        public float dribbleMoveThreshold = 0.6f;
 
         [Header("Inside finishing (dunk / layup)")]
         [Tooltip("Time in the air before an unheld finish auto-resolves.")]
@@ -152,8 +152,11 @@ namespace MarioBasketball.Gameplay
         public bool IsStunned => _stunTimer > 0f;
         /// <summary>Knocked down (ankle-broken / leveled) — sprawls on the floor.</summary>
         public bool IsFallen => _fallTimer > 0f;
-        /// <summary>Live-dribbling on the floor (ball bounces) vs gathered/shooting.</summary>
+        /// <summary>Actively dribbling: moving with the ball on the floor. Holding
+        /// it while stationary is a palmed/triple-threat (the ball does NOT
+        /// auto-bounce).</summary>
         public bool IsDribbling => HasBall && _cc != null && _cc.isGrounded
+                                   && PlanarSpeed > dribbleMoveThreshold
                                    && !IsShooting && !IsFinishing && !IsPosting && !IsStunned;
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
@@ -211,7 +214,6 @@ namespace MarioBasketball.Gameplay
         float _fallTimer;
         PlayerController _assistPasser;
         float _assistTime;
-        Vector3 _assistPos;
         bool _assistDribbled;
 
         void Awake()
@@ -335,11 +337,12 @@ namespace MarioBasketball.Gameplay
             if (has && !_hadBall) _catchTime = Time.time;
             _hadBall = has;
 
-            // Assist window: voided if it lapses or the player drives/dribbles off it.
+            // Assist window: voided if it lapses, the ball is gone, or the
+            // receiver puts it on the floor (starts dribbling).
             if (_assistPasser != null)
             {
                 if (Time.time - _assistTime > assistWindow || !has) _assistPasser = null;
-                else if (HorizontalDistance(transform.position, _assistPos) > assistDriveThreshold) _assistDribbled = true;
+                else if (IsDribbling) _assistDribbled = true;
             }
         }
 
@@ -349,7 +352,6 @@ namespace MarioBasketball.Gameplay
         {
             _assistPasser = passer;
             _assistTime = Time.time;
-            _assistPos = transform.position;
             _assistDribbled = false;
         }
 

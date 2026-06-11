@@ -10,7 +10,7 @@ namespace MarioBasketball.Core
     /// </summary>
     public class TeamState
     {
-        public const int StartingTimeouts = 3;
+        public const int StartingTimeouts = 2;
         /// <summary>Once a team has committed this many fouls, every further
         /// foul sends the fouled team to the free-throw line.</summary>
         public const int PenaltyFoulLimit = 10;
@@ -28,6 +28,9 @@ namespace MarioBasketball.Core
         }
 
         public void AddFoul() => Fouls++;
+
+        /// <summary>Team fouls reset at halftime.</summary>
+        public void ResetFouls() => Fouls = 0;
 
         /// <summary>This team has fouled enough that its fouls now grant the
         /// opponent free throws.</summary>

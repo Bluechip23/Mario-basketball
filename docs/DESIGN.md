@@ -38,6 +38,7 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
 ### Fouling
 - Fouling **is allowed with no downside** up to **10 team fouls**.
 - At **10 fouls**, the fouled team **shoots free throws** from then on.
+- **Team fouls reset at halftime.**
 - **No fouling out** — players never get disqualified.
 - Power drives both **delivering** fouls (pushes, knocking shooters off course)
   and **withstanding** them.
@@ -263,8 +264,10 @@ Lineups are chosen on the pre-match **team select** screen (see below).
     opponent inbounds after a make, inbound after turnovers.
   - Scoring **2 / 3** by distance (the **1**-point free throw arrives with the
     fouling system).
-  - **Timeouts**: 3 per team; calling one grants **+30 energy** to the on-court
-    five (`CallTimeout`).
+  - **Timeouts**: **2 per game** per team; calling one grants **+30 energy** to
+    the on-court players (`CallTimeout`).
+  - **Substitutions only during timeouts and quarter breaks**
+    (`GameManager.CanSubstitute`).
   - **No out of bounds**: perimeter walls — ball bounces, players are stopped.
   - Painted lane, three-point arcs, and centre circle.
   - Debug keys: **T** home timeout, **Y** home substitution.

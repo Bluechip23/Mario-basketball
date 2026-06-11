@@ -158,6 +158,7 @@ namespace MarioBasketball.Bootstrap
 
             // Every player has a brain; it yields on whoever the human controls.
             go.AddComponent<MarioBasketball.AI.PlayerAI>();
+            go.AddComponent<MarioBasketball.Presentation.ProceduralAnimator>();
 
             go.SetActive(true);
 
@@ -181,8 +182,10 @@ namespace MarioBasketball.Bootstrap
 
         void BuildWalls()
         {
+            // Out-of-bounds lines are invisible walls: tall enough that even a
+            // high lob can't leave the court.
             const float t = 0.5f;
-            const float h = 3f;
+            const float h = 12f;
             float hw = courtWidth / 2f;
             float hl = courtLength / 2f;
 
@@ -224,10 +227,10 @@ namespace MarioBasketball.Bootstrap
             }
             Polyline($"{label}Arc", arcPts.ToArray());
 
-            // Lane (paint): baseline to free-throw line.
+            // Lane (paint): FIBA — 4.9 m wide, free-throw line 5.8 m from the baseline.
             float baselineZ = dir < 0f ? -courtLength / 2f : courtLength / 2f;
             float ftZ = baselineZ - dir * 5.8f;
-            float laneHalf = 2.4f;
+            float laneHalf = 2.45f;
             LoopLine($"{label}Lane", new[]
             {
                 new Vector3(-laneHalf, 0.02f, baselineZ),
@@ -249,29 +252,55 @@ namespace MarioBasketball.Bootstrap
             board.transform.localScale = new Vector3(1.8f, 1.05f, 0.1f);
             Tint(board, Color.white);
 
+            // Rim: regulation 0.46 m inner diameter at 3.05 m. The visual ring
+            // has no collider; physics comes from a ring of small colliders so
+            // a near-miss clanks off iron while a clean make drops through.
+            Vector3 rimCentre = new Vector3(0f, rimHeight, 0.1f * faceZ);
             var rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             rim.name = "Rim";
             rim.transform.SetParent(root.transform);
-            rim.transform.localPosition = new Vector3(0f, rimHeight, 0.1f * faceZ);
-            rim.transform.localScale = new Vector3(0.45f, 0.02f, 0.45f);
+            rim.transform.localPosition = rimCentre;
+            rim.transform.localScale = new Vector3(0.46f, 0.02f, 0.46f);
             Tint(rim, new Color(0.95f, 0.45f, 0.1f));
-            Destroy(rim.GetComponent<Collider>()); // visual only; let the ball pass
+            Destroy(rim.GetComponent<Collider>());
+
+            const int rimSegments = 8;
+            for (int i = 0; i < rimSegments; i++)
+            {
+                float a = i / (float)rimSegments * Mathf.PI * 2f;
+                var seg = new GameObject("RimIron");
+                seg.transform.SetParent(root.transform);
+                seg.transform.localPosition = rimCentre + new Vector3(Mathf.Cos(a) * 0.23f, 0f, Mathf.Sin(a) * 0.23f);
+                var segCol = seg.AddComponent<SphereCollider>();
+                segCol.radius = 0.03f;
+            }
+
+            // Net: a soft inverted cone that snaps on a make (NetSwish).
+            var net = new GameObject("Net");
+            net.transform.SetParent(root.transform);
+            net.transform.localPosition = rimCentre + new Vector3(0f, -0.02f, 0f);
+            net.transform.localScale = new Vector3(0.4f, -0.45f, 0.4f); // apex down
+            net.AddComponent<MeshFilter>().sharedMesh = MarioBasketball.Presentation.CharacterModelBuilder.ConeMesh();
+            var netMr = net.AddComponent<MeshRenderer>();
+            netMr.material = new Material(LineMaterial) { color = new Color(0.95f, 0.95f, 0.95f, 0.85f) };
+            net.AddComponent<MarioBasketball.Presentation.NetSwish>();
 
             // Rim contact trigger (shot-clock "hit the rim" detection).
             var rimTriggerGo = new GameObject("RimTrigger");
             rimTriggerGo.transform.SetParent(root.transform);
-            rimTriggerGo.transform.localPosition = new Vector3(0f, rimHeight, 0.1f * faceZ);
+            rimTriggerGo.transform.localPosition = rimCentre;
             var rimCol = rimTriggerGo.AddComponent<SphereCollider>();
             rimCol.radius = 0.5f;
             rimCol.isTrigger = true;
             rimTriggerGo.AddComponent<Rim>();
 
-            // Score trigger just beneath the rim.
+            // Score trigger just beneath the rim — tight, so only a clean
+            // drop-through counts (misses are aimed well outside it).
             var zoneGo = new GameObject("ScoreZone");
             zoneGo.transform.SetParent(root.transform);
-            zoneGo.transform.localPosition = new Vector3(0f, rimHeight - 0.25f, 0.1f * faceZ);
+            zoneGo.transform.localPosition = rimCentre + new Vector3(0f, -0.25f, 0f);
             var zoneCol = zoneGo.AddComponent<SphereCollider>();
-            zoneCol.radius = 0.28f;
+            zoneCol.radius = 0.16f;
             zoneCol.isTrigger = true;
             zoneGo.AddComponent<ScoreZone>();
 

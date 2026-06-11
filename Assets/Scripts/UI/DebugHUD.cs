@@ -101,7 +101,7 @@ namespace MarioBasketball.UI
                 "            Pass X: tap = loft, hold = hard (Right stick aims; or hold LB then A/B)   Dribble move B   Post up RB\n" +
                 "Posting (hold RB):  Hook Y   Drop step A   Spin B   Fake LB   Back down RT   Pass X\n" +
                 "Defense:  Switch A/LB   Steal X   Push/foul or bump RT   Jump/Block Y\n" +
-                "D-pad Up: Timeout   D-pad Down: Sub        (keyboard fallbacks exist too)\n" +
+                "D-pad Up: Timeout   D-pad Down: Sub (only during timeouts/quarter breaks)\n" +
                 "You control the gold-ringed player; on offense control follows the ball.",
                 _small);
         }

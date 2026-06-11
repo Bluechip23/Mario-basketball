@@ -159,6 +159,8 @@ namespace MarioBasketball.Gameplay
         public float BodyHeight => _cc != null ? _cc.height : 1.8f;
         public bool IsAirborne => _cc != null && !_cc.isGrounded;
         public bool IsDiving => _diveTimer > 0f;
+        /// <summary>Current horizontal speed (m/s) — drives the run animation.</summary>
+        public float PlanarSpeed { get; private set; }
         public bool IsShooting => _shooting;
         /// <summary>How full the shot meter is (0-1) for the jump in progress.</summary>
         public float ShotChargeFraction => _shooting ? Mathf.Clamp01(_shotCharge / ShotMeterDuration) : 0f;
@@ -409,6 +411,7 @@ namespace MarioBasketball.Gameplay
             }
 
             if (_shoveTimer > 0f) horizontal += _shoveVel;
+            PlanarSpeed = horizontal.magnitude;
 
             if (_cc.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
             _verticalVelocity += gravity * dt;
@@ -421,6 +424,19 @@ namespace MarioBasketball.Gameplay
                 Quaternion want = Quaternion.LookRotation(faceDir, Vector3.up);
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * dt);
             }
+        }
+
+        /// <summary>Players can't stand on each other: landing on top of another
+        /// player slides you off to the side.</summary>
+        void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            if (hit.normal.y < 0.6f) return; // only care about "standing on" contacts
+            if (hit.collider.GetComponentInParent<PlayerController>() == null) return;
+
+            Vector3 away = transform.position - hit.transform.position;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.01f ? away.normalized : transform.forward;
+            ApplyShove(away * 2.5f);
         }
 
         BallController Ball => GameManager.Instance != null ? GameManager.Instance.ball : null;

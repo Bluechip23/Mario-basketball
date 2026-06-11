@@ -20,6 +20,7 @@ namespace MarioBasketball.Presentation
     ///   set overhead → elbow extends into the release, off-hand guides; the
     ///   wrist flicks forward in a brief follow-through after the ball leaves.</item>
     ///   <item><b>Dunk</b>: both arms drive up; <b>layup</b>: one arm extends.</item>
+    ///   <item><b>Carrying a gathered ball</b>: both hands hold it at the chest.</item>
     ///   <item><b>Ankle-broken / leveled</b>: the body sprawls to the floor.</item>
     /// </list>
     /// Characters without limbs (Boo, Piranha Plant) have no joints and are
@@ -70,6 +71,11 @@ namespace MarioBasketball.Presentation
         public float dunkWristDegrees = -35f;    // throwing the ball down through the rim
         public float layupArmDegrees = -170f;
         public float layupElbowDegrees = -5f;
+
+        [Header("Carrying a gathered ball")]
+        public float holdArmDegrees = -45f;      // both hands on the ball at the chest
+        public float holdElbowDegrees = -65f;
+        public float holdWristDegrees = 15f;     // palms cradling under it
 
         [Header("Misc")]
         public float poseLerp = 13f;
@@ -190,6 +196,13 @@ namespace MarioBasketball.Presentation
                     guardArmDegrees + (moving ? swing * armSwingDegrees * 0.4f * speedScale : 0f),
                     dribbleElbowBent * 0.5f,
                     0f);
+            }
+            else if (_pc.HasBall)
+            {
+                // Gathered ball (fresh pickup, post-up, airborne rebound):
+                // both hands carry it at the chest instead of hanging loose.
+                Pose(_armL, _elbowL, _wristL, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
+                Pose(_armR, _elbowR, _wristR, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
             }
             else
             {

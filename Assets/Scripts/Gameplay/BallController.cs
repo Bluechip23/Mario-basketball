@@ -82,7 +82,7 @@ namespace MarioBasketball.Gameplay
                 if (Holder.IsDribbling)
                     transform.position = DribblePosition();
                 else
-                    transform.position = Vector3.Lerp(transform.position, Holder.BallHoldPoint, followLerp * Time.deltaTime);
+                    transform.position = Vector3.Lerp(transform.position, Holder.CarriedBallPoint, followLerp * Time.deltaTime);
             }
             else if (State == BallState.Shot)
             {
@@ -114,6 +114,13 @@ namespace MarioBasketball.Gameplay
         int _handSign = 1;     // which hand the ball is on (+1 right, -1 left)
         float _crossTimer;     // a low crossover sweep in progress
 
+        /// <summary>Which hand the dribble is on (+1 right, -1 left) — the
+        /// animator pumps the matching arm.</summary>
+        public int DribbleHand => _handSign;
+        /// <summary>Where the dribble is in its bounce cycle: 0/1 = hip contact,
+        /// 0.5 = floor. Shared with the animator so the hand rides the ball.</summary>
+        public float DribblePhase01 => (Time.time * dribbleHz) % 1f;
+
         /// <summary>Sweep the ball low across to the other hand (a crossover).</summary>
         public void Crossover() => _crossTimer = crossoverDuration;
 
@@ -138,7 +145,7 @@ namespace MarioBasketball.Gameplay
             }
 
             // Parabolic bounce: hip at the ends of the cycle, floor in the middle.
-            float frac = (Time.time * dribbleHz) % 1f;
+            float frac = DribblePhase01;
             float u = 2f * frac - 1f;
             float y = Mathf.Lerp(groundY + ballRadius, hipY, u * u);
             Vector3 pos = ground + Holder.transform.right * (_handSign * dribbleHandSide) + Holder.transform.forward * dribbleForward;

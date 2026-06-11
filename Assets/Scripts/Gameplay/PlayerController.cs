@@ -141,6 +141,29 @@ namespace MarioBasketball.Gameplay
             }
         }
 
+        /// <summary>Where a gathered (non-dribbled) ball is carried. During a
+        /// jump shot it rises with the meter from the chest gather to an
+        /// overhead set point (so the shot releases above the head, matching the
+        /// arm pose); held high in both hands for a dunk/layup; at the hip
+        /// otherwise.</summary>
+        public Vector3 CarriedBallPoint
+        {
+            get
+            {
+                float h = BodyHeight;
+                if (IsShooting)
+                {
+                    float k = Mathf.Clamp01(ShotChargeFraction / Mathf.Max(0.01f, ShotPerfectFraction));
+                    Vector3 gather = transform.position + transform.forward * (0.24f * h) + Vector3.up * (0.10f * h);
+                    Vector3 set = transform.position + transform.forward * (0.10f * h) + Vector3.up * (0.62f * h);
+                    return Vector3.Lerp(gather, set, k);
+                }
+                if (IsFinishing)
+                    return transform.position + transform.forward * (0.18f * h) + Vector3.up * (0.55f * h);
+                return BallHoldPoint;
+            }
+        }
+
         public PlayerCharacter Character => _character;
         public PostUpController Post => _post;
         public bool HasBall => Ball != null && Ball.Holder == this;

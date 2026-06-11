@@ -31,6 +31,8 @@ namespace MarioBasketball.Gameplay
         [Tooltip("How far to the side the dribble hand is, in metres.")]
         public float dribbleHandSide = 0.42f;
         public float dribbleForward = 0.25f;
+        [Tooltip("Extra forward lead per m/s of run speed, so the ball is pushed out ahead on the move.")]
+        public float dribbleForwardPerSpeed = 0.035f;
         public float crossoverDuration = 0.32f;
         public float dribbleSpeed = 6f; // legacy; kept for the animator
         [Tooltip("Seconds the releaser can't re-grab after shooting/passing.")]
@@ -39,6 +41,10 @@ namespace MarioBasketball.Gameplay
         public float reboundHeight = 2.2f;
         [Tooltip("How long a thrown pass stays an 'in-flight pass' (Steals to intercept) before becoming a true loose ball (Rebounds).")]
         public float passLiveTime = 1.4f;
+        [Tooltip("Horizontal damping (per second) while loose near the floor, so scrambles settle into someone's hands instead of pinballing.")]
+        public float looseRollDamping = 1.4f;
+        [Tooltip("A loose ball below this height counts as 'on the floor' for the roll damping.")]
+        public float looseRollHeight = 0.6f;
 
         public BallState State { get; private set; } = BallState.Free;
         public PlayerController Holder { get; private set; }
@@ -86,7 +92,7 @@ namespace MarioBasketball.Gameplay
                 if (Holder.IsDribbling || _crossTimer > 0f)
                     transform.position = DribblePosition();
                 else
-                    transform.position = Vector3.Lerp(transform.position, Holder.BallHoldPoint, followLerp * Time.deltaTime);
+                    transform.position = Vector3.Lerp(transform.position, Holder.CarriedBallPoint, followLerp * Time.deltaTime);
             }
             else if (State == BallState.Shot)
             {
@@ -106,17 +112,39 @@ namespace MarioBasketball.Gameplay
                     State = BallState.Free;
                 }
             }
-            else if (State == BallState.Free && IsPass)
+            else if (State == BallState.Free)
             {
-                // An uncaught pass eventually becomes a plain loose ball.
-                _passTimer -= Time.deltaTime;
-                if (_passTimer <= 0f) { IsPass = false; IsAlleyOop = false; }
+                if (IsPass)
+                {
+                    // An uncaught pass eventually becomes a plain loose ball.
+                    _passTimer -= Time.deltaTime;
+                    if (_passTimer <= 0f) { IsPass = false; IsAlleyOop = false; }
+                }
+                // A loose ball on the floor sheds speed so the scramble resolves
+                // near the players instead of pinballing around the court.
+                if (!_rb.isKinematic && !IsPass && transform.position.y < looseRollHeight)
+                {
+                    float keep = Mathf.Max(0f, 1f - looseRollDamping * Time.deltaTime);
+                    Vector3 v = _rb.linearVelocity;
+                    _rb.linearVelocity = new Vector3(v.x * keep, v.y, v.z * keep);
+                }
             }
         }
 
         float _passTimer;
         int _handSign = 1;     // which hand the ball is on (+1 right, -1 left)
         float _crossTimer;     // a low crossover sweep in progress
+        bool _wasDribbling;
+        float _dribbleStart;   // when the current dribble began (phase anchor)
+
+        /// <summary>Which hand the dribble is on (+1 right, -1 left) — the
+        /// animator pumps the matching arm.</summary>
+        public int DribbleHand => _handSign;
+        /// <summary>Where the dribble is in its bounce cycle: 0/1 = hip contact,
+        /// 0.5 = floor. Anchored to when the dribble started, so the first bounce
+        /// leaves from the hand. Shared with the animator so the hand rides the
+        /// ball.</summary>
+        public float DribblePhase01 => ((Time.time - _dribbleStart) * dribbleHz) % 1f;
 
         /// <summary>Sweep the ball low across to the other hand (a crossover).</summary>
         public void Crossover() => _crossTimer = crossoverDuration;
@@ -142,10 +170,12 @@ namespace MarioBasketball.Gameplay
             }
 
             // Parabolic bounce: hip at the ends of the cycle, floor in the middle.
-            float frac = (Time.time * dribbleHz) % 1f;
+            float frac = DribblePhase01;
             float u = 2f * frac - 1f;
             float y = Mathf.Lerp(groundY + ballRadius, hipY, u * u);
-            Vector3 pos = ground + Holder.transform.right * (_handSign * dribbleHandSide) + Holder.transform.forward * dribbleForward;
+            // On the move the ball is pushed out ahead of the body.
+            float lead = dribbleForward + dribbleForwardPerSpeed * Holder.PlanarSpeed;
+            Vector3 pos = ground + Holder.transform.right * (_handSign * dribbleHandSide) + Holder.transform.forward * lead;
             pos.y = y;
             return pos;
         }
@@ -165,6 +195,7 @@ namespace MarioBasketball.Gameplay
             IsRebound = false;
             IsPass = false;
             IsAlleyOop = false;
+            _wasDribbling = false; // re-anchor the bounce on the next dribble
             _rb.isKinematic = true;
             _rb.detectCollisions = false;
         }

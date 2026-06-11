@@ -218,13 +218,15 @@ namespace MarioBasketball.Bootstrap
 
         void BuildHalfMarkings(float hoopZ, float dir, string label)
         {
-            // Three-point arc: a semicircle around the hoop bulging toward centre.
+            // Three-point arc: a semicircle around the hoop bulging toward
+            // centre court (dir points from centre toward this hoop, so the
+            // bulge is opposite it).
             var arcPts = new List<Vector3>();
             int seg = 32;
             for (int i = 0; i <= seg; i++)
             {
                 float phi = Mathf.Lerp(-90f, 90f, i / (float)seg) * Mathf.Deg2Rad;
-                arcPts.Add(new Vector3(threePointRadius * Mathf.Sin(phi), 0.02f, hoopZ + dir * threePointRadius * Mathf.Cos(phi)));
+                arcPts.Add(new Vector3(threePointRadius * Mathf.Sin(phi), 0.02f, hoopZ - dir * threePointRadius * Mathf.Cos(phi)));
             }
             Polyline($"{label}Arc", arcPts.ToArray());
 

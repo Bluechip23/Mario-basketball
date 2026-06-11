@@ -5,17 +5,20 @@ namespace MarioBasketball.Presentation
 {
     /// <summary>
     /// Cheap procedural animation for the placeholder models: swings the limb
-    /// joints (<c>JointArmL/R</c> at the shoulder, <c>JointElbowL/R</c> at the
-    /// elbow, <c>JointLegL/R</c> at the hip) and tips the whole body on a
-    /// knockdown, driven from the player's state.
+    /// joints (<c>JointArmL/R</c> at the shoulder, <c>JointElbowL/R</c>,
+    /// <c>JointWristL/R</c>, <c>JointLegL/R</c> at the hip, <c>JointKneeL/R</c>)
+    /// and tips the whole body on a knockdown, driven from the player's state.
     /// <list type="bullet">
-    ///   <item><b>Run</b>: legs and bent arms counter-swing, scaled by speed.</item>
+    ///   <item><b>Run</b>: legs and bent arms counter-swing, scaled by speed;
+    ///   knees bend through the recovery half of each stride and the legs tuck
+    ///   while airborne.</item>
     ///   <item><b>Dribble</b>: the ball-side hand rides the real ball — it pushes
-    ///   down (elbow extending) as the ball drops and waits at the hip for it to
-    ///   come back up. Follows crossovers to the other hand.</item>
-    ///   <item><b>Jump shot</b>: gather at the chest → set overhead → elbow
-    ///   extends into the release, off-hand guides; brief follow-through after
-    ///   the ball leaves.</item>
+    ///   down (elbow extending, wrist snapping through) as the ball drops and
+    ///   waits at the hip for it to come back up. Follows crossovers to the
+    ///   other hand.</item>
+    ///   <item><b>Jump shot</b>: gather at the chest with the wrist cocked back →
+    ///   set overhead → elbow extends into the release, off-hand guides; the
+    ///   wrist flicks forward in a brief follow-through after the ball leaves.</item>
     ///   <item><b>Dunk</b>: both arms drive up; <b>layup</b>: one arm extends.</item>
     ///   <item><b>Ankle-broken / leveled</b>: the body sprawls to the floor.</item>
     /// </list>
@@ -32,21 +35,30 @@ namespace MarioBasketball.Presentation
         [Tooltip("Elbow bend while running (arms pump bent, not straight).")]
         public float runElbowDegrees = -40f;
         public float idleElbowDegrees = -10f;
+        [Tooltip("Knee bend as the trailing leg swings back through under the body.")]
+        public float runKneeDegrees = 65f;
+        public float idleKneeDegrees = 4f;
+        [Tooltip("Knee tuck while off the ground (jump shot, dunk, rebound).")]
+        public float airTuckKneeDegrees = 75f;
 
         [Header("Dribble")]
         [Tooltip("Shoulder raise when the hand meets the ball at the hip.")]
         public float dribbleArmBase = -40f;
         [Tooltip("How far the shoulder drops toward hanging as the hand pushes the ball to the floor.")]
         public float dribblePushDegrees = 34f;
-        public float dribbleElbowBent = -70f;   // at hip contact
-        public float dribbleElbowPushed = -12f; // pushing through the bounce
+        public float dribbleElbowBent = -70f;    // at hip contact
+        public float dribbleElbowPushed = -12f;  // pushing through the bounce
+        public float dribbleWristCocked = 35f;   // hand laid back on the ball at the hip
+        public float dribbleWristPushed = -25f;  // snapped through at the floor
         public float guardArmDegrees = -18f;
 
         [Header("Jump shot form")]
         public float gatherArmDegrees = -70f;    // ball gathered at the chest
         public float gatherElbowDegrees = -95f;
+        public float gatherWristDegrees = 45f;   // wrist cocked back under the ball
         public float releaseArmDegrees = -150f;  // arm extended toward the rim
         public float releaseElbowDegrees = -10f;
+        public float releaseWristDegrees = -55f; // the gooseneck flick
         public float guideArmDegrees = -105f;    // off-hand steadies the ball
         public float guideElbowDegrees = -50f;
         [Tooltip("Seconds the shooting arm holds the release pose after the ball leaves.")]
@@ -55,6 +67,7 @@ namespace MarioBasketball.Presentation
         [Header("Finish (dunk / layup)")]
         public float dunkArmDegrees = -160f;
         public float dunkElbowDegrees = -25f;
+        public float dunkWristDegrees = -35f;    // throwing the ball down through the rim
         public float layupArmDegrees = -170f;
         public float layupElbowDegrees = -5f;
 
@@ -64,7 +77,7 @@ namespace MarioBasketball.Presentation
 
         PlayerController _pc;
         BallController _ball;
-        Transform _model, _armL, _armR, _elbowL, _elbowR, _legL, _legR;
+        Transform _model, _armL, _armR, _elbowL, _elbowR, _wristL, _wristR, _legL, _legR, _kneeL, _kneeR;
         float _phase;
         float _fallTilt;
         bool _wasShooting;
@@ -78,8 +91,12 @@ namespace MarioBasketball.Presentation
             _armR = FindDeep(transform, "JointArmR");
             _elbowL = FindDeep(transform, "JointElbowL");
             _elbowR = FindDeep(transform, "JointElbowR");
+            _wristL = FindDeep(transform, "JointWristL");
+            _wristR = FindDeep(transform, "JointWristR");
             _legL = FindDeep(transform, "JointLegL");
             _legR = FindDeep(transform, "JointLegR");
+            _kneeL = FindDeep(transform, "JointKneeL");
+            _kneeR = FindDeep(transform, "JointKneeR");
             _fallTilt = Random.Range(-25f, 25f);
         }
 
@@ -105,6 +122,19 @@ namespace MarioBasketball.Presentation
 
             SetX(_legL, swing * legSwingDegrees * speedScale);
             SetX(_legR, -swing * legSwingDegrees * speedScale);
+            if (_pc.IsAirborne)
+            {
+                SetX(_kneeL, airTuckKneeDegrees);
+                SetX(_kneeR, airTuckKneeDegrees);
+            }
+            else
+            {
+                // The knee folds while its leg recovers forward and is straight
+                // for the planted half of the stride.
+                float recover = moving ? Mathf.Cos(_phase) : 0f;
+                SetX(_kneeL, idleKneeDegrees + Mathf.Max(0f, recover) * runKneeDegrees * speedScale);
+                SetX(_kneeR, idleKneeDegrees + Mathf.Max(0f, -recover) * runKneeDegrees * speedScale);
+            }
 
             // A released jump shot holds its follow-through briefly.
             bool shooting = _pc.IsShooting;
@@ -115,28 +145,31 @@ namespace MarioBasketball.Presentation
             if (shooting)
             {
                 // Form tracks the shot meter: gather → set → release at the apex.
+                // The wrist stays cocked back under the ball until the flick.
                 float k = Mathf.Clamp01(_pc.ShotChargeFraction / Mathf.Max(0.01f, _pc.ShotPerfectFraction));
-                Pose(_armR, _elbowR,
+                Pose(_armR, _elbowR, _wristR,
                     Mathf.Lerp(gatherArmDegrees, releaseArmDegrees, k),
-                    Mathf.Lerp(gatherElbowDegrees, releaseElbowDegrees, k));
-                Pose(_armL, _elbowL,
+                    Mathf.Lerp(gatherElbowDegrees, releaseElbowDegrees, k),
+                    gatherWristDegrees);
+                Pose(_armL, _elbowL, _wristL,
                     Mathf.Lerp(gatherArmDegrees, guideArmDegrees, k),
-                    Mathf.Lerp(gatherElbowDegrees, guideElbowDegrees, k));
+                    Mathf.Lerp(gatherElbowDegrees, guideElbowDegrees, k),
+                    gatherWristDegrees * 0.5f);
             }
             else if (_followThrough > 0f)
             {
-                Pose(_armR, _elbowR, releaseArmDegrees, releaseElbowDegrees);
-                Pose(_armL, _elbowL, guideArmDegrees, guideElbowDegrees);
+                Pose(_armR, _elbowR, _wristR, releaseArmDegrees, releaseElbowDegrees, releaseWristDegrees);
+                Pose(_armL, _elbowL, _wristL, guideArmDegrees, guideElbowDegrees, 0f);
             }
             else if (_pc.IsFinishing && _pc.FinishIsDunk)
             {
-                Pose(_armR, _elbowR, dunkArmDegrees, dunkElbowDegrees); // two-hand slam
-                Pose(_armL, _elbowL, dunkArmDegrees, dunkElbowDegrees);
+                Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees); // two-hand slam
+                Pose(_armL, _elbowL, _wristL, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
             }
             else if (_pc.IsFinishing)
             {
-                Pose(_armR, _elbowR, layupArmDegrees, layupElbowDegrees); // one-hand finish
-                Pose(_armL, _elbowL, guardArmDegrees, dribbleElbowBent);
+                Pose(_armR, _elbowR, _wristR, layupArmDegrees, layupElbowDegrees, releaseWristDegrees * 0.5f); // one-hand finish
+                Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
             }
             else if (_pc.IsDribbling)
             {
@@ -147,27 +180,30 @@ namespace MarioBasketball.Presentation
                 float u = 2f * frac - 1f;
                 float push = 1f - u * u;
                 bool leftHand = _ball != null && _ball.DribbleHand < 0;
-                Transform pumpArm = leftHand ? _armL : _armR, pumpElbow = leftHand ? _elbowL : _elbowR;
-                Transform offArm = leftHand ? _armR : _armL, offElbow = leftHand ? _elbowR : _elbowL;
-                Pose(pumpArm, pumpElbow,
+                Transform pumpArm = leftHand ? _armL : _armR, pumpElbow = leftHand ? _elbowL : _elbowR, pumpWrist = leftHand ? _wristL : _wristR;
+                Transform offArm = leftHand ? _armR : _armL, offElbow = leftHand ? _elbowR : _elbowL, offWrist = leftHand ? _wristR : _wristL;
+                Pose(pumpArm, pumpElbow, pumpWrist,
                     dribbleArmBase + dribblePushDegrees * push,
-                    Mathf.Lerp(dribbleElbowBent, dribbleElbowPushed, push));
-                Pose(offArm, offElbow,
+                    Mathf.Lerp(dribbleElbowBent, dribbleElbowPushed, push),
+                    Mathf.Lerp(dribbleWristCocked, dribbleWristPushed, push));
+                Pose(offArm, offElbow, offWrist,
                     guardArmDegrees + (moving ? swing * armSwingDegrees * 0.4f * speedScale : 0f),
-                    dribbleElbowBent * 0.5f);
+                    dribbleElbowBent * 0.5f,
+                    0f);
             }
             else
             {
                 float elbow = moving ? runElbowDegrees : idleElbowDegrees;
-                Pose(_armL, _elbowL, -swing * armSwingDegrees * speedScale, elbow);
-                Pose(_armR, _elbowR, swing * armSwingDegrees * speedScale, elbow);
+                Pose(_armL, _elbowL, _wristL, -swing * armSwingDegrees * speedScale, elbow, 0f);
+                Pose(_armR, _elbowR, _wristR, swing * armSwingDegrees * speedScale, elbow, 0f);
             }
         }
 
-        void Pose(Transform shoulder, Transform elbow, float shoulderDeg, float elbowDeg)
+        void Pose(Transform shoulder, Transform elbow, Transform wrist, float shoulderDeg, float elbowDeg, float wristDeg)
         {
             SetX(shoulder, shoulderDeg);
             SetX(elbow, elbowDeg);
+            SetX(wrist, wristDeg);
         }
 
         void SetX(Transform joint, float degrees)

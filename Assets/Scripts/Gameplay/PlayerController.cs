@@ -106,8 +106,8 @@ namespace MarioBasketball.Gameplay
         public float blockKnockPower = 4f;
 
         [Header("Steal (Steals vs Ball Handling)")]
-        public float stealReach = 1.15f;
-        public float stealCooldown = 1.5f;
+        public float stealReach = 0.95f;
+        public float stealCooldown = 1.0f;
         public float stealWhiffCooldown = 0.4f;
         public float stealBaseChance = 0.04f;
         public float stealStatScale = 0.035f;
@@ -146,8 +146,14 @@ namespace MarioBasketball.Gameplay
         public bool HasBall => Ball != null && Ball.Holder == this;
         public bool IsPosting => _post != null && _post.IsPosting;
         public bool IsStunned => _stunTimer > 0f;
+        /// <summary>Knocked down (ankle-broken / leveled) — sprawls on the floor.</summary>
+        public bool IsFallen => _fallTimer > 0f;
+        /// <summary>Live-dribbling on the floor (ball bounces) vs gathered/shooting.</summary>
+        public bool IsDribbling => HasBall && _cc != null && _cc.isGrounded
+                                   && !IsShooting && !IsFinishing && !IsPosting && !IsStunned;
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
+        public bool FinishIsDunk => _finishIsDunk;
         /// <summary>The human is aiming a directed pass (right stick pushed).</summary>
         public bool IsAimingPass => _passAim.magnitude >= passAimDeadzone && HasBall;
         /// <summary>The teammate currently targeted by the pass aim (for icons).</summary>
@@ -198,6 +204,7 @@ namespace MarioBasketball.Gameplay
         float _dribbleBoostTimer;
         bool _passCharging;
         float _passChargeTime;
+        float _fallTimer;
 
         void Awake()
         {
@@ -287,6 +294,7 @@ namespace MarioBasketball.Gameplay
             float dt = Time.deltaTime;
             if (_stealCooldown > 0f) _stealCooldown -= dt;
             if (_stunTimer > 0f) _stunTimer -= dt;
+            if (_fallTimer > 0f) _fallTimer -= dt;
             if (_diveTimer > 0f) _diveTimer -= dt;
             if (_shoveTimer > 0f) _shoveTimer -= dt;
             if (_pushCooldown > 0f) _pushCooldown -= dt;
@@ -411,6 +419,7 @@ namespace MarioBasketball.Gameplay
             }
 
             if (_shoveTimer > 0f) horizontal += _shoveVel;
+            horizontal += Separation();   // never stand on / inside another player
             PlanarSpeed = horizontal.magnitude;
 
             if (_cc.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
@@ -426,18 +435,32 @@ namespace MarioBasketball.Gameplay
             }
         }
 
-        /// <summary>Players can't stand on each other: landing on top of another
-        /// player slides you off to the side.</summary>
-        void OnControllerColliderHit(ControllerColliderHit hit)
+        /// <summary>Soft body separation: if another player is overlapping us
+        /// horizontally, push apart so nobody can stand on (or inside) anyone.</summary>
+        Vector3 Separation()
         {
-            if (hit.normal.y < 0.6f) return; // only care about "standing on" contacts
-            if (hit.collider.GetComponentInParent<PlayerController>() == null) return;
+            var gm = GameManager.Instance;
+            if (gm == null) return Vector3.zero;
+            float myR = _cc != null ? _cc.radius : 0.4f;
+            Vector3 push = Vector3.zero;
 
-            Vector3 away = transform.position - hit.transform.position;
-            away.y = 0f;
-            away = away.sqrMagnitude > 0.01f ? away.normalized : transform.forward;
-            ApplyShove(away * 2.5f);
+            foreach (var side in new[] { gm.Home, gm.Away })
+            {
+                foreach (var other in side.onCourt)
+                {
+                    if (other == null || other == this || !other.enabled) continue;
+                    Vector3 d = transform.position - other.transform.position; d.y = 0f;
+                    float minDist = myR + other.BodyRadius;
+                    float dist = d.magnitude;
+                    if (dist >= minDist) continue;
+                    Vector3 dir = dist > 0.01f ? d / dist : new Vector3(Random.value - 0.5f, 0f, Random.value - 0.5f).normalized;
+                    push += dir * (minDist - dist) * 6f; // proportional to overlap
+                }
+            }
+            return push;
         }
+
+        public float BodyRadius => _cc != null ? _cc.radius : 0.4f;
 
         BallController Ball => GameManager.Instance != null ? GameManager.Instance.ball : null;
 
@@ -846,8 +869,10 @@ namespace MarioBasketball.Gameplay
 
             if (Random.value < chance)
             {
-                def.Stun(ankleStun);              // broken ankles
+                def.Stun(ankleStun, fall: true);  // broken ankles — they hit the deck
                 _dribbleBoostTimer = dribbleBoostTime; // separation
+                if (GameManager.Instance != null && GameManager.Instance.ball != null)
+                    GameManager.Instance.ball.Crossover(); // sweep the ball across
                 if (RimDirection().sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(RimDirection().normalized, Vector3.up);
             }
             else
@@ -950,9 +975,10 @@ namespace MarioBasketball.Gameplay
 
         // ---- State changes from other systems ------------------------------
 
-        public void Stun(float seconds)
+        public void Stun(float seconds, bool fall = false)
         {
             _stunTimer = Mathf.Max(_stunTimer, seconds);
+            if (fall) _fallTimer = Mathf.Max(_fallTimer, seconds);
             if (IsPosting) _post.End();
         }
 

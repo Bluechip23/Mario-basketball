@@ -61,10 +61,11 @@ namespace MarioBasketball.Presentation
 
         // ---- Shared humanoid base ------------------------------------------
 
-        /// <summary>Legs + jersey torso + arms + head. Limbs hang from named
-        /// joint pivots ("JointArmL", "JointLegR"…) so <c>ProceduralAnimator</c>
-        /// can swing them at the shoulder/hip. Returns the head centre height
-        /// and diameter (model space) so callers can add features.</summary>
+        /// <summary>Legs + jersey torso + two-segment arms + head. Limbs hang
+        /// from named joint pivots ("JointArmL", "JointElbowR", "JointLegR"…) so
+        /// <c>ProceduralAnimator</c> can swing them at the shoulder/elbow/hip.
+        /// Returns the head centre height and diameter (model space) so callers
+        /// can add features.</summary>
         static (float headY, float headDia) Humanoid(Transform m, float h, Color jersey, Color skin, float width = 1f)
         {
             // Leaner, more athletic proportions (slimmer than a blockout).
@@ -86,13 +87,8 @@ namespace MarioBasketball.Presentation
             float shoulderY = torsoY + torsoLen * 0.34f;
             float shoulderX = torsoR * 1.05f + armR;
             // Arms pivot at the shoulder and hang down at rest.
-            Transform shL = Joint(m, "JointArmL", new Vector3(-shoulderX, shoulderY, 0f));
-            Transform shR = Joint(m, "JointArmR", new Vector3(shoulderX, shoulderY, 0f));
-            Capsule(shL, new Vector3(0f, -armLen / 2f, 0f), new Vector3(armR * 2f, armLen / 2f, armR * 2f), skin, "armL");
-            Capsule(shR, new Vector3(0f, -armLen / 2f, 0f), new Vector3(armR * 2f, armLen / 2f, armR * 2f), skin, "armR");
-            // Hands.
-            Sphere(shL, new Vector3(0f, -armLen, 0f), armR * 2.4f, skin, "handL");
-            Sphere(shR, new Vector3(0f, -armLen, 0f), armR * 2.4f, skin, "handR");
+            Arm(m, "L", new Vector3(-shoulderX, shoulderY, 0f), armLen, armR, skin);
+            Arm(m, "R", new Vector3(shoulderX, shoulderY, 0f), armLen, armR, skin);
 
             float neck = 0.05f * h;
             Capsule(m, new Vector3(0f, torsoY + torsoLen * 0.55f, 0f), new Vector3(torsoR * 0.7f, neck, torsoR * 0.7f), skin, "neck");
@@ -108,6 +104,19 @@ namespace MarioBasketball.Presentation
             j.transform.SetParent(parent, false);
             j.transform.localPosition = localPos;
             return j.transform;
+        }
+
+        /// <summary>Two-segment arm: shoulder joint → upper arm, elbow joint →
+        /// forearm + hand, so the animator can bend the elbow for dribbling and
+        /// shooting form.</summary>
+        static void Arm(Transform m, string side, Vector3 shoulderPos, float armLen, float armR, Color skin)
+        {
+            Transform sh = Joint(m, "JointArm" + side, shoulderPos);
+            float upper = armLen * 0.52f, lower = armLen * 0.48f;
+            Capsule(sh, new Vector3(0f, -upper / 2f, 0f), new Vector3(armR * 2f, upper / 2f, armR * 2f), skin, "upperArm" + side);
+            Transform el = Joint(sh, "JointElbow" + side, new Vector3(0f, -upper, 0f));
+            Capsule(el, new Vector3(0f, -lower / 2f, 0f), new Vector3(armR * 1.8f, lower / 2f, armR * 1.8f), skin, "forearm" + side);
+            Sphere(el, new Vector3(0f, -lower, 0f), armR * 2.4f, skin, "hand" + side);
         }
 
         // ---- Characters ----------------------------------------------------
@@ -138,10 +147,8 @@ namespace MarioBasketball.Presentation
             float torsoY = legLen + 0.34f * h, torsoR = 0.13f * h;
             Capsule(m, new Vector3(0f, torsoY, 0f), new Vector3(torsoR * 2f, 0.13f * h, torsoR * 1.5f), jersey, "torso");
             float armLen = 0.38f * h, armR = 0.055f * h;
-            Transform shL = Joint(m, "JointArmL", new Vector3(-(torsoR + armR), torsoY + armLen / 2f, 0f));
-            Transform shR = Joint(m, "JointArmR", new Vector3(torsoR + armR, torsoY + armLen / 2f, 0f));
-            Capsule(shL, new Vector3(0f, -armLen / 2f, 0f), new Vector3(armR * 2f, armLen / 2f, armR * 2f), Skin, "armL");
-            Capsule(shR, new Vector3(0f, -armLen / 2f, 0f), new Vector3(armR * 2f, armLen / 2f, armR * 2f), Skin, "armR");
+            Arm(m, "L", new Vector3(-(torsoR + armR), torsoY + armLen / 2f, 0f), armLen, armR, Skin);
+            Arm(m, "R", new Vector3(torsoR + armR, torsoY + armLen / 2f, 0f), armLen, armR, Skin);
 
             float headDia = 0.24f * h, headY = legLen + 0.5f * h;
             Sphere(m, new Vector3(0f, headY, 0f), headDia, Skin, "head");

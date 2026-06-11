@@ -26,9 +26,13 @@ namespace MarioBasketball.Gameplay
         [Header("Dribble feel")]
         [Tooltip("How quickly the ball snaps to the holder's hold point.")]
         public float followLerp = 25f;
-        [Tooltip("Height of the dribble bob while held, in metres.")]
-        public float dribbleBob = 0.15f;
-        public float dribbleSpeed = 6f;
+        [Tooltip("Dribble bounces per second.")]
+        public float dribbleHz = 2.3f;
+        [Tooltip("How far to the side the dribble hand is, in metres.")]
+        public float dribbleHandSide = 0.42f;
+        public float dribbleForward = 0.25f;
+        public float crossoverDuration = 0.32f;
+        public float dribbleSpeed = 6f; // legacy; kept for the animator
         [Tooltip("Seconds the releaser can't re-grab after shooting/passing.")]
         public float releaseLockDuration = 0.4f;
         [Tooltip("A missed shot becomes a live (grabbable) rebound once it falls below this height.")]
@@ -74,9 +78,11 @@ namespace MarioBasketball.Gameplay
 
             if (State == BallState.Held && Holder != null)
             {
-                Vector3 target = Holder.BallHoldPoint;
-                target.y += Mathf.Abs(Mathf.Sin(Time.time * dribbleSpeed)) * dribbleBob;
-                transform.position = Vector3.Lerp(transform.position, target, followLerp * Time.deltaTime);
+                if (_crossTimer > 0f) _crossTimer -= Time.deltaTime;
+                if (Holder.IsDribbling)
+                    transform.position = DribblePosition();
+                else
+                    transform.position = Vector3.Lerp(transform.position, Holder.BallHoldPoint, followLerp * Time.deltaTime);
             }
             else if (State == BallState.Shot)
             {
@@ -105,6 +111,40 @@ namespace MarioBasketball.Gameplay
         }
 
         float _passTimer;
+        int _handSign = 1;     // which hand the ball is on (+1 right, -1 left)
+        float _crossTimer;     // a low crossover sweep in progress
+
+        /// <summary>Sweep the ball low across to the other hand (a crossover).</summary>
+        public void Crossover() => _crossTimer = crossoverDuration;
+
+        /// <summary>A real bouncing dribble beside the ball-handler (drops to the
+        /// floor and back to hip height), with a low cross-sweep during a move.</summary>
+        Vector3 DribblePosition()
+        {
+            float ballRadius = transform.localScale.x * 0.5f;
+            float groundY = Holder.transform.position.y - Holder.BodyHeight * 0.5f;
+            float hipY = Holder.transform.position.y;            // ~hip/waist
+            Vector3 ground = Holder.transform.position;
+
+            if (_crossTimer > 0f)
+            {
+                // Stays low and sweeps from one hand to the other.
+                float k = 1f - _crossTimer / crossoverDuration;
+                float side = Mathf.Lerp(_handSign, -_handSign, k) * dribbleHandSide;
+                if (_crossTimer - Time.deltaTime <= 0f) _handSign = -_handSign;
+                Vector3 cp = ground + Holder.transform.right * side + Holder.transform.forward * dribbleForward;
+                cp.y = groundY + ballRadius + 0.12f;
+                return cp;
+            }
+
+            // Parabolic bounce: hip at the ends of the cycle, floor in the middle.
+            float frac = (Time.time * dribbleHz) % 1f;
+            float u = 2f * frac - 1f;
+            float y = Mathf.Lerp(groundY + ballRadius, hipY, u * u);
+            Vector3 pos = ground + Holder.transform.right * (_handSign * dribbleHandSide) + Holder.transform.forward * dribbleForward;
+            pos.y = y;
+            return pos;
+        }
 
         /// <summary>Whether <paramref name="player"/> may scoop up this loose ball.</summary>
         public bool CanBePickedUpBy(PlayerController player)

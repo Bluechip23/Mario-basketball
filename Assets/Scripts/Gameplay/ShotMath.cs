@@ -125,8 +125,10 @@ namespace MarioBasketball.Gameplay
                 Vector2 j = Random.insideUnitCircle * 0.04f;
                 return new Vector3(j.x, 0f, j.y);
             }
+            // Off the rim — mostly clanks iron / rolls out (feeds rebounds),
+            // sometimes a clean miss. Tuned to the rim's iron-ring radius.
             float ang = Random.value * Mathf.PI * 2f;
-            float r = Random.Range(0.5f, 0.85f);
+            float r = Random.Range(0.33f, 0.62f);
             return new Vector3(Mathf.Cos(ang) * r, 0f, Mathf.Sin(ang) * r);
         }
     }

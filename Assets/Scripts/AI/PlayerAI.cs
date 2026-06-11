@@ -53,7 +53,7 @@ namespace MarioBasketball.AI
         public float offBallGap = 1.3f;
         [Range(0f, 1f)] public float helpSag = 0.25f;
         public float sprintDistance = 4f;
-        public float stealRange = 1.3f;
+        public float stealRange = 1.0f;
         public float pushRange = 1.5f;
         [Tooltip("Per-frame chance the on-ball defender commits a foul.")]
         [Range(0f, 1f)] public float pushChance = 0.0015f;

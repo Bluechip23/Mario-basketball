@@ -67,27 +67,37 @@ namespace MarioBasketball.Presentation
         /// and diameter (model space) so callers can add features.</summary>
         static (float headY, float headDia) Humanoid(Transform m, float h, Color jersey, Color skin, float width = 1f)
         {
-            float legLen = 0.46f * h, legR = 0.12f * h * width;
+            // Leaner, more athletic proportions (slimmer than a blockout).
+            float legLen = 0.50f * h, legR = 0.075f * h * width, hipX = 0.085f * h;
             // Legs pivot at the hip; the capsule (with its shoe) hangs below.
-            Transform hipL = Joint(m, "JointLegL", new Vector3(-0.12f * h, legLen, 0f));
-            Transform hipR = Joint(m, "JointLegR", new Vector3(0.12f * h, legLen, 0f));
+            Transform hipL = Joint(m, "JointLegL", new Vector3(-hipX, legLen, 0f));
+            Transform hipR = Joint(m, "JointLegR", new Vector3(hipX, legLen, 0f));
             Capsule(hipL, new Vector3(0f, -legLen / 2f, 0f), new Vector3(legR * 2f, legLen / 2f, legR * 2f), Shorts, "legL");
             Capsule(hipR, new Vector3(0f, -legLen / 2f, 0f), new Vector3(legR * 2f, legLen / 2f, legR * 2f), Shorts, "legR");
-            Box(hipL, new Vector3(0f, -legLen + 0.02f * h, 0.04f * h), new Vector3(legR * 2.2f, 0.05f * h, legR * 3f), Shoe, "shoeL");
-            Box(hipR, new Vector3(0f, -legLen + 0.02f * h, 0.04f * h), new Vector3(legR * 2.2f, 0.05f * h, legR * 3f), Shoe, "shoeR");
+            Box(hipL, new Vector3(0f, -legLen + 0.02f * h, 0.03f * h), new Vector3(legR * 2.2f, 0.04f * h, legR * 3.2f), Shoe, "shoeL");
+            Box(hipR, new Vector3(0f, -legLen + 0.02f * h, 0.03f * h), new Vector3(legR * 2.2f, 0.04f * h, legR * 3.2f), Shoe, "shoeR");
 
-            float torsoLen = 0.32f * h, torsoR = 0.2f * h * width, torsoY = legLen + torsoLen / 2f;
-            Capsule(m, new Vector3(0f, torsoY, 0f), new Vector3(torsoR * 2f, torsoLen / 2f + 0.05f * h, torsoR * 1.5f), jersey, "torso");
+            float torsoLen = 0.30f * h, torsoR = 0.135f * h * width, torsoY = legLen + torsoLen / 2f;
+            // Tapered torso: broader shoulders, narrower waist (two stacked capsules).
+            Capsule(m, new Vector3(0f, torsoY - torsoLen * 0.18f, 0f), new Vector3(torsoR * 1.8f, torsoLen / 2f, torsoR * 1.25f), jersey, "waist");
+            Capsule(m, new Vector3(0f, torsoY + torsoLen * 0.22f, 0f), new Vector3(torsoR * 2.2f, torsoLen / 2.6f, torsoR * 1.35f), jersey, "chest");
 
-            float armLen = 0.42f * h, armR = 0.07f * h * width;
-            float shoulderY = torsoY + armLen / 2f;
+            float armLen = 0.46f * h, armR = 0.046f * h * width;
+            float shoulderY = torsoY + torsoLen * 0.34f;
+            float shoulderX = torsoR * 1.05f + armR;
             // Arms pivot at the shoulder and hang down at rest.
-            Transform shL = Joint(m, "JointArmL", new Vector3(-(torsoR + armR * 0.8f), shoulderY, 0f));
-            Transform shR = Joint(m, "JointArmR", new Vector3(torsoR + armR * 0.8f, shoulderY, 0f));
+            Transform shL = Joint(m, "JointArmL", new Vector3(-shoulderX, shoulderY, 0f));
+            Transform shR = Joint(m, "JointArmR", new Vector3(shoulderX, shoulderY, 0f));
             Capsule(shL, new Vector3(0f, -armLen / 2f, 0f), new Vector3(armR * 2f, armLen / 2f, armR * 2f), skin, "armL");
             Capsule(shR, new Vector3(0f, -armLen / 2f, 0f), new Vector3(armR * 2f, armLen / 2f, armR * 2f), skin, "armR");
+            // Hands.
+            Sphere(shL, new Vector3(0f, -armLen, 0f), armR * 2.4f, skin, "handL");
+            Sphere(shR, new Vector3(0f, -armLen, 0f), armR * 2.4f, skin, "handR");
 
-            float headDia = 0.27f * h, headY = legLen + torsoLen + headDia * 0.42f;
+            float neck = 0.05f * h;
+            Capsule(m, new Vector3(0f, torsoY + torsoLen * 0.55f, 0f), new Vector3(torsoR * 0.7f, neck, torsoR * 0.7f), skin, "neck");
+
+            float headDia = 0.23f * h, headY = legLen + torsoLen + headDia * 0.5f;
             Sphere(m, new Vector3(0f, headY, 0f), headDia, skin, "head");
             return (headY, headDia);
         }

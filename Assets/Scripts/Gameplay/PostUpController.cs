@@ -164,7 +164,7 @@ namespace MarioBasketball.Gameplay
 
             if (knockdown)
             {
-                _pc.Stun(knockdownStun);
+                _pc.Stun(knockdownStun, fall: true);
                 if (gm != null && gm.ball != null && gm.ball.Holder == _pc && _defender != null)
                 {
                     gm.ball.PickUp(_defender);

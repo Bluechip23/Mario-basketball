@@ -55,6 +55,8 @@ namespace MarioBasketball.Core
         public float reboundRandom = 1.5f;
         [Tooltip("Wario's offensive-rebound trait rating.")]
         public int offensiveReboundRating = 9;
+        [Tooltip("A defender must be within this (arms reach) to pick off a pass.")]
+        public float passInterceptRadius = 1.1f;
 
         [Header("Scene references (auto-wired by GameBootstrap)")]
         public BallController ball;
@@ -216,6 +218,11 @@ namespace MarioBasketball.Core
 
         float ReboundCatchRadius(PlayerController p)
         {
+            // Intercepting a live pass is an arms-reach play, not a wide
+            // rebound box — a defender across the lane shouldn't pick it.
+            if (ball.IsPass && p.team != ball.PassingTeam)
+                return passInterceptRadius + reboundHeightRadius * Mathf.Max(0f, p.BodyHeight - 1.6f);
+
             float r = reboundBaseRadius + reboundRadiusPerStat * GrabStat(p)
                     + reboundHeightRadius * Mathf.Max(0f, p.BodyHeight - 1.6f);
             if (p.IsAirborne) r += reboundJumpReach;

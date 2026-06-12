@@ -23,7 +23,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats DonkeyKong() => new CharacterStats
         {
             characterName = "Donkey Kong",
-            speed = 7, ballHandling = 2, threePoint = 1, midRange = 1, insideScoring = 4, postOffense = 4, dunk = 10, power = 9, rebounds = 9, blocks = 8, steals = 5, postDefense = 8, perimeterDefense = 7, stamina = 7,
+            speed = 7, ballHandling = 2, threePoint = 1, midRange = 1, insideScoring = 4, postOffense = 4, dunk = 10, power = 9, rebounds = 9, blocks = 8, steals = 5, postDefense = 8, perimeterDefense = 5, stamina = 7,
             hiddenTrait = HiddenTrait.None, heightMeters = 2.45f,
             archetype = PlayerArchetype.Big,
             description = "The kingdom's most violent finisher. Throw it anywhere near the rim and he'll hammer it home — every dunk is a poster."
@@ -32,7 +32,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Mario() => new CharacterStats
         {
             characterName = "Mario",
-            speed = 7, ballHandling = 8, threePoint = 7, midRange = 8, insideScoring = 8, postOffense = 7, dunk = 7, power = 6, rebounds = 7, blocks = 6, steals = 6, postDefense = 4, perimeterDefense = 6, stamina = 8,
+            speed = 7, ballHandling = 8, threePoint = 7, midRange = 8, insideScoring = 7, postOffense = 7, dunk = 7, power = 6, rebounds = 7, blocks = 6, steals = 6, postDefense = 4, perimeterDefense = 5, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.8f,
             archetype = PlayerArchetype.Wing,
             description = "The all-around captain. Scores from anywhere, handles the ball, and never takes a possession off at either end."
@@ -41,7 +41,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Luigi() => new CharacterStats
         {
             characterName = "Luigi",
-            speed = 7, ballHandling = 5, threePoint = 3, midRange = 6, insideScoring = 7, postOffense = 6, dunk = 7, power = 6, rebounds = 7, blocks = 7, steals = 6, postDefense = 7, perimeterDefense = 7, stamina = 8,
+            speed = 7, ballHandling = 5, threePoint = 3, midRange = 6, insideScoring = 6, postOffense = 4, dunk = 7, power = 6, rebounds = 7, blocks = 6, steals = 6, postDefense = 7, perimeterDefense = 7, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.9f,
             archetype = PlayerArchetype.Wing,
             description = "The dependable two-way wing living in his brother's shadow — solid everywhere, with a sneaky knack for finishing inside."
@@ -70,7 +70,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Waluigi() => new CharacterStats
         {
             characterName = "Waluigi",
-            speed = 6, ballHandling = 3, threePoint = 3, midRange = 3, insideScoring = 8, postOffense = 9, dunk = 6, power = 6, rebounds = 7, blocks = 8, steals = 6, postDefense = 8, perimeterDefense = 1, stamina = 6,
+            speed = 6, ballHandling = 3, threePoint = 3, midRange = 3, insideScoring = 8, postOffense = 9, dunk = 6, power = 6, rebounds = 7, blocks = 8, steals = 4, postDefense = 8, perimeterDefense = 1, stamina = 6,
             hiddenTrait = HiddenTrait.OffensiveRebounder, heightMeters = 2.35f,
             archetype = PlayerArchetype.Big,
             description = "A lanky low-post menace who swats shots and feasts on the offensive glass. Wah. Keep a body on him or pay for it."
@@ -79,7 +79,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats DiddyKong() => new CharacterStats
         {
             characterName = "Diddy Kong",
-            speed = 10, ballHandling = 7, threePoint = 2, midRange = 3, insideScoring = 6, postOffense = 6, dunk = 4, power = 6, rebounds = 6, blocks = 5, steals = 8, postDefense = 3, perimeterDefense = 9, stamina = 8,
+            speed = 10, ballHandling = 7, threePoint = 2, midRange = 3, insideScoring = 6, postOffense = 6, dunk = 4, power = 6, rebounds = 6, blocks = 5, steals = 8, postDefense = 3, perimeterDefense = 7, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.5f,
             archetype = PlayerArchetype.Guard,
             description = "Pure jet fuel. The fastest player on any floor, hounding the ball from baseline to baseline."
@@ -115,7 +115,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats BabyMario() => new CharacterStats
         {
             characterName = "Baby Mario",
-            speed = 7, ballHandling = 8, threePoint = 3, midRange = 6, insideScoring = 8, postOffense = 8, dunk = 2, power = 5, rebounds = 3, blocks = 3, steals = 6, postDefense = 2, perimeterDefense = 6, stamina = 8,
+            speed = 7, ballHandling = 8, threePoint = 3, midRange = 6, insideScoring = 8, postOffense = 8, dunk = 2, power = 5, rebounds = 3, blocks = 3, steals = 4, postDefense = 2, perimeterDefense = 6, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.15f,
             archetype = PlayerArchetype.Guard,
             description = "All of the captain's craft in a knee-high package, with a shockingly grown-up post game for a baby."
@@ -125,7 +125,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Wario() => new CharacterStats
         {
             characterName = "Wario",
-            speed = 4, ballHandling = 6, threePoint = 7, midRange = 10, insideScoring = 6, postOffense = 7, dunk = 5, power = 8, rebounds = 7, blocks = 5, steals = 6, postDefense = 6, perimeterDefense = 5, stamina = 6,
+            speed = 4, ballHandling = 6, threePoint = 7, midRange = 10, insideScoring = 6, postOffense = 7, dunk = 5, power = 8, rebounds = 7, blocks = 5, steals = 5, postDefense = 6, perimeterDefense = 5, stamina = 6,
             hiddenTrait = HiddenTrait.SmoothPasser, heightMeters = 2.0f,
             archetype = PlayerArchetype.Big,
             description = "The bully with a silk mid-range jumper. Doubles down low only feed his smooth (and smug) passing."
@@ -135,7 +135,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats PiranhaPlant() => new CharacterStats
         {
             characterName = "Piranha Plant",
-            speed = 5, ballHandling = 3, threePoint = 8, midRange = 2, insideScoring = 3, postOffense = 2, dunk = 1, power = 6, rebounds = 8, blocks = 5, steals = 4, postDefense = 7, perimeterDefense = 3, stamina = 6,
+            speed = 5, ballHandling = 3, threePoint = 8, midRange = 2, insideScoring = 3, postOffense = 2, dunk = 1, power = 6, rebounds = 8, blocks = 5, steals = 3, postDefense = 7, perimeterDefense = 3, stamina = 6,
             hiddenTrait = HiddenTrait.QuickCatchShooter, heightMeters = 2.1f,
             archetype = PlayerArchetype.Big,
             description = "A planted catch-and-shoot tower — swing it fast and it bites from three. Slow getting back the other way."
@@ -144,7 +144,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Daisy() => new CharacterStats
         {
             characterName = "Daisy",
-            speed = 7, ballHandling = 7, threePoint = 5, midRange = 9, insideScoring = 6, postOffense = 3, dunk = 3, power = 3, rebounds = 3, blocks = 3, steals = 6, postDefense = 3, perimeterDefense = 8, stamina = 8,
+            speed = 7, ballHandling = 7, threePoint = 5, midRange = 9, insideScoring = 6, postOffense = 3, dunk = 5, power = 3, rebounds = 3, blocks = 3, steals = 6, postDefense = 3, perimeterDefense = 8, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.85f,
             archetype = PlayerArchetype.Wing,
             description = "Hi, I'm Daisy! A pesky on-ball defender with the purest mid-range stroke in the kingdom."
@@ -153,7 +153,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats MontyMole() => new CharacterStats
         {
             characterName = "Monty Mole",
-            speed = 7, ballHandling = 4, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 7, rebounds = 4, blocks = 7, steals = 4, postDefense = 3, perimeterDefense = 10, stamina = 8,
+            speed = 7, ballHandling = 4, threePoint = 5, midRange = 5, insideScoring = 5, postOffense = 3, dunk = 3, power = 7, rebounds = 7, blocks = 7, steals = 4, postDefense = 3, perimeterDefense = 10, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.45f,
             archetype = PlayerArchetype.Guard,
             description = "A burrowing perimeter pest. There is no driving around him, under him or through him."
@@ -186,12 +186,49 @@ namespace MarioBasketball.Characters
             description = "A masked bucket-getter who scores at all three levels. Ride him while you can — the tank empties fast."
         };
 
+        public static CharacterStats Delfan() => new CharacterStats
+        {
+            characterName = "Delfan",
+            speed = 4, ballHandling = 8, threePoint = 9, midRange = 7, insideScoring = 3, postOffense = 4, dunk = 2, power = 7, rebounds = 2, blocks = 2, steals = 4, postDefense = 6, perimeterDefense = 6, stamina = 8,
+            hiddenTrait = HiddenTrait.None, heightMeters = 1.6f,
+            archetype = PlayerArchetype.Guard,
+            description = "A sturdy, deliberate sharpshooter with real handle. Slow up the floor, but give him a sliver of space and the three is going down."
+        };
+
+        public static CharacterStats Laurentius() => new CharacterStats
+        {
+            characterName = "Laurentius",
+            speed = 6, ballHandling = 4, threePoint = 1, midRange = 6, insideScoring = 4, postOffense = 3, dunk = 4, power = 8, rebounds = 10, blocks = 8, steals = 5, postDefense = 7, perimeterDefense = 8, stamina = 8,
+            hiddenTrait = HiddenTrait.None, heightMeters = 2.2f,
+            archetype = PlayerArchetype.Big,
+            description = "The glass belongs to him. A board-vacuuming enforcer who defends the paint and the perimeter alike — just never ask for a three."
+        };
+
+        public static CharacterStats CliffyGuy() => new CharacterStats
+        {
+            characterName = "Cliffy Guy",
+            speed = 10, ballHandling = 6, threePoint = 1, midRange = 1, insideScoring = 8, postOffense = 3, dunk = 8, power = 5, rebounds = 2, blocks = 2, steals = 9, postDefense = 3, perimeterDefense = 4, stamina = 8,
+            hiddenTrait = HiddenTrait.None, heightMeters = 1.55f,
+            archetype = PlayerArchetype.Guard,
+            description = "A blur in a mask. Scales any defense for steals and rim attacks — allergic to jump shots and rebounds."
+        };
+
+        public static CharacterStats JonahGuy() => new CharacterStats
+        {
+            characterName = "Jonah Guy",
+            speed = 3, ballHandling = 4, threePoint = 7, midRange = 4, insideScoring = 7, postOffense = 6, dunk = 5, power = 7, rebounds = 7, blocks = 6, steals = 2, postDefense = 8, perimeterDefense = 5, stamina = 10,
+            hiddenTrait = HiddenTrait.None, heightMeters = 2.05f,
+            archetype = PlayerArchetype.Big,
+            description = "A whale of a worker. Never tires, bangs inside, guards the post — and surprises from deep when left alone."
+        };
+
         /// <summary>Every character currently defined in code.</summary>
         public static IReadOnlyList<CharacterStats> All() => new List<CharacterStats>
         {
             Bowser(), DonkeyKong(), Mario(), Luigi(), Peach(), Toad(), Waluigi(), DiddyKong(),
             Yoshi(), Birdo(), Boo(), BabyMario(), Wario(), PiranhaPlant(), Daisy(),
-            MontyMole(), Koopa(), Kritter(), Shyguy()
+            MontyMole(), Koopa(), Kritter(), Shyguy(),
+            Delfan(), Laurentius(), CliffyGuy(), JonahGuy()
         };
     }
 }

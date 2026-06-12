@@ -39,6 +39,24 @@ namespace MarioBasketball.Characters
 
         public HiddenTrait hiddenTrait = HiddenTrait.None;
 
+        /// <summary>Position group for the select-screen cards. Leave
+        /// <see cref="PlayerArchetype.Unset"/> to derive it from height —
+        /// see <see cref="Archetype"/>.</summary>
+        public PlayerArchetype archetype = PlayerArchetype.Unset;
+
+        /// <summary>Scouting-report blurb shown on the front of the character's
+        /// select card. Flavour only — no gameplay effect.</summary>
+        [TextArea] public string description = "";
+
+        /// <summary>The resolved position group: the authored
+        /// <see cref="archetype"/>, or a height-based guess for characters (and
+        /// created players) that never picked one.</summary>
+        public PlayerArchetype Archetype =>
+            archetype != PlayerArchetype.Unset ? archetype
+            : heightMeters < 1.65f ? PlayerArchetype.Guard
+            : heightMeters < 2.05f ? PlayerArchetype.Wing
+            : PlayerArchetype.Big;
+
         /// <summary>Visual/physical height in metres — presentation, not a
         /// gameplay stat. NBA-Street-style exaggeration is encouraged (Bowser
         /// towers, Toad is tiny). Drives the body capsule and controller size.</summary>

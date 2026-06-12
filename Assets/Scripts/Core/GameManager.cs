@@ -97,6 +97,9 @@ namespace MarioBasketball.Core
 
             Home = new TeamState(TeamSide.Home);
             Away = new TeamState(TeamSide.Away);
+            // The Settings screen overrides the inspector defaults per match.
+            quarterLengthSeconds = GameSettings.QuarterMinutes * 60f;
+            shotClockSeconds = GameSettings.ShotClockSeconds;
             Clock = new MatchClock(quarterLengthSeconds, totalQuarters);
             Shot = new ShotClock(shotClockSeconds);
         }

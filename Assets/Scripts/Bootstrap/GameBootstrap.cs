@@ -37,6 +37,7 @@ namespace MarioBasketball.Bootstrap
 
         void Awake()
         {
+            GameSettings.ApplyAudio();
             BuildLighting();
             BuildCourt();
             BuildWalls();
@@ -58,9 +59,13 @@ namespace MarioBasketball.Bootstrap
             var createPlayer = gameObject.AddComponent<CreatePlayerMenu>();
             createPlayer.enabled = false;
 
+            var settings = gameObject.AddComponent<SettingsMenu>();
+            settings.enabled = false;
+
             var main = gameObject.AddComponent<MainMenu>();
             main.teamSelect = teamSelect;
             main.createPlayer = createPlayer;
+            main.settings = settings;
             teamSelect.mainMenu = main;
             createPlayer.mainMenu = main;
         }

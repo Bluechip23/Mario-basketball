@@ -57,7 +57,24 @@ namespace MarioBasketball.Gameplay
         public float fakeLeverageBonus = 1.5f;
         public float fakeQualityBonus = 3f;
 
+        [Header("Advanced post moves")]
+        [Tooltip("Power gap at/above which a power drop step flattens the defender.")]
+        public float powerDropKnockdownGap = 3f;
+        public float powerDropShove = 5f;
+        [Tooltip("Block-chance multiplier on a turnaround jumper (the fade).")]
+        [Range(0f, 1f)] public float turnaroundBlockMult = 0.4f;
+        [Tooltip("Block-chance multiplier on an up-and-under off a bitten fake.")]
+        [Range(0f, 1f)] public float upAndUnderBlockMult = 0.25f;
+
+        [Header("Shimmy (right-stick hard dribble in the post)")]
+        public float shimmyPower = 5f;
+        public float shimmyCooldownTime = 0.6f;
+        [Tooltip("How long the defender is frozen when the shimmy shakes them.")]
+        public float shimmyFreeze = 0.45f;
+
         public bool IsPosting { get; private set; }
+        /// <summary>True while a successful fake still has the defender in the air.</summary>
+        public bool FakeActive => _fakeActive;
         public float Leverage => _leverage;
         public PlayerController EngagedDefender => _defender;
         public Vector3 DriveVelocity { get; private set; }
@@ -67,6 +84,7 @@ namespace MarioBasketball.Gameplay
         PlayerController _defender;
         bool _fakeActive;
         float _fakeTimer;
+        float _shimmyCooldown;
 
         void Awake()
         {
@@ -104,6 +122,38 @@ namespace MarioBasketball.Gameplay
         {
             if (!IsPosting || _defender == null) return;
             _leverage -= _defender.EffectiveStat(StatType.Power) * tapImpulse;
+        }
+
+        /// <summary>A right-stick hard dribble while posting: a quick shimmy in
+        /// <paramref name="dir"/> to create separation. Toward the basket it also
+        /// gains a little leverage; if the move shakes the defender (Post Offense
+        /// vs Post Defense) they're frozen for a beat.</summary>
+        public void Shimmy(Vector3 dir)
+        {
+            if (!IsPosting || _shimmyCooldown > 0f) return;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) return;
+            _shimmyCooldown = shimmyCooldownTime;
+            dir.Normalize();
+
+            _pc.ApplyShove(dir * shimmyPower);
+
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(_pc.team) : null;
+            if (hoop != null)
+            {
+                Vector3 toBasket = hoop.AimPoint - transform.position; toBasket.y = 0f;
+                if (toBasket.sqrMagnitude > 0.01f && Vector3.Dot(dir, toBasket.normalized) > 0.5f)
+                    _leverage = Mathf.Min(maxLeverage, _leverage + 1f);
+            }
+
+            if (_defender != null)
+            {
+                float offense = _pc.EffectiveStat(StatType.PostOffense);
+                float defense = _defender.EffectiveStat(StatType.PostDefense);
+                float shake = Mathf.Clamp(0.4f + 0.05f * (offense - defense), 0.1f, 0.85f);
+                if (Random.value < shake) _defender.Stun(shimmyFreeze);
+            }
         }
 
         void Update()
@@ -151,6 +201,7 @@ namespace MarioBasketball.Gameplay
                 _fakeTimer -= dt;
                 if (_fakeTimer <= 0f) _fakeActive = false;
             }
+            if (_shimmyCooldown > 0f) _shimmyCooldown -= dt;
 
             if (_leverage <= knockdownThreshold) DefenderWins(knockdown: true);
             else if (_leverage <= shoveThreshold) DefenderWins(knockdown: false);
@@ -220,10 +271,58 @@ namespace MarioBasketball.Gameplay
                     }
                     ResolveShot(spinQuality, blockable: true);
                     break;
+
+                case PostMove.SkyHook:
+                    // Released above everything — unblockable, but a tougher make.
+                    ResolveShot(offense - 0.3f * defense + 3f * deep + fakeBonus - 0.5f, blockable: false);
+                    break;
+
+                case PostMove.PowerDropStep:
+                    ResolvePowerDropStep(offense, defense, fakeBonus);
+                    break;
+
+                case PostMove.TurnaroundJumper:
+                    // Face up and fade — lives on Mid Range, the fade kills the block.
+                    float mid = _pc.EffectiveStat(StatType.MidRange);
+                    float fadeQuality = 0.5f * offense + 0.7f * mid - 0.35f * defense + 2f * deep + fakeBonus;
+                    ResolveShot(fadeQuality, blockable: true, blockMult: turnaroundBlockMult);
+                    break;
+
+                case PostMove.UpAndUnder:
+                    // Step through under the (ideally airborne) defender. Without a
+                    // bitten fake first it's just a slow, contestable step-through.
+                    float inside = _pc.EffectiveStat(StatType.InsideScoring);
+                    if (_fakeActive)
+                        ResolveShot(offense + 0.5f * inside - 0.3f * defense + 4f * deep + fakeQualityBonus,
+                            blockable: true, blockMult: upAndUnderBlockMult);
+                    else
+                        ResolveShot(offense - 0.5f * defense + 3f * deep, blockable: true);
+                    break;
             }
         }
 
-        void ResolveShot(float quality, bool blockable)
+        /// <summary>Bulldoze into the lane off the Power stat: shoves the defender
+        /// aside (or flattens an overpowered one) before the finish.</summary>
+        void ResolvePowerDropStep(float offense, float defense, float fakeBonus)
+        {
+            float power = _pc.EffectiveStat(StatType.Power);
+            _leverage = Mathf.Min(maxLeverage, _leverage + dropStepLungeLeverage + 0.2f * power);
+            float deep = Mathf.Clamp01(_leverage / maxLeverage);
+
+            if (_defender != null)
+            {
+                Vector3 aside = _defender.transform.position - transform.position; aside.y = 0f;
+                if (aside.sqrMagnitude < 0.01f) aside = transform.right;
+                _defender.ApplyShove(aside.normalized * powerDropShove);
+                if (power - _defender.EffectiveStat(StatType.Power) >= powerDropKnockdownGap)
+                    _defender.Stun(0.7f, fall: true); // run clean over them
+            }
+
+            float finish = Mathf.Max(offense, _pc.EffectiveStat(StatType.InsideScoring), _pc.EffectiveStat(StatType.Dunk));
+            ResolveShot(finish + 0.25f * power - 0.5f * defense + 5f * deep + fakeBonus, blockable: true);
+        }
+
+        void ResolveShot(float quality, bool blockable, float blockMult = 1f)
         {
             var gm = GameManager.Instance;
             Hoop hoop = gm.GetAttackingHoop(_pc.team);
@@ -232,7 +331,7 @@ namespace MarioBasketball.Gameplay
             if (blockable && _defender != null)
             {
                 float blk = _defender.EffectiveStat(StatType.Blocks);
-                float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - quality), 0f, blockMaxChance);
+                float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - quality), 0f, blockMaxChance) * blockMult;
                 if (Random.value < chance)
                 {
                     Vector3 away = transform.position - hoop.AimPoint; away.y = 0f;

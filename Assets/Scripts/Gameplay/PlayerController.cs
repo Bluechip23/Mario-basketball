@@ -101,6 +101,17 @@ namespace MarioBasketball.Gameplay
         public float dribbleBaseChance = 0.45f;
         public float dribbleStatScale = 0.06f;
 
+        [Header("Dribble flicks (right-stick hard dribbles for separation)")]
+        public float flickCooldownTime = 0.45f;
+        [Tooltip("Burst impulse on a flick toward / across the defender.")]
+        public float flickBurstPower = 6f;
+        [Tooltip("Backward impulse on a step-back (flick away from the basket).")]
+        public float stepBackPower = 7.5f;
+        [Tooltip("Opposite lateral flicks within this window chain into a hesitation cross.")]
+        public float hesitationWindow = 0.6f;
+        [Tooltip("How long the defender freezes when a flick move shakes them (the full ankleStun is reserved for the hesitation cross).")]
+        public float flickFreeze = 0.4f;
+
         [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
         public float blockRange = 1.1f;
@@ -232,6 +243,9 @@ namespace MarioBasketball.Gameplay
         bool _iconHeld;
         float _dribbleCooldown;
         float _dribbleBoostTimer;
+        float _flickCooldown;
+        float _lastLateralFlickTime = -10f;
+        float _lastLateralFlickSign;
         bool _passCharging;
         float _passChargeTime;
         float _fallTimer;
@@ -292,6 +306,7 @@ namespace MarioBasketball.Gameplay
             _input.DropStepPressed += TriggerDropStep;
             _input.SpinPressed += TriggerSpin;
             _input.FakePressed += TriggerFake;
+            _input.DribbleFlick += OnDribbleFlick;
             _input.Enable();
         }
 
@@ -310,6 +325,7 @@ namespace MarioBasketball.Gameplay
             _input.DropStepPressed -= TriggerDropStep;
             _input.SpinPressed -= TriggerSpin;
             _input.FakePressed -= TriggerFake;
+            _input.DribbleFlick -= OnDribbleFlick;
             _input.Disable();
             _input = null;
         }
@@ -333,6 +349,7 @@ namespace MarioBasketball.Gameplay
             if (_pushCooldown > 0f) _pushCooldown -= dt;
             if (_dribbleCooldown > 0f) _dribbleCooldown -= dt;
             if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
+            if (_flickCooldown > 0f) _flickCooldown -= dt;
             if (_passCharging)
             {
                 _passChargeTime += dt;
@@ -949,6 +966,79 @@ namespace MarioBasketball.Gameplay
             }
         }
 
+        /// <summary>A right-stick flick — a hard dribble in that direction to
+        /// create separation. Read relative to the basket: away = step-back,
+        /// toward = attacking burst, sideways = crossover (and two quick opposite
+        /// sideways flicks chain into a hesitation cross, the big ankle-breaker).
+        /// In the post it's a shimmy (<see cref="PostUpController.Shimmy"/>).
+        /// Layers on top of the dribble-move button, it doesn't replace it.</summary>
+        void OnDribbleFlick(Vector2 stick)
+        {
+            if (MatchPause.IsPaused || IsStunned || !HasBall || _shooting || _finishing) return;
+            if (_flickCooldown > 0f || !_cc.isGrounded) return;
+            Vector3 dir = new Vector3(stick.x, 0f, stick.y);
+            if (dir.sqrMagnitude < 0.01f) return;
+            dir.Normalize();
+            _flickCooldown = flickCooldownTime;
+
+            var ball = Ball;
+            if (IsPosting)
+            {
+                _post.Shimmy(dir);
+                if (ball != null) ball.Crossover();
+                return;
+            }
+
+            // Read the flick relative to the basket.
+            Vector3 toBasket = RimDirection();
+            toBasket = toBasket.sqrMagnitude > 0.01f ? toBasket.normalized : transform.forward;
+            float dot = Vector3.Dot(dir, toBasket);
+
+            bool stepBack = dot <= -0.5f;
+            bool attack = dot >= 0.5f;
+            bool hesitationCross = false;
+            if (!stepBack && !attack)
+            {
+                // Lateral: opposite flicks in quick succession = hesitation cross.
+                float side = Mathf.Sign(Vector3.Cross(toBasket, dir).y);
+                hesitationCross = Time.time - _lastLateralFlickTime <= hesitationWindow
+                                  && side != _lastLateralFlickSign && _lastLateralFlickSign != 0f;
+                _lastLateralFlickTime = Time.time;
+                _lastLateralFlickSign = side;
+            }
+
+            // The dribble itself always happens: a burst in the flick direction.
+            ApplyShove(dir * (stepBack ? stepBackPower : flickBurstPower));
+            _dribbleBoostTimer = attack || hesitationCross ? dribbleBoostTime : dribbleBoostTime * 0.5f;
+            if (ball != null) ball.Crossover();
+            // A step-back squares you to the hoop for the shot; otherwise face the move.
+            transform.rotation = Quaternion.LookRotation(stepBack ? toBasket : dir, Vector3.up);
+
+            // Whether it shakes the defender is Ball Handling vs Perimeter Defense.
+            var def = NearestOpponentTo(transform.position);
+            if (def == null || HorizontalDistance(transform.position, def.transform.position) > dribbleRange) return;
+
+            float bh = Effective(StatType.BallHandling, 5f);
+            float pd = def.EffectiveStat(StatType.PerimeterDefense);
+            float chance = Mathf.Clamp(dribbleBaseChance + dribbleStatScale * (bh - pd), 0.05f, 0.95f);
+            if (Random.value < chance)
+            {
+                // The hesitation cross is the highlight move — full broken ankles.
+                if (hesitationCross) def.Stun(ankleStun, fall: true);
+                else def.Stun(flickFreeze);
+            }
+            else
+            {
+                // Exposed the ball on the move — a good defender can poke it free.
+                float strip = Mathf.Clamp(0.04f + 0.03f * (pd - bh), 0f, 0.3f);
+                if (Random.value < strip && GameManager.Instance != null && GameManager.Instance.ball != null)
+                {
+                    GameManager.Instance.ball.PickUp(def);
+                    GameManager.Instance.OnPossessionGained(def);
+                }
+            }
+        }
+
         public void TriggerBackDown()
         {
             if (MatchPause.IsPaused || IsStunned) return;
@@ -1006,9 +1096,17 @@ namespace MarioBasketball.Gameplay
             }
         }
 
-        void TriggerHook() => TriggerPostMove(PostMove.Hook);
-        void TriggerDropStep() => TriggerPostMove(PostMove.DropStep);
-        void TriggerSpin() => TriggerPostMove(PostMove.Spin);
+        // The post buttons are layered: turbo (LT) upgrades each to its advanced
+        // version, and Drop Step pressed while a fake is live is the up-and-under.
+        void TriggerHook() => TriggerPostMove(_sprintIntent ? PostMove.SkyHook : PostMove.Hook);
+
+        void TriggerDropStep()
+        {
+            if (IsPosting && _post.FakeActive) { TriggerPostMove(PostMove.UpAndUnder); return; }
+            TriggerPostMove(_sprintIntent ? PostMove.PowerDropStep : PostMove.DropStep);
+        }
+
+        void TriggerSpin() => TriggerPostMove(_sprintIntent ? PostMove.TurnaroundJumper : PostMove.Spin);
 
         // L1: air-adjust while finishing, otherwise the post fake.
         void TriggerFake()

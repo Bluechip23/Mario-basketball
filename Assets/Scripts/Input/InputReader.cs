@@ -24,6 +24,12 @@ namespace MarioBasketball.InputControl
         /// <summary>LB held — bring up teammate pass icons.</summary>
         public bool IconHeld { get; private set; }
 
+        /// <summary>The right stick was flicked (pushed hard and released within
+        /// <see cref="flickMaxHold"/>) — the ball-handler's hard-dribble gesture.
+        /// Carries the flick direction (stick space). A stick that's pushed and
+        /// held is a pass aim, not a flick.</summary>
+        public event Action<Vector2> DribbleFlick;
+
         public event Action ShootPressed;
         public event Action ShootReleased;
         public event Action PassPressed;
@@ -144,6 +150,52 @@ namespace MarioBasketball.InputControl
             SprintHeld = _sprint.IsPressed();
             PostUpHeld = _postUp.IsPressed();
             IconHeld = _fake.IsPressed(); // LB / C held = pass-icon modifier
+            DetectFlick();
+        }
+
+        /// <summary>Stick magnitude that arms a flick.</summary>
+        public float flickThreshold = 0.8f;
+        /// <summary>Magnitude the stick must fall back below to fire the flick.</summary>
+        public float flickRelease = 0.35f;
+        /// <summary>Armed longer than this and it's a held pass aim, not a flick.</summary>
+        public float flickMaxHold = 0.22f;
+
+        bool _flickArmed;
+        float _flickArmTime;
+        Vector2 _flickPeak;
+        float _prevAimMag;
+
+        // A flick is a sharp push past flickThreshold that returns to neutral
+        // within flickMaxHold — distinct from the held right-stick pass aim.
+        void DetectFlick()
+        {
+            float mag = PassAim.magnitude;
+
+            if (!_flickArmed)
+            {
+                if (mag >= flickThreshold && _prevAimMag < flickThreshold)
+                {
+                    _flickArmed = true;
+                    _flickArmTime = Time.unscaledTime;
+                    _flickPeak = PassAim;
+                }
+            }
+            else
+            {
+                if (mag > _flickPeak.magnitude) _flickPeak = PassAim;
+
+                if (mag <= flickRelease)
+                {
+                    _flickArmed = false;
+                    DribbleFlick?.Invoke(_flickPeak.normalized);
+                }
+                else if (Time.unscaledTime - _flickArmTime > flickMaxHold)
+                {
+                    _flickArmed = false; // held — it's an aim, not a flick
+                }
+            }
+
+            _prevAimMag = mag;
         }
     }
 }

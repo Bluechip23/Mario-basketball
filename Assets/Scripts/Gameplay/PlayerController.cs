@@ -187,6 +187,15 @@ namespace MarioBasketball.Gameplay
                 }
                 if (IsFinishing)
                     return transform.position + transform.forward * (0.18f * h) + Vector3.up * (0.55f * h);
+                if (IsPostShooting)
+                {
+                    // The shot rises overhead as the release meter fills (the
+                    // poster's back is to the rim, so keep it straight up).
+                    float k = Mathf.Clamp01(PostShotChargeFraction / Mathf.Max(0.01f, PostShotPerfectFraction));
+                    Vector3 gather = transform.position + Vector3.up * (0.30f * h);
+                    Vector3 set = transform.position + Vector3.up * (0.66f * h);
+                    return Vector3.Lerp(gather, set, k);
+                }
                 return BallHoldPoint;
             }
         }
@@ -221,6 +230,12 @@ namespace MarioBasketball.Gameplay
         /// <summary>Current horizontal speed (m/s) — drives the run animation.</summary>
         public float PlanarSpeed { get; private set; }
         public bool IsShooting => _shooting;
+        /// <summary>A post move's shot is mid-release (its timing meter is up).</summary>
+        public bool IsPostShooting => _post != null && _post.PostShotActive;
+        /// <summary>Post-shot meter fill (0-1), for the release-timing pose/feedback.</summary>
+        public float PostShotChargeFraction => _post != null ? _post.PostShotChargeFraction : 0f;
+        /// <summary>Where the perfect post-shot release sits on the meter (0-1).</summary>
+        public float PostShotPerfectFraction => _post != null ? _post.PostShotPerfectFraction : 0f;
         /// <summary>World-space planar direction the current jump shot is fading
         /// toward (zero for a straight-up shot). Drives the body lean.</summary>
         public Vector3 FadeDirection => _fadeDir;
@@ -710,6 +725,12 @@ namespace MarioBasketball.Gameplay
         bool HasTrait(HiddenTrait trait)
             => _character != null && _character.stats != null && _character.stats.hiddenTrait == trait;
 
+        /// <summary>Apply the Acrobat (Baby Mario) timing relief to a raw
+        /// release-timing multiplier: he eats only a fraction of the mistiming
+        /// penalty. Shared by jump shots and timed post shots.</summary>
+        public float TimingWithTrait(float timing)
+            => HasTrait(HiddenTrait.Acrobat) ? 1f - (1f - timing) * (1f - acrobatTimingRelief) : timing;
+
         /// <summary>Make% lost to an air-adjust — fully mitigated at Inside 10,
         /// and waived entirely for an Acrobat (Baby Mario alters in the air free).</summary>
         float AdjustPenalty()
@@ -742,8 +763,7 @@ namespace MarioBasketball.Gameplay
             float timing = error <= perfectReleaseWindow
                 ? 1f
                 : Mathf.Clamp(1f - (error - perfectReleaseWindow) * timingFalloffPerSec, minTimingMultiplier, 1f);
-            // The Acrobat (Baby Mario) shrugs off most of a mistimed release.
-            if (HasTrait(HiddenTrait.Acrobat)) timing = 1f - (1f - timing) * (1f - acrobatTimingRelief);
+            timing = TimingWithTrait(timing); // Acrobat (Baby Mario) shrugs off mistiming
             ExecuteShot(timing, _pendingQuickCatch, _fadeAmount);
         }
 
@@ -1198,6 +1218,9 @@ namespace MarioBasketball.Gameplay
         public void TriggerPostMove(PostMove move)
         {
             if (MatchPause.IsPaused || IsStunned || !IsPosting) return;
+            // Once a move's shot is charging, any post button releases it (timing
+            // the shot) rather than starting a new move.
+            if (_post.PostShotActive) { _post.ReleasePostShot(); return; }
             _post.DoMove(move);
         }
 

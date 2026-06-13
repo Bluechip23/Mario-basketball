@@ -72,6 +72,17 @@ namespace MarioBasketball.Gameplay
         [Tooltip("How long the defender is frozen when the shimmy shakes them.")]
         public float shimmyFreeze = 0.45f;
 
+        [Header("Post shot timing (only the shot is timed; the footwork is not)")]
+        [Tooltip("Seconds from starting the shot to its ideal release point.")]
+        public float postShotPerfectTime = 0.5f;
+        [Tooltip("Auto-release this long after the perfect point if the player never releases (a late, mistimed shot).")]
+        public float postShotAutoReleaseAfter = 0.35f;
+        [Tooltip("Release within this many seconds of the perfect point for a perfect shot.")]
+        public float postPerfectWindow = 0.08f;
+        [Tooltip("Make% multiplier lost per second of mistiming beyond the window.")]
+        public float postTimingFalloffPerSec = 2f;
+        [Range(0f, 1f)] public float postMinTimingMultiplier = 0.35f;
+
         public bool IsPosting { get; private set; }
         /// <summary>True while a successful fake still has the defender in the air.</summary>
         public bool FakeActive => _fakeActive;
@@ -79,12 +90,26 @@ namespace MarioBasketball.Gameplay
         public PlayerController EngagedDefender => _defender;
         public Vector3 DriveVelocity { get; private set; }
 
+        /// <summary>A post move's shot has been launched and its release meter is
+        /// charging — the next post-button press (human) releases it; the AI
+        /// releases at the perfect point. The footwork already happened.</summary>
+        public bool PostShotActive { get; private set; }
+        float PostShotMeterDuration => Mathf.Max(0.01f, postShotPerfectTime + postShotAutoReleaseAfter);
+        /// <summary>How full the post-shot release meter is (0-1).</summary>
+        public float PostShotChargeFraction => PostShotActive ? Mathf.Clamp01(_postShotTimer / PostShotMeterDuration) : 0f;
+        /// <summary>Where the perfect release sits on that meter (0-1).</summary>
+        public float PostShotPerfectFraction => Mathf.Clamp01(postShotPerfectTime / PostShotMeterDuration);
+
         PlayerController _pc;
         float _leverage;
         PlayerController _defender;
         bool _fakeActive;
         float _fakeTimer;
         float _shimmyCooldown;
+        float _postShotTimer;
+        float _postShotQuality;
+        bool _postShotBlockable;
+        float _postShotBlockMult;
 
         void Awake()
         {
@@ -98,6 +123,8 @@ namespace MarioBasketball.Gameplay
             _defender = defender;
             _leverage = 0f;
             _fakeActive = false;
+            PostShotActive = false;
+            _postShotTimer = 0f;
             DriveVelocity = Vector3.zero;
         }
 
@@ -106,12 +133,13 @@ namespace MarioBasketball.Gameplay
             IsPosting = false;
             _defender = null;
             _fakeActive = false;
+            PostShotActive = false;
             DriveVelocity = Vector3.zero;
         }
 
         public void OffenseTap()
         {
-            if (!IsPosting) return;
+            if (!IsPosting || PostShotActive) return;
             float power = _pc.EffectiveStat(StatType.Power);
             _leverage += power * tapImpulse * (_fakeActive ? 1.5f : 1f);
             _leverage = Mathf.Min(_leverage, maxLeverage);
@@ -167,10 +195,22 @@ namespace MarioBasketball.Gameplay
                 return;
             }
 
+            float dt = Time.deltaTime;
+
+            // While a post shot is going up, the back-down battle freezes — the
+            // player plants and the release meter is all that matters.
+            if (PostShotActive)
+            {
+                DriveVelocity = Vector3.zero;
+                _postShotTimer += dt;
+                if (!_pc.isHuman && _postShotTimer >= postShotPerfectTime) { ReleasePostShot(); return; }
+                if (_postShotTimer >= PostShotMeterDuration) ReleasePostShot(); // held too long → late
+                return;
+            }
+
             if (_defender == null || !_defender.enabled)
                 _defender = NearestOpponent(gm);
 
-            float dt = Time.deltaTime;
             _leverage = Mathf.MoveTowards(_leverage, 0f, leverageDecay * dt);
 
             // AI defenders resist automatically; a human defender taps instead.
@@ -231,7 +271,7 @@ namespace MarioBasketball.Gameplay
 
         public void DoMove(PostMove move)
         {
-            if (!IsPosting) return;
+            if (!IsPosting || PostShotActive) return;
             var gm = GameManager.Instance;
             if (gm == null || !_pc.HasBall) { End(); return; }
 
@@ -240,6 +280,9 @@ namespace MarioBasketball.Gameplay
             float deep = Mathf.Clamp01(_leverage / maxLeverage);
             float fakeBonus = _fakeActive ? fakeQualityBonus : 0f;
 
+            // Each case below runs its footwork (leverage, shoves, a spin's strip
+            // risk) immediately, then hands off to BeginPostShot — the shot at
+            // the end is what the player has to time.
             switch (move)
             {
                 case PostMove.Fake:
@@ -247,14 +290,14 @@ namespace MarioBasketball.Gameplay
                     return;
 
                 case PostMove.Hook:
-                    ResolveShot(offense - 0.4f * defense + 4f * deep + 1f + fakeBonus, blockable: false);
+                    BeginPostShot(offense - 0.4f * defense + 4f * deep + 1f + fakeBonus, blockable: false);
                     break;
 
                 case PostMove.DropStep:
                     _leverage = Mathf.Min(maxLeverage, _leverage + dropStepLungeLeverage);
                     deep = Mathf.Clamp01(_leverage / maxLeverage);
                     float finish = Mathf.Max(offense, _pc.EffectiveStat(StatType.InsideScoring));
-                    ResolveShot(finish - 0.5f * defense + 5f * deep + fakeBonus, blockable: true);
+                    BeginPostShot(finish - 0.5f * defense + 5f * deep + fakeBonus, blockable: true);
                     break;
 
                 case PostMove.Spin:
@@ -269,12 +312,12 @@ namespace MarioBasketball.Gameplay
                         End();
                         return;
                     }
-                    ResolveShot(spinQuality, blockable: true);
+                    BeginPostShot(spinQuality, blockable: true);
                     break;
 
                 case PostMove.SkyHook:
                     // Released above everything — unblockable, but a tougher make.
-                    ResolveShot(offense - 0.3f * defense + 3f * deep + fakeBonus - 0.5f, blockable: false);
+                    BeginPostShot(offense - 0.3f * defense + 3f * deep + fakeBonus - 0.5f, blockable: false);
                     break;
 
                 case PostMove.PowerDropStep:
@@ -285,7 +328,7 @@ namespace MarioBasketball.Gameplay
                     // Face up and fade — lives on Mid Range, the fade kills the block.
                     float mid = _pc.EffectiveStat(StatType.MidRange);
                     float fadeQuality = 0.5f * offense + 0.7f * mid - 0.35f * defense + 2f * deep + fakeBonus;
-                    ResolveShot(fadeQuality, blockable: true, blockMult: turnaroundBlockMult);
+                    BeginPostShot(fadeQuality, blockable: true, blockMult: turnaroundBlockMult);
                     break;
 
                 case PostMove.UpAndUnder:
@@ -293,10 +336,10 @@ namespace MarioBasketball.Gameplay
                     // bitten fake first it's just a slow, contestable step-through.
                     float inside = _pc.EffectiveStat(StatType.InsideScoring);
                     if (_fakeActive)
-                        ResolveShot(offense + 0.5f * inside - 0.3f * defense + 4f * deep + fakeQualityBonus,
+                        BeginPostShot(offense + 0.5f * inside - 0.3f * defense + 4f * deep + fakeQualityBonus,
                             blockable: true, blockMult: upAndUnderBlockMult);
                     else
-                        ResolveShot(offense - 0.5f * defense + 3f * deep, blockable: true);
+                        BeginPostShot(offense - 0.5f * defense + 3f * deep, blockable: true);
                     break;
             }
         }
@@ -319,14 +362,41 @@ namespace MarioBasketball.Gameplay
             }
 
             float finish = Mathf.Max(offense, _pc.EffectiveStat(StatType.InsideScoring), _pc.EffectiveStat(StatType.Dunk));
-            ResolveShot(finish + 0.25f * power - 0.5f * defense + 5f * deep + fakeBonus, blockable: true);
+            BeginPostShot(finish + 0.25f * power - 0.5f * defense + 5f * deep + fakeBonus, blockable: true);
         }
 
-        void ResolveShot(float quality, bool blockable, float blockMult = 1f)
+        /// <summary>Footwork is done — launch the shot and start its release
+        /// meter. The shot itself resolves in <see cref="ReleasePostShot"/>.</summary>
+        void BeginPostShot(float quality, bool blockable, float blockMult = 1f)
+        {
+            PostShotActive = true;
+            _postShotTimer = 0f;
+            _postShotQuality = quality;
+            _postShotBlockable = blockable;
+            _postShotBlockMult = blockMult;
+            DriveVelocity = Vector3.zero; // plant and rise into the shot
+        }
+
+        /// <summary>Release the timed post shot (human button press, or auto for
+        /// the AI / on overrun). How close the meter is to its perfect point
+        /// scales the make chance, exactly like a jump shot.</summary>
+        public void ReleasePostShot()
+        {
+            if (!PostShotActive) return;
+            PostShotActive = false;
+            float error = Mathf.Abs(_postShotTimer - postShotPerfectTime);
+            float timing = error <= postPerfectWindow
+                ? 1f
+                : Mathf.Clamp(1f - (error - postPerfectWindow) * postTimingFalloffPerSec, postMinTimingMultiplier, 1f);
+            timing = _pc.TimingWithTrait(timing); // Acrobat (Baby Mario) shrugs off mistiming
+            ResolveShot(_postShotQuality, _postShotBlockable, _postShotBlockMult, timing);
+        }
+
+        void ResolveShot(float quality, bool blockable, float blockMult, float timing)
         {
             var gm = GameManager.Instance;
-            Hoop hoop = gm.GetAttackingHoop(_pc.team);
-            if (hoop == null) { End(); return; }
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(_pc.team) : null;
+            if (hoop == null || !_pc.HasBall) { End(); return; }
 
             if (blockable && _defender != null)
             {
@@ -343,7 +413,7 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _pc.Character != null && _pc.Character.OnFire;
-            float makeChance = ShotMath.MakeChanceFromQuality(quality, onFire);
+            float makeChance = Mathf.Clamp(ShotMath.MakeChanceFromQuality(quality, onFire) * timing, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             gm.ball.Shoot(hoop.AimPoint, _pc.team, 2, moveFlightTime, ShotMath.AimOffset(make), _pc);
             End();

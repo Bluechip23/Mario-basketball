@@ -210,6 +210,15 @@ unlocks the step-through:
 - **Up & Under** (A while a bitten fake is live): step through under the
   airborne defender for a nearly free finish.
 
+**Timing the shot.** The footwork (the lunge, spin, power bulldoze, shove) is
+instant — but the **shot at the end is timed**, like a jump shot. Triggering a
+move plants the player and starts a short release meter (the arms and ball rise
+to a peak); press a post button again near the top to release. A clean release
+shoots at full make%, an early or late one drops it (down to
+`postMinTimingMultiplier`). The AI releases on time automatically. Baby Mario's
+**Acrobat** trait applies here too — he barely suffers from a mistimed post
+release (so a hook fired the instant he goes up still drops).
+
 > **Controller-first.** The prototype uses a contextual gamepad layout (face
 > buttons are shot/pass on offense and post moves while posting; D-pad handles
 > timeout/sub), with keyboard fallbacks. Not yet wired: double-tap mid-air shot

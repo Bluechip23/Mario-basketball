@@ -125,7 +125,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Wario() => new CharacterStats
         {
             characterName = "Wario",
-            speed = 4, ballHandling = 6, threePoint = 7, midRange = 10, insideScoring = 6, postOffense = 7, dunk = 5, power = 8, rebounds = 7, blocks = 5, steals = 5, postDefense = 6, perimeterDefense = 5, stamina = 6,
+            speed = 4, ballHandling = 6, threePoint = 6, midRange = 10, insideScoring = 6, postOffense = 7, dunk = 5, power = 8, rebounds = 7, blocks = 5, steals = 5, postDefense = 6, perimeterDefense = 5, stamina = 6,
             hiddenTrait = HiddenTrait.SmoothPasser, heightMeters = 2.0f,
             archetype = PlayerArchetype.Big,
             description = "The bully with a silk mid-range jumper. Doubles down low only feed his smooth (and smug) passing."
@@ -145,7 +145,7 @@ namespace MarioBasketball.Characters
         {
             characterName = "Daisy",
             speed = 7, ballHandling = 7, threePoint = 5, midRange = 9, insideScoring = 6, postOffense = 3, dunk = 5, power = 3, rebounds = 3, blocks = 3, steals = 6, postDefense = 3, perimeterDefense = 8, stamina = 8,
-            hiddenTrait = HiddenTrait.None, heightMeters = 1.85f,
+            hiddenTrait = HiddenTrait.KillerInstinct, heightMeters = 1.85f,
             archetype = PlayerArchetype.Wing,
             description = "Hi, I'm Daisy! A pesky on-ball defender with the purest mid-range stroke in the kingdom."
         };
@@ -190,7 +190,7 @@ namespace MarioBasketball.Characters
         {
             characterName = "Delfan",
             speed = 4, ballHandling = 8, threePoint = 9, midRange = 7, insideScoring = 3, postOffense = 4, dunk = 2, power = 7, rebounds = 2, blocks = 2, steals = 4, postDefense = 6, perimeterDefense = 6, stamina = 8,
-            hiddenTrait = HiddenTrait.None, heightMeters = 1.6f,
+            hiddenTrait = HiddenTrait.CalledShot, heightMeters = 1.6f,
             archetype = PlayerArchetype.Guard,
             description = "A sturdy, deliberate sharpshooter with real handle. Slow up the floor, but give him a sliver of space and the three is going down."
         };
@@ -217,7 +217,7 @@ namespace MarioBasketball.Characters
         {
             characterName = "Jonah Guy",
             speed = 3, ballHandling = 4, threePoint = 7, midRange = 4, insideScoring = 7, postOffense = 6, dunk = 5, power = 7, rebounds = 7, blocks = 6, steals = 2, postDefense = 8, perimeterDefense = 5, stamina = 10,
-            hiddenTrait = HiddenTrait.None, heightMeters = 2.05f,
+            hiddenTrait = HiddenTrait.Energizer, heightMeters = 2.05f,
             archetype = PlayerArchetype.Big,
             description = "A whale of a worker. Never tires, bangs inside, guards the post — and surprises from deep when left alone."
         };

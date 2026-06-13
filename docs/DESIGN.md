@@ -294,7 +294,16 @@ Hidden traits (wired):
   air — neither the fadeaway lean nor the L1 air-adjust on a dunk/layup — and
   suffers **~80% less** from a mistimed release (firing the instant he leaves
   the floor or holding it too long). He still gets only the same fade
-  *separation* everyone does; he just skips the difficulty. Everyone else `None`.
+  *separation* everyone does; he just skips the difficulty.
+- **Daisy — Killer Instinct**: a closer who feeds on tired legs. As the opposing
+  on-court team's energy drains, a flat bonus (up to `killerMaxBonus`) is added
+  to **every** one of her effective stats — run them ragged and she takes over.
+- **Jonah Guy — Energizer**: glue guy. Whenever he scores **off a teammate's
+  assist** or **assists a teammate's score**, that teammate gets a small stamina
+  boost (`assistEnergyBonus`).
+- **Delfan — Called Shot**: twice a game, **double-tap turbo** while one of his
+  shots (taken from within half court) is in the air to **guarantee** it drops.
+  Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 

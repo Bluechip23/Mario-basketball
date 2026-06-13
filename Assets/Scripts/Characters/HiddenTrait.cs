@@ -60,6 +60,29 @@ namespace MarioBasketball.Characters
         /// still buys him the same separation everyone gets — he just doesn't eat
         /// the difficulty. See <c>ShotMath</c> / <c>PlayerController</c> (Baby Mario).
         /// </summary>
-        Acrobat
+        Acrobat,
+
+        /// <summary>
+        /// Killer Instinct: a closer who feeds on tired legs. As the opposing
+        /// on-court team's energy drains, <i>every</i> one of her effective stats
+        /// climbs (up to a cap at full opponent fatigue) — run them ragged and
+        /// she takes over. See <c>PlayerController</c> (Daisy).
+        /// </summary>
+        KillerInstinct,
+
+        /// <summary>
+        /// Energizer: a glue guy whose connections lift his teammates. Whenever
+        /// he scores off a teammate's assist, or assists a teammate's score, that
+        /// teammate gets a small stamina boost. See <c>GameManager.RegisterBasket</c>
+        /// (Jonah Guy).
+        /// </summary>
+        Energizer,
+
+        /// <summary>
+        /// Called Shot: twice a game, double-tap turbo while one of his shots
+        /// (taken from within half court) is in the air to guarantee it drops.
+        /// See <c>PlayerController</c> / <c>BallController.ForceMake</c> (Delfan).
+        /// </summary>
+        CalledShot
     }
 }

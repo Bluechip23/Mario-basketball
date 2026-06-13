@@ -52,6 +52,12 @@ namespace MarioBasketball.Characters
         public float EnergyFraction => maxEnergy > 0f ? energy / maxEnergy : 0f;
         public bool OnFire { get; private set; }
 
+        /// <summary>A flat bonus a hidden trait adds to every effective stat,
+        /// refreshed by the owning controller each frame (0 for everyone else).
+        /// Used by Daisy's Killer Instinct, which scales it with how gassed the
+        /// opponents are.</summary>
+        public float TraitStatBonus { get; set; }
+
         // Heat-check streak state, driven by GameManager:
         /// <summary>This player's consecutive made shots (broken by a miss or a
         /// teammate scoring).</summary>
@@ -131,8 +137,8 @@ namespace MarioBasketball.Characters
         /// rating (used by traits that override a stat, e.g. quick catch-and-shoot).</summary>
         public float GetEffectiveFor(float rawStat)
         {
-            float value = rawStat * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f);
-            return Mathf.Clamp(value, 0f, CharacterStats.Max + onFireStatBonus);
+            float value = rawStat * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f) + TraitStatBonus;
+            return Mathf.Clamp(value, 0f, CharacterStats.Max + onFireStatBonus + TraitStatBonus);
         }
 
         public void SetOnFire(bool value) => OnFire = value;

@@ -69,6 +69,16 @@ namespace MarioBasketball.Gameplay
         public float assistWindow = 1.0f;
         [Tooltip("Acrobat trait (Baby Mario): fraction of the shot-mistiming penalty he ignores — 0.8 = suffers 80% less from early/late releases.")]
         [Range(0f, 1f)] public float acrobatTimingRelief = 0.8f;
+
+        [Header("Hidden traits")]
+        [Tooltip("Killer Instinct (Daisy): flat bonus to every stat at full opponent fatigue.")]
+        public float killerMaxBonus = 4f;
+        [Tooltip("Killer Instinct: opponent fatigue below this fraction gives no bonus (fresh legs).")]
+        [Range(0f, 1f)] public float killerFatigueFloor = 0.1f;
+        [Tooltip("Called Shot (Delfan): guaranteed makes allowed per game.")]
+        public int calledShotMax = 2;
+        [Tooltip("Called Shot: only shots launched within this distance (m) of the hoop — i.e. within half court — qualify.")]
+        public float calledShotRange = 14f;
         [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
         public float dribbleMoveThreshold = 0.6f;
 
@@ -288,6 +298,8 @@ namespace MarioBasketball.Gameplay
         PlayerController _assistPasser;
         float _assistTime;
         bool _assistDribbled;
+        float _lastShotDistance;
+        int _calledShotsUsed;
 
         void Awake()
         {
@@ -343,6 +355,7 @@ namespace MarioBasketball.Gameplay
             _input.SpinPressed += TriggerSpin;
             _input.FakePressed += TriggerFake;
             _input.DribbleFlick += OnDribbleFlick;
+            _input.TurboDoubleTap += OnTurboDoubleTap;
             _input.Enable();
         }
 
@@ -362,6 +375,7 @@ namespace MarioBasketball.Gameplay
             _input.SpinPressed -= TriggerSpin;
             _input.FakePressed -= TriggerFake;
             _input.DribbleFlick -= OnDribbleFlick;
+            _input.TurboDoubleTap -= OnTurboDoubleTap;
             _input.Disable();
             _input = null;
         }
@@ -402,6 +416,7 @@ namespace MarioBasketball.Gameplay
                 HandlePostHold();
             }
 
+            UpdateKillerInstinct();
             AdvanceShotMeter(dt);
             AdvanceFinish(dt);
             Move();
@@ -430,6 +445,13 @@ namespace MarioBasketball.Gameplay
             _assistTime = Time.time;
             _assistDribbled = false;
         }
+
+        /// <summary>The teammate whose pass this shot is going up directly off of
+        /// (within the assist window, no dribble), or null. Captured by the ball
+        /// on a shot for assist effects (Playmaker, Energizer).</summary>
+        public PlayerController AssistingPasser =>
+            (_assistPasser != null && !_assistDribbled && Time.time - _assistTime <= assistWindow)
+                ? _assistPasser : null;
 
         /// <summary>+2 if shooting directly off a Playmaker's pass (in time, no drive).</summary>
         int AssistBonus()
@@ -685,6 +707,7 @@ namespace MarioBasketball.Gameplay
             if (hoop == null) return;
 
             Vector3 aim = hoop.AimPoint;
+            _lastShotDistance = HorizontalDistance(transform.position, aim); // for Delfan's called shot
             // Dunk scores off Dunk, layup off Inside Scoring; +2 off a Playmaker pass.
             StatType scoreStat = isDunk ? StatType.Dunk : StatType.InsideScoring;
             int rawFinish = (_character != null ? _character.stats.Get(scoreStat) : 5) + AssistBonus();
@@ -730,6 +753,40 @@ namespace MarioBasketball.Gameplay
         /// penalty. Shared by jump shots and timed post shots.</summary>
         public float TimingWithTrait(float timing)
             => HasTrait(HiddenTrait.Acrobat) ? 1f - (1f - timing) * (1f - acrobatTimingRelief) : timing;
+
+        /// <summary>Killer Instinct (Daisy): refresh the flat stat bonus from how
+        /// gassed the opposing on-court team is — fresh legs give nothing, dead
+        /// legs give the full <see cref="killerMaxBonus"/> across every stat.</summary>
+        void UpdateKillerInstinct()
+        {
+            if (_character == null || !HasTrait(HiddenTrait.KillerInstinct)) return;
+            var gm = GameManager.Instance;
+            if (gm == null) { _character.TraitStatBonus = 0f; return; }
+
+            float sum = 0f; int n = 0;
+            foreach (var o in gm.TeamFor(GameManager.Opponent(team)).onCourt)
+            {
+                if (o == null || o.Character == null || !o.enabled) continue;
+                sum += 1f - o.Character.EnergyFraction; // 0 fresh … 1 spent
+                n++;
+            }
+            float fatigue = n > 0 ? sum / n : 0f;
+            float scaled = Mathf.Clamp01((fatigue - killerFatigueFloor) / Mathf.Max(0.01f, 1f - killerFatigueFloor));
+            _character.TraitStatBonus = killerMaxBonus * scaled;
+        }
+
+        /// <summary>Called Shot (Delfan): double-tapping turbo while one of his
+        /// shots — taken from within half court — is in the air guarantees it
+        /// drops. Twice a game.</summary>
+        void OnTurboDoubleTap()
+        {
+            if (MatchPause.IsPaused || !HasTrait(HiddenTrait.CalledShot)) return;
+            if (_calledShotsUsed >= calledShotMax) return;
+            var ball = Ball;
+            if (ball == null || ball.State != BallController.BallState.Shot || ball.Shooter != this) return;
+            if (_lastShotDistance > calledShotRange) return; // beyond half court — no dice
+            if (ball.ForceMake()) _calledShotsUsed++;
+        }
 
         /// <summary>Make% lost to an air-adjust — fully mitigated at Inside 10,
         /// and waived entirely for an Acrobat (Baby Mario alters in the air free).</summary>
@@ -783,6 +840,7 @@ namespace MarioBasketball.Gameplay
 
             Vector3 aim = hoop.AimPoint;
             float distance = HorizontalDistance(transform.position, aim);
+            _lastShotDistance = distance; // for Delfan's within-half-court called shot
             int points = distance >= threePointDistance ? 3 : 2;
 
             StatType shotStat =

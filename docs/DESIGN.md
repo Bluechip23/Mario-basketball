@@ -166,6 +166,16 @@ shot, e.g. adjust a layup/dunk) · Push/Foul · Post up · Post move (contextual
 buttons while posted) · Defensive stance · Bring up teammate icons · Speed
 burst · Dribble move · Timeout.
 
+### Fadeaway / leaning jump shots
+On a jump shot, the **move stick** shapes the jump. Hold it in a direction
+and the shooter **fades that way** — the body leans and drifts off the
+square-up while staying faced to the rim; let go and they rise **straight up**
+for a normal shot. A fadeaway is a trade: the separation **lowers the
+defender's block and contest** (scaled by how hard you fade), but it's a
+**harder shot** — a make penalty mitigated by **Mid Range** (fully gone at
+Mid Range 10). Inside finishes (dunks/layups) are unaffected; this is the
+jump-shot game.
+
 ### Right-stick dribble flicks
 With the ball, **flicking the right stick** (a sharp push that returns to
 neutral — distinct from holding it to aim a pass) is a **hard dribble in that

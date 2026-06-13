@@ -70,6 +70,16 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
         public float dribbleMoveThreshold = 0.6f;
 
+        [Header("Fadeaway / lean (jump shots)")]
+        [Tooltip("Hold the move stick during a jump shot to fade that way; release nothing and it's a straight-up shot. Drift speed (m/s) at a full-held stick.")]
+        public float fadeSpeed = 3.2f;
+        [Tooltip("Fraction of the defender's block chance removed at a full fade (the separation a fadeaway buys).")]
+        [Range(0f, 1f)] public float fadeBlockReduction = 0.6f;
+        [Tooltip("Fraction of the defender's contest make-penalty removed at a full fade.")]
+        [Range(0f, 1f)] public float fadeContestReduction = 0.7f;
+        [Tooltip("Max make% lost to a full fadeaway — it's a harder shot, fully mitigated at Mid Range 10.")]
+        [Range(0f, 1f)] public float fadeMaxPenalty = 0.22f;
+
         [Header("Inside finishing (dunk / layup)")]
         [Tooltip("Time in the air before an unheld finish auto-resolves.")]
         public float finishAirTime = 0.45f;
@@ -209,6 +219,11 @@ namespace MarioBasketball.Gameplay
         /// <summary>Current horizontal speed (m/s) — drives the run animation.</summary>
         public float PlanarSpeed { get; private set; }
         public bool IsShooting => _shooting;
+        /// <summary>World-space planar direction the current jump shot is fading
+        /// toward (zero for a straight-up shot). Drives the body lean.</summary>
+        public Vector3 FadeDirection => _fadeDir;
+        /// <summary>How hard the shot is fading, 0 (straight up) to 1 (full lean).</summary>
+        public float FadeAmount => _fadeAmount;
         /// <summary>How full the shot meter is (0-1) for the jump in progress.</summary>
         public float ShotChargeFraction => _shooting ? Mathf.Clamp01(_shotCharge / ShotMeterDuration) : 0f;
         /// <summary>Where the perfect-release marker sits on the meter (0-1).</summary>
@@ -232,6 +247,8 @@ namespace MarioBasketball.Gameplay
         bool _shooting;
         float _shotCharge;
         float _apexTime;
+        Vector3 _fadeDir;
+        float _fadeAmount;
         bool _pendingQuickCatch;
         bool _hadBall;
         float _catchTime = -10f;
@@ -476,6 +493,28 @@ namespace MarioBasketball.Gameplay
                 horizontal = toRim.sqrMagnitude > 0.01f ? toRim.normalized * finishApproachSpeed : Vector3.zero;
                 _character?.ReportActivity(true, false);
             }
+            else if (_shooting)
+            {
+                // A jump shot doesn't run: hold the stick to fade that way (the
+                // body leans, see ProceduralAnimator), or hold nothing to rise
+                // straight up. We stay squared to the rim so it reads as a
+                // fadeaway, not a drift.
+                Vector3 fade = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
+                _fadeAmount = Mathf.Clamp01(fade.magnitude);
+                if (_fadeAmount > 0.05f)
+                {
+                    _fadeDir = fade.normalized;
+                    horizontal = _fadeDir * fadeSpeed * _fadeAmount;
+                }
+                else
+                {
+                    _fadeAmount = 0f;
+                    horizontal = Vector3.zero;
+                }
+                Vector3 toRim = RimDirection();
+                if (toRim.sqrMagnitude > 0.01f) { rotateToMove = true; faceDir = toRim.normalized; }
+                _character?.ReportActivity(false, false);
+            }
             else
             {
                 Vector3 dir = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
@@ -565,6 +604,8 @@ namespace MarioBasketball.Gameplay
             _pendingQuickCatch = QuickCatchReady(); // captured at the catch, before the jump
             _shooting = true;
             _shotCharge = 0f;
+            _fadeDir = Vector3.zero;
+            _fadeAmount = 0f;
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // jump
         }
 
@@ -662,6 +703,16 @@ namespace MarioBasketball.Gameplay
             return maxAdjustPenalty * (1f - Mathf.Clamp01((inside - 1f) / 9f));
         }
 
+        /// <summary>Make% lost to a fadeaway, scaled by how hard it faded — the
+        /// better the shooter's Mid Range, the smaller the hit (fully mitigated
+        /// at Mid Range 10).</summary>
+        float FadePenalty(float fadeAmount)
+        {
+            if (fadeAmount <= 0f) return 0f;
+            float mid = Effective(StatType.MidRange, 5f);
+            return fadeMaxPenalty * fadeAmount * (1f - Mathf.Clamp01((mid - 1f) / 9f));
+        }
+
         void ReleaseJumpShot()
         {
             _shooting = false;
@@ -669,16 +720,18 @@ namespace MarioBasketball.Gameplay
             float timing = error <= perfectReleaseWindow
                 ? 1f
                 : Mathf.Clamp(1f - (error - perfectReleaseWindow) * timingFalloffPerSec, minTimingMultiplier, 1f);
-            ExecuteShot(timing, _pendingQuickCatch);
+            ExecuteShot(timing, _pendingQuickCatch, _fadeAmount);
         }
 
         /// <summary>
         /// Resolve a shot: block roll first (unaffected by timing or on fire),
         /// then a make roll using <see cref="ShotMath"/> scaled by the release
         /// <paramref name="timingMultiplier"/> (1 = perfect). A quick catch-and-
-        /// shoot three overrides the 3-Point rating to a 10.
+        /// shoot three overrides the 3-Point rating to a 10. A
+        /// <paramref name="fadeAmount"/> (0-1) is a fadeaway: it buys separation
+        /// (lower block + contest) at the cost of a harder shot.
         /// </summary>
-        void ExecuteShot(float timingMultiplier, bool quickCatch)
+        void ExecuteShot(float timingMultiplier, bool quickCatch, float fadeAmount = 0f)
         {
             if (!HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
@@ -711,6 +764,7 @@ namespace MarioBasketball.Gameplay
                     float closeness = 1f - dd / contestRange;
                     float blk = defender.EffectiveStat(StatType.Blocks);
                     float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - shotStatValue), 0f, blockMaxChance) * closeness;
+                    chance *= 1f - fadeBlockReduction * fadeAmount; // fading away from the contest
                     if (Random.value < chance)
                     {
                         Vector3 away = transform.position - aim; away.y = 0f;
@@ -722,7 +776,9 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _character != null && _character.OnFire;
-            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, shotStatValue) * timingMultiplier;
+            float contestScale = 1f - fadeContestReduction * fadeAmount;
+            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, shotStatValue, contestScale) * timingMultiplier;
+            makeChance -= FadePenalty(fadeAmount); // a fadeaway is a tougher shot
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);

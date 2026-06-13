@@ -80,6 +80,8 @@ namespace MarioBasketball.Presentation
         [Header("Misc")]
         public float poseLerp = 13f;
         public float fallAngle = 80f;
+        [Tooltip("Body lean (degrees) at a full fadeaway jump shot.")]
+        public float fadeLeanAngle = 24f;
 
         PlayerController _pc;
         BallController _ball;
@@ -112,10 +114,23 @@ namespace MarioBasketball.Presentation
             if (_ball == null && MarioBasketball.Core.GameManager.Instance != null)
                 _ball = MarioBasketball.Core.GameManager.Instance.ball;
 
-            // Knocked down: tip the whole body to the floor (and skip limb poses).
+            // Body tilt: sprawl to the floor when knocked down, or lean into a
+            // fadeaway jump shot (the shooter holds the stick to fade that way).
             if (_model != null)
             {
-                Quaternion want = _pc.IsFallen ? Quaternion.Euler(fallAngle, 0f, _fallTilt) : Quaternion.identity;
+                Quaternion want;
+                if (_pc.IsFallen)
+                    want = Quaternion.Euler(fallAngle, 0f, _fallTilt);
+                else if (_pc.IsShooting && _pc.FadeAmount > 0.05f)
+                {
+                    // Convert the world fade into the body's own frame: a fade
+                    // away from the rim pitches the torso back, a sideways fade
+                    // rolls it over that hip.
+                    Vector3 local = transform.InverseTransformDirection(_pc.FadeDirection);
+                    float amt = _pc.FadeAmount * fadeLeanAngle;
+                    want = Quaternion.Euler(local.z * amt, 0f, -local.x * amt);
+                }
+                else want = Quaternion.identity;
                 _model.localRotation = Quaternion.Slerp(_model.localRotation, want, poseLerp * Time.deltaTime);
             }
             if (_pc.IsFallen) return;

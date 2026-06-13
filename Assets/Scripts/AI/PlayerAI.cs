@@ -220,7 +220,18 @@ namespace MarioBasketball.AI
 
             float lev = _pc.Post != null ? _pc.Post.Leverage : 0f;
             if (lev >= aiPostFinishLeverage || _postDecisionTimer <= 0f)
-                _pc.DoPostMove(lev >= aiPostDeepLeverage ? PostMove.DropStep : PostMove.Hook);
+                _pc.DoPostMove(ChoosePostMove(lev));
+        }
+
+        /// <summary>Pick a finisher that fits the player: deep + strong bullies
+        /// with the power drop step, shallow shooters fade or go to the sky hook.</summary>
+        PostMove ChoosePostMove(float leverage)
+        {
+            if (leverage >= aiPostDeepLeverage)
+                return _pc.EffectiveStat(StatType.Power) >= 7f ? PostMove.PowerDropStep : PostMove.DropStep;
+            if (_pc.EffectiveStat(StatType.MidRange) > _pc.EffectiveStat(StatType.PostOffense))
+                return PostMove.TurnaroundJumper;
+            return Random.value < 0.3f ? PostMove.SkyHook : PostMove.Hook;
         }
 
         void OffenseOffBall(GameManager gm)

@@ -10,12 +10,19 @@ namespace MarioBasketball.UI
     /// An IMGUI pause menu toggled with Esc / Start. Freezes the game
     /// (<c>Time.timeScale = 0</c>) and offers Resume, a <b>Stats</b> view that
     /// lists every player's full stat sheet (handy for balancing mid-game),
-    /// Restart and Quit. Throwaway IMGUI like the rest of the prototype UI.
+    /// <b>Settings</b>, Restart and Quit. Controller navigation matches the
+    /// other menus (flashing yellow selection, A confirms, B resumes).
+    /// Throwaway IMGUI like the rest of the prototype UI.
     /// </summary>
     public class PauseMenu : MonoBehaviour
     {
+        static readonly string[] Items = { "Resume", "Stats", "Settings", "Restart", "Quit" };
+
         InputAction _pause;
         bool _showStats;
+        bool _inSettings;
+        int _sel;
+        MenuNav _nav;
         Vector2 _scroll;
 
         GUIStyle _title;
@@ -36,6 +43,8 @@ namespace MarioBasketball.UI
             _pause.AddBinding("<Gamepad>/start");
             _pause.performed += OnPausePressed;
             _pause.Enable();
+            _nav = new MenuNav();
+            _nav.Enable();
         }
 
         void OnDisable()
@@ -44,6 +53,8 @@ namespace MarioBasketball.UI
             _pause.performed -= OnPausePressed;
             _pause.Disable();
             _pause = null;
+            _nav?.Disable();
+            _nav = null;
             // Don't leave the game frozen if this object goes away.
             Time.timeScale = 1f;
             MatchPause.IsPaused = false;
@@ -55,12 +66,62 @@ namespace MarioBasketball.UI
         {
             MatchPause.IsPaused = paused;
             Time.timeScale = paused ? 0f : 1f;
-            if (!paused) _showStats = false;
+            if (paused) _sel = 0;
+            else
+            {
+                _showStats = false;
+                CloseSettings();
+            }
+        }
+
+        void Update()
+        {
+            if (!MatchPause.IsPaused || _inSettings) return;
+            _nav.Tick();
+
+            if (_showStats)
+            {
+                if (_nav.East || _nav.Submit) _showStats = false;
+                return;
+            }
+
+            if (_nav.Step.y != 0)
+                _sel = (_sel - _nav.Step.y + Items.Length) % Items.Length;
+            if (_nav.Submit) Activate(_sel);
+            else if (_nav.East) SetPaused(false);
+        }
+
+        void Activate(int index)
+        {
+            switch (index)
+            {
+                case 0: SetPaused(false); break;
+                case 1: _showStats = true; break;
+                case 2: OpenSettings(); break;
+                case 3: Restart(); break;
+                case 4: Application.Quit(); break;
+            }
+        }
+
+        void OpenSettings()
+        {
+            var settings = GetComponent<SettingsMenu>();
+            if (settings == null) settings = gameObject.AddComponent<SettingsMenu>();
+            _inSettings = true;
+            settings.Open(() => _inSettings = false);
+        }
+
+        void CloseSettings()
+        {
+            if (!_inSettings) return;
+            _inSettings = false;
+            var settings = GetComponent<SettingsMenu>();
+            if (settings != null) settings.enabled = false;
         }
 
         void OnGUI()
         {
-            if (!MatchPause.IsPaused) return;
+            if (!MatchPause.IsPaused || _inSettings) return;
             EnsureStyles();
 
             // Dim the field behind the menu.
@@ -75,17 +136,17 @@ namespace MarioBasketball.UI
 
         void DrawMenu()
         {
-            float w = 320f, h = 280f;
+            float w = 320f, h = 340f;
             var rect = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUILayout.BeginArea(rect, GUI.skin.box);
-            GUILayout.Space(8);
-            GUILayout.Label("PAUSED", _title);
-            GUILayout.Space(12);
-            if (GUILayout.Button("Resume", _button, GUILayout.Height(44))) SetPaused(false);
-            if (GUILayout.Button("Stats", _button, GUILayout.Height(44))) _showStats = true;
-            if (GUILayout.Button("Restart", _button, GUILayout.Height(44))) Restart();
-            if (GUILayout.Button("Quit", _button, GUILayout.Height(44))) Application.Quit();
-            GUILayout.EndArea();
+            GUI.Box(rect, GUIContent.none);
+            GUI.Label(new Rect(rect.x, rect.y + 10, rect.width, 32), "PAUSED", _title);
+
+            for (int i = 0; i < Items.Length; i++)
+            {
+                var r = new Rect(rect.x + 24, rect.y + 54 + i * 54, w - 48, 44);
+                if (_sel == i) MenuNav.DrawSelection(r);
+                if (GUI.Button(r, Items[i], _button)) { _sel = i; Activate(i); }
+            }
         }
 
         void DrawStats()

@@ -70,6 +70,18 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
         public float dribbleMoveThreshold = 0.6f;
 
+        [Header("Fadeaway / lean (jump shots)")]
+        [Tooltip("Hold the move stick during a jump shot to fade that way; release nothing and it's a straight-up shot. Drift speed (m/s) at a full-held stick.")]
+        public float fadeSpeed = 3.2f;
+        [Tooltip("Fraction of the defender's block chance removed at a full fade (the separation a fadeaway buys).")]
+        [Range(0f, 1f)] public float fadeBlockReduction = 0.6f;
+        [Tooltip("Fraction of the defender's contest make-penalty removed at a full fade.")]
+        [Range(0f, 1f)] public float fadeContestReduction = 0.7f;
+        [Tooltip("Max make% lost to a full fadeaway — it's a harder shot, fully mitigated at Mid Range 10.")]
+        [Range(0f, 1f)] public float fadeMaxPenalty = 0.22f;
+        [Tooltip("Fade multiplier when leaning fully AGAINST your run direction at top speed (leaning WITH your momentum stays full). Lower = momentum matters more; 1 disables the asymmetry.")]
+        [Range(0f, 1f)] public float fadeAgainstMomentumMin = 0.25f;
+
         [Header("Inside finishing (dunk / layup)")]
         [Tooltip("Time in the air before an unheld finish auto-resolves.")]
         public float finishAirTime = 0.45f;
@@ -100,6 +112,17 @@ namespace MarioBasketball.Gameplay
         public float ankleStun = 0.9f;
         public float dribbleBaseChance = 0.45f;
         public float dribbleStatScale = 0.06f;
+
+        [Header("Dribble flicks (right-stick hard dribbles for separation)")]
+        public float flickCooldownTime = 0.45f;
+        [Tooltip("Burst impulse on a flick toward / across the defender.")]
+        public float flickBurstPower = 6f;
+        [Tooltip("Backward impulse on a step-back (flick away from the basket).")]
+        public float stepBackPower = 7.5f;
+        [Tooltip("Opposite lateral flicks within this window chain into a hesitation cross.")]
+        public float hesitationWindow = 0.6f;
+        [Tooltip("How long the defender freezes when a flick move shakes them (the full ankleStun is reserved for the hesitation cross).")]
+        public float flickFreeze = 0.4f;
 
         [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
@@ -198,6 +221,11 @@ namespace MarioBasketball.Gameplay
         /// <summary>Current horizontal speed (m/s) — drives the run animation.</summary>
         public float PlanarSpeed { get; private set; }
         public bool IsShooting => _shooting;
+        /// <summary>World-space planar direction the current jump shot is fading
+        /// toward (zero for a straight-up shot). Drives the body lean.</summary>
+        public Vector3 FadeDirection => _fadeDir;
+        /// <summary>How hard the shot is fading, 0 (straight up) to 1 (full lean).</summary>
+        public float FadeAmount => _fadeAmount;
         /// <summary>How full the shot meter is (0-1) for the jump in progress.</summary>
         public float ShotChargeFraction => _shooting ? Mathf.Clamp01(_shotCharge / ShotMeterDuration) : 0f;
         /// <summary>Where the perfect-release marker sits on the meter (0-1).</summary>
@@ -221,6 +249,10 @@ namespace MarioBasketball.Gameplay
         bool _shooting;
         float _shotCharge;
         float _apexTime;
+        Vector3 _fadeDir;
+        float _fadeAmount;
+        Vector3 _lastRunVelocity;
+        Vector3 _launchVel;
         bool _pendingQuickCatch;
         bool _hadBall;
         float _catchTime = -10f;
@@ -232,6 +264,9 @@ namespace MarioBasketball.Gameplay
         bool _iconHeld;
         float _dribbleCooldown;
         float _dribbleBoostTimer;
+        float _flickCooldown;
+        float _lastLateralFlickTime = -10f;
+        float _lastLateralFlickSign;
         bool _passCharging;
         float _passChargeTime;
         float _fallTimer;
@@ -292,6 +327,7 @@ namespace MarioBasketball.Gameplay
             _input.DropStepPressed += TriggerDropStep;
             _input.SpinPressed += TriggerSpin;
             _input.FakePressed += TriggerFake;
+            _input.DribbleFlick += OnDribbleFlick;
             _input.Enable();
         }
 
@@ -310,6 +346,7 @@ namespace MarioBasketball.Gameplay
             _input.DropStepPressed -= TriggerDropStep;
             _input.SpinPressed -= TriggerSpin;
             _input.FakePressed -= TriggerFake;
+            _input.DribbleFlick -= OnDribbleFlick;
             _input.Disable();
             _input = null;
         }
@@ -333,6 +370,7 @@ namespace MarioBasketball.Gameplay
             if (_pushCooldown > 0f) _pushCooldown -= dt;
             if (_dribbleCooldown > 0f) _dribbleCooldown -= dt;
             if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
+            if (_flickCooldown > 0f) _flickCooldown -= dt;
             if (_passCharging)
             {
                 _passChargeTime += dt;
@@ -459,6 +497,32 @@ namespace MarioBasketball.Gameplay
                 horizontal = toRim.sqrMagnitude > 0.01f ? toRim.normalized * finishApproachSpeed : Vector3.zero;
                 _character?.ReportActivity(true, false);
             }
+            else if (_shooting)
+            {
+                // A jump shot doesn't run: hold the stick to fade that way (the
+                // body leans, see ProceduralAnimator), or hold nothing to rise
+                // straight up. We stay squared to the rim so it reads as a
+                // fadeaway, not a drift.
+                Vector3 fade = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
+                _fadeAmount = Mathf.Clamp01(fade.magnitude);
+                if (_fadeAmount > 0.05f)
+                {
+                    _fadeDir = fade.normalized;
+                    // Fading with your momentum is easy; against it (planting the
+                    // wrong way at the last second) barely leans — and the faster
+                    // you were going, the harder it is to reverse.
+                    _fadeAmount *= MomentumFadeScale(_fadeDir);
+                    horizontal = _fadeDir * fadeSpeed * _fadeAmount;
+                }
+                else
+                {
+                    _fadeAmount = 0f;
+                    horizontal = Vector3.zero;
+                }
+                Vector3 toRim = RimDirection();
+                if (toRim.sqrMagnitude > 0.01f) { rotateToMove = true; faceDir = toRim.normalized; }
+                _character?.ReportActivity(false, false);
+            }
             else
             {
                 Vector3 dir = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
@@ -472,6 +536,7 @@ namespace MarioBasketball.Gameplay
                 _character?.ReportActivity(dir.sqrMagnitude > 0.01f, sprinting);
 
                 horizontal = dir * speed;
+                _lastRunVelocity = horizontal; // momentum carried into a fadeaway
                 rotateToMove = dir.sqrMagnitude > 0.01f;
                 faceDir = dir;
             }
@@ -548,6 +613,9 @@ namespace MarioBasketball.Gameplay
             _pendingQuickCatch = QuickCatchReady(); // captured at the catch, before the jump
             _shooting = true;
             _shotCharge = 0f;
+            _fadeDir = Vector3.zero;
+            _fadeAmount = 0f;
+            _launchVel = _lastRunVelocity; // the momentum you take into the jump
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // jump
         }
 
@@ -645,6 +713,32 @@ namespace MarioBasketball.Gameplay
             return maxAdjustPenalty * (1f - Mathf.Clamp01((inside - 1f) / 9f));
         }
 
+        /// <summary>Make% lost to a fadeaway, scaled by how hard it faded — the
+        /// better the shooter's Mid Range, the smaller the hit (fully mitigated
+        /// at Mid Range 10).</summary>
+        float FadePenalty(float fadeAmount)
+        {
+            if (fadeAmount <= 0f) return 0f;
+            float mid = Effective(StatType.MidRange, 5f);
+            return fadeMaxPenalty * fadeAmount * (1f - Mathf.Clamp01((mid - 1f) / 9f));
+        }
+
+        /// <summary>How much of the requested fade actually comes out, given the
+        /// momentum carried into the jump: leaning <b>with</b> your run direction
+        /// keeps the full fade, leaning <b>against</b> it (at speed) collapses
+        /// toward <see cref="fadeAgainstMomentumMin"/>. Standing still, you fade
+        /// freely either way.</summary>
+        float MomentumFadeScale(Vector3 fadeDir)
+        {
+            float sp = _launchVel.magnitude;
+            if (sp < 0.5f) return 1f; // not moving — lean wherever you like
+            float align = Vector3.Dot(fadeDir, _launchVel / sp);          // -1 against … +1 with
+            float withness = (align + 1f) * 0.5f;                          // 0 … 1
+            float scaleAtSpeed = Mathf.Lerp(fadeAgainstMomentumMin, 1f, withness);
+            float speed01 = Mathf.Clamp01(sp / maxMoveSpeed);              // slow runs barely constrain
+            return Mathf.Lerp(1f, scaleAtSpeed, speed01);
+        }
+
         void ReleaseJumpShot()
         {
             _shooting = false;
@@ -652,16 +746,18 @@ namespace MarioBasketball.Gameplay
             float timing = error <= perfectReleaseWindow
                 ? 1f
                 : Mathf.Clamp(1f - (error - perfectReleaseWindow) * timingFalloffPerSec, minTimingMultiplier, 1f);
-            ExecuteShot(timing, _pendingQuickCatch);
+            ExecuteShot(timing, _pendingQuickCatch, _fadeAmount);
         }
 
         /// <summary>
         /// Resolve a shot: block roll first (unaffected by timing or on fire),
         /// then a make roll using <see cref="ShotMath"/> scaled by the release
         /// <paramref name="timingMultiplier"/> (1 = perfect). A quick catch-and-
-        /// shoot three overrides the 3-Point rating to a 10.
+        /// shoot three overrides the 3-Point rating to a 10. A
+        /// <paramref name="fadeAmount"/> (0-1) is a fadeaway: it buys separation
+        /// (lower block + contest) at the cost of a harder shot.
         /// </summary>
-        void ExecuteShot(float timingMultiplier, bool quickCatch)
+        void ExecuteShot(float timingMultiplier, bool quickCatch, float fadeAmount = 0f)
         {
             if (!HasBall) return;
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
@@ -694,6 +790,7 @@ namespace MarioBasketball.Gameplay
                     float closeness = 1f - dd / contestRange;
                     float blk = defender.EffectiveStat(StatType.Blocks);
                     float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - shotStatValue), 0f, blockMaxChance) * closeness;
+                    chance *= 1f - fadeBlockReduction * fadeAmount; // fading away from the contest
                     if (Random.value < chance)
                     {
                         Vector3 away = transform.position - aim; away.y = 0f;
@@ -705,7 +802,9 @@ namespace MarioBasketball.Gameplay
             }
 
             bool onFire = _character != null && _character.OnFire;
-            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, shotStatValue) * timingMultiplier;
+            float contestScale = 1f - fadeContestReduction * fadeAmount;
+            float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, shotStatValue, contestScale) * timingMultiplier;
+            makeChance -= FadePenalty(fadeAmount); // a fadeaway is a tougher shot
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);
@@ -949,6 +1048,79 @@ namespace MarioBasketball.Gameplay
             }
         }
 
+        /// <summary>A right-stick flick — a hard dribble in that direction to
+        /// create separation. Read relative to the basket: away = step-back,
+        /// toward = attacking burst, sideways = crossover (and two quick opposite
+        /// sideways flicks chain into a hesitation cross, the big ankle-breaker).
+        /// In the post it's a shimmy (<see cref="PostUpController.Shimmy"/>).
+        /// Layers on top of the dribble-move button, it doesn't replace it.</summary>
+        void OnDribbleFlick(Vector2 stick)
+        {
+            if (MatchPause.IsPaused || IsStunned || !HasBall || _shooting || _finishing) return;
+            if (_flickCooldown > 0f || !_cc.isGrounded) return;
+            Vector3 dir = new Vector3(stick.x, 0f, stick.y);
+            if (dir.sqrMagnitude < 0.01f) return;
+            dir.Normalize();
+            _flickCooldown = flickCooldownTime;
+
+            var ball = Ball;
+            if (IsPosting)
+            {
+                _post.Shimmy(dir);
+                if (ball != null) ball.Crossover();
+                return;
+            }
+
+            // Read the flick relative to the basket.
+            Vector3 toBasket = RimDirection();
+            toBasket = toBasket.sqrMagnitude > 0.01f ? toBasket.normalized : transform.forward;
+            float dot = Vector3.Dot(dir, toBasket);
+
+            bool stepBack = dot <= -0.5f;
+            bool attack = dot >= 0.5f;
+            bool hesitationCross = false;
+            if (!stepBack && !attack)
+            {
+                // Lateral: opposite flicks in quick succession = hesitation cross.
+                float side = Mathf.Sign(Vector3.Cross(toBasket, dir).y);
+                hesitationCross = Time.time - _lastLateralFlickTime <= hesitationWindow
+                                  && side != _lastLateralFlickSign && _lastLateralFlickSign != 0f;
+                _lastLateralFlickTime = Time.time;
+                _lastLateralFlickSign = side;
+            }
+
+            // The dribble itself always happens: a burst in the flick direction.
+            ApplyShove(dir * (stepBack ? stepBackPower : flickBurstPower));
+            _dribbleBoostTimer = attack || hesitationCross ? dribbleBoostTime : dribbleBoostTime * 0.5f;
+            if (ball != null) ball.Crossover();
+            // A step-back squares you to the hoop for the shot; otherwise face the move.
+            transform.rotation = Quaternion.LookRotation(stepBack ? toBasket : dir, Vector3.up);
+
+            // Whether it shakes the defender is Ball Handling vs Perimeter Defense.
+            var def = NearestOpponentTo(transform.position);
+            if (def == null || HorizontalDistance(transform.position, def.transform.position) > dribbleRange) return;
+
+            float bh = Effective(StatType.BallHandling, 5f);
+            float pd = def.EffectiveStat(StatType.PerimeterDefense);
+            float chance = Mathf.Clamp(dribbleBaseChance + dribbleStatScale * (bh - pd), 0.05f, 0.95f);
+            if (Random.value < chance)
+            {
+                // The hesitation cross is the highlight move — full broken ankles.
+                if (hesitationCross) def.Stun(ankleStun, fall: true);
+                else def.Stun(flickFreeze);
+            }
+            else
+            {
+                // Exposed the ball on the move — a good defender can poke it free.
+                float strip = Mathf.Clamp(0.04f + 0.03f * (pd - bh), 0f, 0.3f);
+                if (Random.value < strip && GameManager.Instance != null && GameManager.Instance.ball != null)
+                {
+                    GameManager.Instance.ball.PickUp(def);
+                    GameManager.Instance.OnPossessionGained(def);
+                }
+            }
+        }
+
         public void TriggerBackDown()
         {
             if (MatchPause.IsPaused || IsStunned) return;
@@ -1006,9 +1178,17 @@ namespace MarioBasketball.Gameplay
             }
         }
 
-        void TriggerHook() => TriggerPostMove(PostMove.Hook);
-        void TriggerDropStep() => TriggerPostMove(PostMove.DropStep);
-        void TriggerSpin() => TriggerPostMove(PostMove.Spin);
+        // The post buttons are layered: turbo (LT) upgrades each to its advanced
+        // version, and Drop Step pressed while a fake is live is the up-and-under.
+        void TriggerHook() => TriggerPostMove(_sprintIntent ? PostMove.SkyHook : PostMove.Hook);
+
+        void TriggerDropStep()
+        {
+            if (IsPosting && _post.FakeActive) { TriggerPostMove(PostMove.UpAndUnder); return; }
+            TriggerPostMove(_sprintIntent ? PostMove.PowerDropStep : PostMove.DropStep);
+        }
+
+        void TriggerSpin() => TriggerPostMove(_sprintIntent ? PostMove.TurnaroundJumper : PostMove.Spin);
 
         // L1: air-adjust while finishing, otherwise the post fake.
         void TriggerFake()

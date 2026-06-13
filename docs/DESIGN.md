@@ -166,6 +166,49 @@ shot, e.g. adjust a layup/dunk) · Push/Foul · Post up · Post move (contextual
 buttons while posted) · Defensive stance · Bring up teammate icons · Speed
 burst · Dribble move · Timeout.
 
+### Fadeaway / leaning jump shots
+On a jump shot, the **move stick** shapes the jump. Hold it in a direction
+and the shooter **fades that way** — the body leans and drifts off the
+square-up while staying faced to the rim; let go and they rise **straight up**
+for a normal shot. A fadeaway is a trade: the separation **lowers the
+defender's block and contest** (scaled by how hard you fade), but it's a
+**harder shot** — a make penalty mitigated by **Mid Range** (fully gone at
+Mid Range 10). Inside finishes (dunks/layups) are unaffected; this is the
+jump-shot game.
+
+**Momentum matters.** The fade you actually get depends on the direction you
+were already running. Leaning **with** your momentum gives the full lean;
+leaning **against** it — e.g. driving left and trying to plant and fade right
+at the last second — barely leans at all, and the faster you were going, the
+harder it is to reverse. From a standstill you can fade freely either way.
+
+### Right-stick dribble flicks
+With the ball, **flicking the right stick** (a sharp push that returns to
+neutral — distinct from holding it to aim a pass) is a **hard dribble in that
+direction**, used to create separation. The move is read relative to the
+basket — Ball Handling vs Perimeter Defense decides whether the defender is
+shaken (a botched move can be stripped):
+- **Away from the basket** → **step-back**: burst backward and square up for
+  the shot.
+- **Toward the basket** → **quick first-step burst** to attack.
+- **Sideways** → **crossover**; two quick **opposite** sideways flicks chain
+  into a **hesitation cross**, the full ankle-breaker (defender hits the deck).
+- **While posting** → a **shimmy** hop for post separation (toward the hoop it
+  also gains a little back-down leverage).
+This layers on top of the dribble-move button; it does not replace it.
+
+### Post moves (buttons while posted)
+Base: **Hook** (Y) · **Drop Step** (A) · **Spin** (B) · **Fake** (LB). Holding
+**turbo (LT)** upgrades each to its advanced version, and chaining off a fake
+unlocks the step-through:
+- **Sky Hook** (LT+Y): released too high to ever be blocked, but a tougher make.
+- **Power Drop Step** (LT+A): a Power-driven bulldoze that shoves (or flattens)
+  the defender on the way to the rim.
+- **Turnaround Jumper** (LT+B): face up and fade — scored off **Mid Range**;
+  the fade nearly kills the block.
+- **Up & Under** (A while a bitten fake is live): step through under the
+  airborne defender for a nearly free finish.
+
 > **Controller-first.** The prototype uses a contextual gamepad layout (face
 > buttons are shot/pass on offense and post moves while posting; D-pad handles
 > timeout/sub), with keyboard fallbacks. Not yet wired: double-tap mid-air shot
@@ -354,7 +397,9 @@ Lineups are chosen on the pre-match **team select** screen (see below).
 - [ ] Local multiplayer device assignment via `Controls.inputactions`.
 - [ ] Post-up polish: animations, distinct move feel, jump-to-contest timing.
 - [ ] Rebound catch-radius contests (Rebounds stat); steals/blocks polish.
-- [ ] Dribble moves, speed burst as distinct mechanic, defensive stance.
+- [ ] Speed burst as distinct mechanic, defensive stance. (Dribble moves are
+      in: the B-button move plus right-stick flicks — step-back, burst,
+      crossover, hesitation cross, post shimmy.)
 - [ ] Passing: tap-loft vs hold-hard, teammate icon targeting.
 - [ ] Dunks/alley-oops, mid-air shot adjust (double-tap), tricks + gamebreakers.
 - [ ] Hidden-trait effects (e.g. catch-and-shoot penalty off the dribble).

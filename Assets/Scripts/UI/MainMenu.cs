@@ -4,15 +4,18 @@ namespace MarioBasketball.UI
 {
     /// <summary>
     /// The game's start menu (IMGUI). Routes to an Exhibition game (the existing
-    /// <see cref="TeamSelectMenu"/>) or to Create-a-Player, which offers a
-    /// Journey character (limited stats, earns more in story mode) or a Standard
-    /// player (unlimited stats, exhibition only) with an info box per option.
-    /// One menu is enabled at a time; this component enables the others.
+    /// <see cref="TeamSelectMenu"/>), Create-a-Player (Journey character with
+    /// limited stats vs Standard with unlimited stats, info box per option) or
+    /// <see cref="SettingsMenu"/>. Controller-first: d-pad / stick moves a
+    /// flashing yellow selection outline, A confirms, B backs out; the mouse
+    /// still works. One menu is enabled at a time; this component enables the
+    /// others.
     /// </summary>
     public class MainMenu : MonoBehaviour
     {
         public TeamSelectMenu teamSelect;
         public CreatePlayerMenu createPlayer;
+        public SettingsMenu settings;
 
         const string JourneyInfo =
             "create journey player with limited stats. More stats can be earned " +
@@ -23,16 +26,69 @@ namespace MarioBasketball.UI
 
         enum Page { Main, CreateSelect }
         Page _page = Page.Main;
+        int _sel;
+        MenuNav _nav;
 
         GUIStyle _title;
         GUIStyle _button;
         GUIStyle _info;
 
+        // Main page entries (Journey story mode is shown but not selectable yet).
+        static readonly string[] MainItems = { "Exhibition Game", "Create a Player", "Settings", "Quit" };
+        static readonly string[] CreateItems = { "Create Journey Character", "Create Standard Player", "Back" };
+
         /// <summary>Bring the menu back up at the top level.</summary>
         public void Show()
         {
             _page = Page.Main;
+            _sel = 0;
             enabled = true;
+        }
+
+        void OnEnable()
+        {
+            _nav = new MenuNav();
+            _nav.Enable();
+        }
+
+        void OnDisable()
+        {
+            _nav?.Disable();
+            _nav = null;
+        }
+
+        void Update()
+        {
+            _nav.Tick();
+            int count = _page == Page.Main ? MainItems.Length : CreateItems.Length;
+            if (_nav.Step.y != 0)
+                _sel = (_sel - _nav.Step.y + count) % count;
+
+            if (_nav.Submit) Activate(_sel);
+            else if (_nav.East && _page == Page.CreateSelect) { _page = Page.Main; _sel = 1; }
+        }
+
+        void Activate(int index)
+        {
+            if (_page == Page.Main)
+            {
+                switch (index)
+                {
+                    case 0: StartExhibition(); break;
+                    case 1: _page = Page.CreateSelect; _sel = 0; break;
+                    case 2: OpenSettings(); break;
+                    case 3: Application.Quit(); break;
+                }
+            }
+            else
+            {
+                switch (index)
+                {
+                    case 0: OpenEditor(journey: true); break;
+                    case 1: OpenEditor(journey: false); break;
+                    case 2: _page = Page.Main; _sel = 1; break;
+                }
+            }
         }
 
         void OnGUI()
@@ -50,26 +106,34 @@ namespace MarioBasketball.UI
 
         void DrawMain()
         {
-            float w = 420f, h = 360f;
+            float w = 420f, h = 420f;
             var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Space(10);
-            GUILayout.Label("MARIO STREET BASKETBALL", _title);
-            GUILayout.Space(18);
+            GUI.Box(area, GUIContent.none);
+            GUI.Label(new Rect(area.x, area.y + 14, area.width, 36), "MARIO STREET BASKETBALL", _title);
 
-            if (GUILayout.Button("Exhibition Game", _button, GUILayout.Height(48)))
-                StartExhibition();
-            if (GUILayout.Button("Create a Player", _button, GUILayout.Height(48)))
-                _page = Page.CreateSelect;
+            // Selectable entries, with the disabled Journey teaser between
+            // Settings and Quit (it doesn't take the selection cursor).
+            var rects = new Rect[MainItems.Length];
+            float y = area.y + 70;
+            for (int i = 0; i < MainItems.Length; i++)
+            {
+                bool beforeQuit = i == MainItems.Length - 1;
+                if (beforeQuit)
+                {
+                    GUI.enabled = false;
+                    GUI.Button(new Rect(area.x + 30, y, w - 60, 48), "Journey (Story Mode) — coming soon", _button);
+                    GUI.enabled = true;
+                    y += 58;
+                }
+                rects[i] = new Rect(area.x + 30, y, w - 60, 48);
+                y += 58;
+            }
 
-            GUI.enabled = false;
-            GUILayout.Button("Journey (Story Mode) — coming soon", _button, GUILayout.Height(48));
-            GUI.enabled = true;
-
-            if (GUILayout.Button("Quit", _button, GUILayout.Height(40)))
-                Application.Quit();
-
-            GUILayout.EndArea();
+            for (int i = 0; i < MainItems.Length; i++)
+            {
+                if (_sel == i) MenuNav.DrawSelection(rects[i]);
+                if (GUI.Button(rects[i], MainItems[i], _button)) { _sel = i; Activate(i); }
+            }
         }
 
         void DrawCreateSelect()
@@ -85,26 +149,38 @@ namespace MarioBasketball.UI
             var infoRect = new Rect(area.x + 30, area.y + 210, area.width - 60, 150);
             var backRect = new Rect(area.x + 30, area.y + h - 60, area.width - 60, 42);
 
+            // Hovering with the mouse moves the selection too.
             Vector2 mouse = Event.current.mousePosition;
-            bool journeyHover = journeyRect.Contains(mouse);
-            bool standardHover = standardRect.Contains(mouse);
+            if (journeyRect.Contains(mouse)) _sel = 0;
+            else if (standardRect.Contains(mouse)) _sel = 1;
 
-            if (GUI.Button(journeyRect, "Create Journey Character", _button)) OpenEditor(journey: true);
-            if (GUI.Button(standardRect, "Create Standard Player", _button)) OpenEditor(journey: false);
+            if (_sel == 0) MenuNav.DrawSelection(journeyRect);
+            if (_sel == 1) MenuNav.DrawSelection(standardRect);
+            if (_sel == 2) MenuNav.DrawSelection(backRect);
 
-            string info = journeyHover ? JourneyInfo
-                        : standardHover ? StandardInfo
+            if (GUI.Button(journeyRect, CreateItems[0], _button)) OpenEditor(journey: true);
+            if (GUI.Button(standardRect, CreateItems[1], _button)) OpenEditor(journey: false);
+
+            string info = _sel == 0 ? JourneyInfo
+                        : _sel == 1 ? StandardInfo
                         : "Highlight an option to see what it does.";
             GUI.Box(infoRect, GUIContent.none);
             GUI.Label(new Rect(infoRect.x + 10, infoRect.y + 8, infoRect.width - 20, infoRect.height - 16), info, _info);
 
-            if (GUI.Button(backRect, "Back", _button)) _page = Page.Main;
+            if (GUI.Button(backRect, "Back", _button)) { _page = Page.Main; _sel = 1; }
         }
 
         void StartExhibition()
         {
             enabled = false;
             if (teamSelect != null) teamSelect.enabled = true;
+        }
+
+        void OpenSettings()
+        {
+            if (settings == null) return;
+            enabled = false;
+            settings.Open(Show);
         }
 
         void OpenEditor(bool journey)

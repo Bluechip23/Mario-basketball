@@ -296,8 +296,10 @@ Hidden traits (wired):
   the floor or holding it too long). He still gets only the same fade
   *separation* everyone does; he just skips the difficulty.
 - **Daisy — Killer Instinct**: a closer who feeds on tired legs. As the opposing
-  on-court team's energy drains, a flat bonus (up to `killerMaxBonus`) is added
-  to **every** one of her effective stats — run them ragged and she takes over.
+  on-court team's energy drains, a bonus (up to `killerMaxBonus`) is added to her
+  **Mid Range, 3-Point, Inside Scoring and Perimeter Defense** only — run them
+  ragged and her scoring touch and on-ball D take over. Only **Mid Range** can be
+  lifted past 10 (it caps at **11**); the other three cap at 10.
 - **Jonah Guy — Energizer**: glue guy. Whenever he scores **off a teammate's
   assist** or **assists a teammate's score**, that teammate gets a small stamina
   boost (`assistEnergyBonus`).

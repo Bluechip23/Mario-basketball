@@ -71,7 +71,7 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float acrobatTimingRelief = 0.8f;
 
         [Header("Hidden traits")]
-        [Tooltip("Killer Instinct (Daisy): flat bonus to every stat at full opponent fatigue.")]
+        [Tooltip("Killer Instinct (Daisy): bonus to Mid/3PT/Inside/Perimeter-D at full opponent fatigue (Mid can reach 11, the rest cap at 10).")]
         public float killerMaxBonus = 4f;
         [Tooltip("Killer Instinct: opponent fatigue below this fraction gives no bonus (fresh legs).")]
         [Range(0f, 1f)] public float killerFatigueFloor = 0.1f;
@@ -711,7 +711,7 @@ namespace MarioBasketball.Gameplay
             // Dunk scores off Dunk, layup off Inside Scoring; +2 off a Playmaker pass.
             StatType scoreStat = isDunk ? StatType.Dunk : StatType.InsideScoring;
             int rawFinish = (_character != null ? _character.stats.Get(scoreStat) : 5) + AssistBonus();
-            float finisherStat = _character != null ? _character.GetEffectiveFor(rawFinish) : 5f;
+            float finisherStat = _character != null ? _character.GetEffectiveForStat(rawFinish, scoreStat) : 5f;
             PlayerController defender = NearestOpponentTo(transform.position);
 
             if (defender != null)
@@ -754,14 +754,15 @@ namespace MarioBasketball.Gameplay
         public float TimingWithTrait(float timing)
             => HasTrait(HiddenTrait.Acrobat) ? 1f - (1f - timing) * (1f - acrobatTimingRelief) : timing;
 
-        /// <summary>Killer Instinct (Daisy): refresh the flat stat bonus from how
-        /// gassed the opposing on-court team is — fresh legs give nothing, dead
-        /// legs give the full <see cref="killerMaxBonus"/> across every stat.</summary>
+        /// <summary>Killer Instinct (Daisy): refresh the bonus from how gassed the
+        /// opposing on-court team is — fresh legs give nothing, dead legs give the
+        /// full <see cref="killerMaxBonus"/>. It only lands on her scoring and
+        /// perimeter-defense stats (see <c>PlayerCharacter.KillerBonusForStat</c>).</summary>
         void UpdateKillerInstinct()
         {
             if (_character == null || !HasTrait(HiddenTrait.KillerInstinct)) return;
             var gm = GameManager.Instance;
-            if (gm == null) { _character.TraitStatBonus = 0f; return; }
+            if (gm == null) { _character.KillerBonus = 0f; return; }
 
             float sum = 0f; int n = 0;
             foreach (var o in gm.TeamFor(GameManager.Opponent(team)).onCourt)
@@ -772,7 +773,7 @@ namespace MarioBasketball.Gameplay
             }
             float fatigue = n > 0 ? sum / n : 0f;
             float scaled = Mathf.Clamp01((fatigue - killerFatigueFloor) / Mathf.Max(0.01f, 1f - killerFatigueFloor));
-            _character.TraitStatBonus = killerMaxBonus * scaled;
+            _character.KillerBonus = killerMaxBonus * scaled;
         }
 
         /// <summary>Called Shot (Delfan): double-tapping turbo while one of his
@@ -855,7 +856,7 @@ namespace MarioBasketball.Gameplay
             int rawStat = _character != null ? _character.stats.Get(shotStat) : 5;
             if (quickCatch && shotStat == StatType.ThreePoint) rawStat = 10;
             rawStat += AssistBonus();
-            float shotStatValue = _character != null ? _character.GetEffectiveFor(rawStat) : 5f;
+            float shotStatValue = _character != null ? _character.GetEffectiveForStat(rawStat, shotStat) : 5f;
 
             // Block check first — unaffected by timing or being on fire.
             if (defender != null)

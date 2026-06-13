@@ -52,11 +52,11 @@ namespace MarioBasketball.Characters
         public float EnergyFraction => maxEnergy > 0f ? energy / maxEnergy : 0f;
         public bool OnFire { get; private set; }
 
-        /// <summary>A flat bonus a hidden trait adds to every effective stat,
-        /// refreshed by the owning controller each frame (0 for everyone else).
-        /// Used by Daisy's Killer Instinct, which scales it with how gassed the
-        /// opponents are.</summary>
-        public float TraitStatBonus { get; set; }
+        /// <summary>Daisy's Killer Instinct bonus: a flat boost the owning
+        /// controller refreshes each frame, scaled by how gassed the opponents
+        /// are (0 for everyone else). It only sharpens her scoring touch and
+        /// on-ball defence — see <see cref="KillerBonusForStat"/>.</summary>
+        public float KillerBonus { get; set; }
 
         // Heat-check streak state, driven by GameManager:
         /// <summary>This player's consecutive made shots (broken by a miss or a
@@ -128,17 +128,49 @@ namespace MarioBasketball.Characters
             OnFire ? Mathf.Max(EnergyFraction, onFireEffectivenessFloor) : EnergyFraction;
 
         /// <summary>
-        /// The in-game value of a stat after stamina scaling and the on-fire
-        /// bonus. This is what gameplay systems should consume.
+        /// The in-game value of a stat after stamina scaling, the on-fire bonus,
+        /// and any Killer Instinct boost. This is what gameplay systems consume.
         /// </summary>
-        public float GetEffective(StatType stat) => GetEffectiveFor(stats.Get(stat));
+        public float GetEffective(StatType stat) => GetEffectiveForStat(stats.Get(stat), stat);
 
         /// <summary>Apply the same stamina + on-fire scaling to an arbitrary base
-        /// rating (used by traits that override a stat, e.g. quick catch-and-shoot).</summary>
+        /// rating with no trait boost — used by traits that override a stat
+        /// (quick catch-and-shoot, offensive rebound, smooth passer).</summary>
         public float GetEffectiveFor(float rawStat)
         {
-            float value = rawStat * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f) + TraitStatBonus;
-            return Mathf.Clamp(value, 0f, CharacterStats.Max + onFireStatBonus + TraitStatBonus);
+            float value = rawStat * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f);
+            return Mathf.Clamp(value, 0f, CharacterStats.Max + onFireStatBonus);
+        }
+
+        /// <summary>Scale a raw rating for a specific stat, folding in Daisy's
+        /// Killer Instinct boost where it applies. Only Mid Range may be lifted
+        /// past 10 (it caps at 11); the other boosted stats cap at 10.</summary>
+        public float GetEffectiveForStat(float rawRating, StatType stat)
+        {
+            rawRating += KillerBonusForStat(stat);
+            float ceiling = stat == StatType.MidRange ? 11f : CharacterStats.Max; // only Mid breaks 10
+            rawRating = Mathf.Min(rawRating, ceiling);
+            float value = rawRating * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f);
+            return Mathf.Clamp(value, 0f, ceiling + onFireStatBonus);
+        }
+
+        /// <summary>Daisy's Killer Instinct only sharpens her shot-making (Mid
+        /// Range, 3-Point, Inside Scoring) and her on-ball defence (Perimeter
+        /// Defense); every other stat is untouched.</summary>
+        float KillerBonusForStat(StatType stat)
+        {
+            if (KillerBonus <= 0f || stats == null || stats.hiddenTrait != HiddenTrait.KillerInstinct)
+                return 0f;
+            switch (stat)
+            {
+                case StatType.MidRange:
+                case StatType.ThreePoint:
+                case StatType.InsideScoring:
+                case StatType.PerimeterDefense:
+                    return KillerBonus;
+                default:
+                    return 0f;
+            }
         }
 
         public void SetOnFire(bool value) => OnFire = value;

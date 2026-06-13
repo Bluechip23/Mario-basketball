@@ -79,6 +79,8 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float fadeContestReduction = 0.7f;
         [Tooltip("Max make% lost to a full fadeaway — it's a harder shot, fully mitigated at Mid Range 10.")]
         [Range(0f, 1f)] public float fadeMaxPenalty = 0.22f;
+        [Tooltip("Fade multiplier when leaning fully AGAINST your run direction at top speed (leaning WITH your momentum stays full). Lower = momentum matters more; 1 disables the asymmetry.")]
+        [Range(0f, 1f)] public float fadeAgainstMomentumMin = 0.25f;
 
         [Header("Inside finishing (dunk / layup)")]
         [Tooltip("Time in the air before an unheld finish auto-resolves.")]
@@ -249,6 +251,8 @@ namespace MarioBasketball.Gameplay
         float _apexTime;
         Vector3 _fadeDir;
         float _fadeAmount;
+        Vector3 _lastRunVelocity;
+        Vector3 _launchVel;
         bool _pendingQuickCatch;
         bool _hadBall;
         float _catchTime = -10f;
@@ -504,6 +508,10 @@ namespace MarioBasketball.Gameplay
                 if (_fadeAmount > 0.05f)
                 {
                     _fadeDir = fade.normalized;
+                    // Fading with your momentum is easy; against it (planting the
+                    // wrong way at the last second) barely leans — and the faster
+                    // you were going, the harder it is to reverse.
+                    _fadeAmount *= MomentumFadeScale(_fadeDir);
                     horizontal = _fadeDir * fadeSpeed * _fadeAmount;
                 }
                 else
@@ -528,6 +536,7 @@ namespace MarioBasketball.Gameplay
                 _character?.ReportActivity(dir.sqrMagnitude > 0.01f, sprinting);
 
                 horizontal = dir * speed;
+                _lastRunVelocity = horizontal; // momentum carried into a fadeaway
                 rotateToMove = dir.sqrMagnitude > 0.01f;
                 faceDir = dir;
             }
@@ -606,6 +615,7 @@ namespace MarioBasketball.Gameplay
             _shotCharge = 0f;
             _fadeDir = Vector3.zero;
             _fadeAmount = 0f;
+            _launchVel = _lastRunVelocity; // the momentum you take into the jump
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // jump
         }
 
@@ -711,6 +721,22 @@ namespace MarioBasketball.Gameplay
             if (fadeAmount <= 0f) return 0f;
             float mid = Effective(StatType.MidRange, 5f);
             return fadeMaxPenalty * fadeAmount * (1f - Mathf.Clamp01((mid - 1f) / 9f));
+        }
+
+        /// <summary>How much of the requested fade actually comes out, given the
+        /// momentum carried into the jump: leaning <b>with</b> your run direction
+        /// keeps the full fade, leaning <b>against</b> it (at speed) collapses
+        /// toward <see cref="fadeAgainstMomentumMin"/>. Standing still, you fade
+        /// freely either way.</summary>
+        float MomentumFadeScale(Vector3 fadeDir)
+        {
+            float sp = _launchVel.magnitude;
+            if (sp < 0.5f) return 1f; // not moving — lean wherever you like
+            float align = Vector3.Dot(fadeDir, _launchVel / sp);          // -1 against … +1 with
+            float withness = (align + 1f) * 0.5f;                          // 0 … 1
+            float scaleAtSpeed = Mathf.Lerp(fadeAgainstMomentumMin, 1f, withness);
+            float speed01 = Mathf.Clamp01(sp / maxMoveSpeed);              // slow runs barely constrain
+            return Mathf.Lerp(1f, scaleAtSpeed, speed01);
         }
 
         void ReleaseJumpShot()

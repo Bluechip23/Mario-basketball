@@ -176,6 +176,12 @@ defender's block and contest** (scaled by how hard you fade), but it's a
 Mid Range 10). Inside finishes (dunks/layups) are unaffected; this is the
 jump-shot game.
 
+**Momentum matters.** The fade you actually get depends on the direction you
+were already running. Leaning **with** your momentum gives the full lean;
+leaning **against** it — e.g. driving left and trying to plant and fade right
+at the last second — barely leans at all, and the faster you were going, the
+harder it is to reverse. From a standstill you can fade freely either way.
+
 ### Right-stick dribble flicks
 With the ball, **flicking the right stick** (a sharp push that returns to
 neutral — distinct from holding it to aim a pass) is a **hard dribble in that

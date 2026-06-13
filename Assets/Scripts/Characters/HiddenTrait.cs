@@ -50,6 +50,16 @@ namespace MarioBasketball.Characters
         /// (within ~1 s of the catch, before dribbling) gets +2 to the scoring
         /// attribute they use (Koopa).
         /// </summary>
-        Playmaker
+        Playmaker,
+
+        /// <summary>
+        /// Acrobat: improvises shots with no cost. Pays <b>no</b> make penalty
+        /// for altering a shot in mid-air (a fadeaway lean, or the L1 air-adjust
+        /// on a dunk/layup), and suffers ~80% less from shot mistiming (firing
+        /// the instant he goes up, or holding the release too long). The fade
+        /// still buys him the same separation everyone gets — he just doesn't eat
+        /// the difficulty. See <c>ShotMath</c> / <c>PlayerController</c> (Baby Mario).
+        /// </summary>
+        Acrobat
     }
 }

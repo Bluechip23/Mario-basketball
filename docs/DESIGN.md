@@ -172,9 +172,10 @@ and the shooter **fades that way** — the body leans and drifts off the
 square-up while staying faced to the rim; let go and they rise **straight up**
 for a normal shot. A fadeaway is a trade: the separation **lowers the
 defender's block and contest** (scaled by how hard you fade), but it's a
-**harder shot** — a make penalty mitigated by **Mid Range** (fully gone at
-Mid Range 10). Inside finishes (dunks/layups) are unaffected; this is the
-jump-shot game.
+**harder shot** — a **flat make penalty** (`ShotMath.FadeMakePenalty`, scaled
+by how hard you fade) that is **the same for every shooter**; no stat softens
+it. The lone exception is the **Acrobat** trait (Baby Mario), who pays nothing.
+Inside finishes (dunks/layups) are unaffected; this is the jump-shot game.
 
 **Momentum matters.** The fade you actually get depends on the direction you
 were already running. Leaning **with** your momentum gives the full lean;
@@ -279,7 +280,12 @@ Hidden traits (wired):
   out of a post-up), despite his real 6.
 - **Koopa — Playmaker**: a teammate who shoots/dunks **directly off his pass**
   (within ~1 s, before driving/dribbling) gets **+2** to the scoring attribute
-  they use. Everyone else `None`.
+  they use.
+- **Baby Mario — Acrobat**: pays **no** make penalty for altering a shot in the
+  air — neither the fadeaway lean nor the L1 air-adjust on a dunk/layup — and
+  suffers **~80% less** from a mistimed release (firing the instant he leaves
+  the floor or holding it too long). He still gets only the same fade
+  *separation* everyone does; he just skips the difficulty. Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 

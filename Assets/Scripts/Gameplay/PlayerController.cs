@@ -67,6 +67,8 @@ namespace MarioBasketball.Gameplay
         public float quickCatchWindow = 0.3f;
         [Tooltip("Window to shoot off a Playmaker's pass for the +2 assist bonus.")]
         public float assistWindow = 1.0f;
+        [Tooltip("Acrobat trait (Baby Mario): fraction of the shot-mistiming penalty he ignores — 0.8 = suffers 80% less from early/late releases.")]
+        [Range(0f, 1f)] public float acrobatTimingRelief = 0.8f;
         [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
         public float dribbleMoveThreshold = 0.6f;
 
@@ -77,8 +79,6 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float fadeBlockReduction = 0.6f;
         [Tooltip("Fraction of the defender's contest make-penalty removed at a full fade.")]
         [Range(0f, 1f)] public float fadeContestReduction = 0.7f;
-        [Tooltip("Max make% lost to a full fadeaway — it's a harder shot, fully mitigated at Mid Range 10.")]
-        [Range(0f, 1f)] public float fadeMaxPenalty = 0.22f;
         [Tooltip("Fade multiplier when leaning fully AGAINST your run direction at top speed (leaning WITH your momentum stays full). Lower = momentum matters more; 1 disables the asymmetry.")]
         [Range(0f, 1f)] public float fadeAgainstMomentumMin = 0.25f;
 
@@ -706,21 +706,17 @@ namespace MarioBasketball.Gameplay
             Ball.Shoot(aim, team, 2, finishFlightTime, ShotMath.AimOffset(make), this);
         }
 
-        /// <summary>Make% lost to an air-adjust — fully mitigated at Inside 10.</summary>
+        /// <summary>True if this player has the given hidden trait.</summary>
+        bool HasTrait(HiddenTrait trait)
+            => _character != null && _character.stats != null && _character.stats.hiddenTrait == trait;
+
+        /// <summary>Make% lost to an air-adjust — fully mitigated at Inside 10,
+        /// and waived entirely for an Acrobat (Baby Mario alters in the air free).</summary>
         float AdjustPenalty()
         {
+            if (HasTrait(HiddenTrait.Acrobat)) return 0f;
             float inside = Effective(StatType.InsideScoring, 5f);
             return maxAdjustPenalty * (1f - Mathf.Clamp01((inside - 1f) / 9f));
-        }
-
-        /// <summary>Make% lost to a fadeaway, scaled by how hard it faded — the
-        /// better the shooter's Mid Range, the smaller the hit (fully mitigated
-        /// at Mid Range 10).</summary>
-        float FadePenalty(float fadeAmount)
-        {
-            if (fadeAmount <= 0f) return 0f;
-            float mid = Effective(StatType.MidRange, 5f);
-            return fadeMaxPenalty * fadeAmount * (1f - Mathf.Clamp01((mid - 1f) / 9f));
         }
 
         /// <summary>How much of the requested fade actually comes out, given the
@@ -746,6 +742,8 @@ namespace MarioBasketball.Gameplay
             float timing = error <= perfectReleaseWindow
                 ? 1f
                 : Mathf.Clamp(1f - (error - perfectReleaseWindow) * timingFalloffPerSec, minTimingMultiplier, 1f);
+            // The Acrobat (Baby Mario) shrugs off most of a mistimed release.
+            if (HasTrait(HiddenTrait.Acrobat)) timing = 1f - (1f - timing) * (1f - acrobatTimingRelief);
             ExecuteShot(timing, _pendingQuickCatch, _fadeAmount);
         }
 
@@ -804,7 +802,7 @@ namespace MarioBasketball.Gameplay
             bool onFire = _character != null && _character.OnFire;
             float contestScale = 1f - fadeContestReduction * fadeAmount;
             float makeChance = ShotMath.MakeChance(this, shotStat, distance, defender, onFire, shotStatValue, contestScale) * timingMultiplier;
-            makeChance -= FadePenalty(fadeAmount); // a fadeaway is a tougher shot
+            makeChance -= ShotMath.FadePenalty(this, fadeAmount); // flat fadeaway difficulty (0 for an Acrobat)
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, points, shotFlightTime, ShotMath.AimOffset(make), this);

@@ -116,7 +116,7 @@ namespace MarioBasketball.Characters
         {
             characterName = "Baby Mario",
             speed = 7, ballHandling = 8, threePoint = 3, midRange = 6, insideScoring = 8, postOffense = 8, dunk = 2, power = 5, rebounds = 3, blocks = 3, steals = 4, postDefense = 2, perimeterDefense = 6, stamina = 8,
-            hiddenTrait = HiddenTrait.None, heightMeters = 1.15f,
+            hiddenTrait = HiddenTrait.Acrobat, heightMeters = 1.15f,
             archetype = PlayerArchetype.Guard,
             description = "All of the captain's craft in a knee-high package, with a shockingly grown-up post game for a baby."
         };

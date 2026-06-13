@@ -32,6 +32,12 @@ namespace MarioBasketball.Gameplay
         public static float ContestRange = 3f;
         public static float ContestMaxPenalty = 0.35f;
 
+        /// <summary>Make% a full-strength fadeaway costs. Flat — the same for
+        /// every shooter, regardless of stats (an Acrobat is the lone exception:
+        /// he pays nothing). A fadeaway separately eases the block/contest in
+        /// <c>PlayerController</c>; this is the difficulty side of that trade.</summary>
+        public static float FadeMakePenalty = 0.18f;
+
         // Distance falloff per foot, beyond a grace zone (feet), from the zone's near edge.
         public static float ThreePerFoot = 0.04f, ThreeGraceFt = 1f;
         public static float MidPerFoot = 0.02f, MidGraceFt = 1f;
@@ -59,6 +65,21 @@ namespace MarioBasketball.Gameplay
             if (onFire) p += OnFireBonus;
             return Mathf.Clamp(p, MinChance, MaxChance);
         }
+
+        /// <summary>Make% a fadeaway subtracts, given how hard it faded (0-1).
+        /// Identical for everyone — no stat softens it — except an
+        /// <see cref="HiddenTrait.Acrobat"/>, who pays nothing for altering his
+        /// shot in the air (Baby Mario).</summary>
+        public static float FadePenalty(PlayerController shooter, float fadeAmount)
+        {
+            if (fadeAmount <= 0f) return 0f;
+            if (IsAcrobat(shooter)) return 0f;
+            return FadeMakePenalty * Mathf.Clamp01(fadeAmount);
+        }
+
+        static bool IsAcrobat(PlayerController shooter)
+            => shooter != null && shooter.Character != null && shooter.Character.stats != null
+               && shooter.Character.stats.hiddenTrait == HiddenTrait.Acrobat;
 
         /// <summary>Make probability for a post move, driven by its quality score.</summary>
         public static float MakeChanceFromQuality(float quality, bool onFire)

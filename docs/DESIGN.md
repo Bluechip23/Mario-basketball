@@ -305,6 +305,10 @@ Hidden traits (wired):
   boost (`assistEnergyBonus`).
 - **Delfan — Called Shot**: twice a game, **double-tap turbo** while one of his
   shots (taken from within half court) is in the air to **guarantee** it drops.
+- **Birdo — Hot Hand**: a rhythm shooter. A whole-game tally ticks +1 per made
+  field goal and −1 per miss; her **3-Point and Mid Range** gain **+1 for every
+  two net makes** (rounded toward zero — so two misses are needed to drop a tier,
+  and it works the same going negative). Those two stats can climb to **11**.
   Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).

@@ -757,7 +757,7 @@ namespace MarioBasketball.Gameplay
         /// <summary>Killer Instinct (Daisy): refresh the bonus from how gassed the
         /// opposing on-court team is — fresh legs give nothing, dead legs give the
         /// full <see cref="killerMaxBonus"/>. It only lands on her scoring and
-        /// perimeter-defense stats (see <c>PlayerCharacter.KillerBonusForStat</c>).</summary>
+        /// perimeter-defense stats (see <c>PlayerCharacter.TraitBonusForStat</c>).</summary>
         void UpdateKillerInstinct()
         {
             if (_character == null || !HasTrait(HiddenTrait.KillerInstinct)) return;

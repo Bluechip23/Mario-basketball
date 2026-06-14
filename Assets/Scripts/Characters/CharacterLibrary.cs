@@ -98,7 +98,7 @@ namespace MarioBasketball.Characters
         {
             characterName = "Birdo",
             speed = 9, ballHandling = 6, threePoint = 8, midRange = 8, insideScoring = 7, postOffense = 4, dunk = 7, power = 6, rebounds = 5, blocks = 5, steals = 4, postDefense = 3, perimeterDefense = 3, stamina = 9,
-            hiddenTrait = HiddenTrait.None, heightMeters = 1.9f,
+            hiddenTrait = HiddenTrait.HotHand, heightMeters = 1.9f,
             archetype = PlayerArchetype.Wing,
             description = "A sprinting flame-thrower — pull-up threes and mid-range daggers in transition, all game long."
         };

@@ -83,6 +83,16 @@ namespace MarioBasketball.Characters
         /// (taken from within half court) is in the air to guarantee it drops.
         /// See <c>PlayerController</c> / <c>BallController.ForceMake</c> (Delfan).
         /// </summary>
-        CalledShot
+        CalledShot,
+
+        /// <summary>
+        /// Hot Hand: a rhythm shooter who rides streaks. A running counter ticks
+        /// up on each make and down on each miss; her <b>3-Point and Mid Range</b>
+        /// gain +1 for every two net makes (truncated toward zero, so it takes two
+        /// misses to drop a tier, and it works the same going negative). Those two
+        /// stats can climb to 11. See <c>PlayerCharacter</c> /
+        /// <c>GameManager</c> (Birdo).
+        /// </summary>
+        HotHand
     }
 }

@@ -275,6 +275,7 @@ namespace MarioBasketball.Core
 
             UpdateStreaksOnMake(scoringTeam, shooter);
             ApplyAssistEnergy(shooter, assister);
+            if (shooter != null && shooter.Character != null) shooter.Character.ShootingRhythm++; // Birdo's Hot Hand
             AddPoints(scoringTeam, points);
 
             // Clock stops; the other team will inbound under the basket.
@@ -307,6 +308,7 @@ namespace MarioBasketball.Core
             if (shooter == null || shooter.Character == null) return;
             shooter.Character.ConsecutiveMakes = 0;
             shooter.Character.OpponentScoredDuringRun = false;
+            shooter.Character.ShootingRhythm--; // Birdo's Hot Hand cools off
         }
 
         /// <summary>

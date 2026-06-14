@@ -86,6 +86,8 @@ namespace MarioBasketball.Presentation
         public float fadeLeanAngle = 24f;
         [Tooltip("A loose/shot ball within this of an airborne player makes them reach for the board (vs hands straight up to contest).")]
         public float reboundReachDistance = 2.6f;
+        [Tooltip("How far the post defender leans their chest into the poster.")]
+        public float postDefendLean = 16f;
 
         PlayerController _pc;
         BallController _ball;
@@ -118,6 +120,9 @@ namespace MarioBasketball.Presentation
             if (_ball == null && MarioBasketball.Core.GameManager.Instance != null)
                 _ball = MarioBasketball.Core.GameManager.Instance.ball;
 
+            // The poster (if any) currently backing this player down on D.
+            PlayerController postingMe = _pc.PostingMeOnD;
+
             // Body tilt: whip around on a spin move, sprawl to the floor when
             // knocked down, or lean into a fadeaway jump shot.
             bool spinMove = _pc.IsDribbleMoveGesture && _pc.CurrentDribbleMove == DribbleMoveType.Spin;
@@ -144,7 +149,18 @@ namespace MarioBasketball.Presentation
                         float amt = _pc.FadeAmount * fadeLeanAngle;
                         want = Quaternion.Euler(local.z * amt, 0f, -local.x * amt);
                     }
-                    else if (!_pc.IsAirborne && !_pc.IsHanging && !_pc.IsSkyingForOop
+                    else if (postingMe != null)
+                    {
+                        // Engaged on the back-down: lean the chest into the poster.
+                        Vector3 toP = postingMe.transform.position - transform.position; toP.y = 0f;
+                        if (toP.sqrMagnitude > 0.01f)
+                        {
+                            Vector3 local = transform.InverseTransformDirection(toP.normalized);
+                            want = Quaternion.Euler(local.z * postDefendLean, 0f, -local.x * postDefendLean * 0.5f);
+                        }
+                        else want = Quaternion.identity;
+                    }
+                    else if (!_pc.IsAirborne && !_pc.IsPosting && !_pc.IsHanging && !_pc.IsSkyingForOop
                              && !_pc.IsFinishing && _pc.PlanarSpeed > 0.6f)
                     {
                         // Lean into the run, scaled by speed — drives the whole gait.
@@ -182,6 +198,13 @@ namespace MarioBasketball.Presentation
             {
                 SetX(_kneeL, 52f);
                 SetX(_kneeR, 52f);
+            }
+            // Sit into a stance: the poster crouches as they back down; the engaged
+            // defender bends their knees and braces.
+            if (!_pc.IsAirborne && (_pc.IsPosting || postingMe != null))
+            {
+                SetX(_kneeL, 34f);
+                SetX(_kneeR, 34f);
             }
 
             // Leg work for a finish: one-foot takeoff drives the opposite knee up
@@ -322,6 +345,12 @@ namespace MarioBasketball.Presentation
                 // wrists snap through (a chest/push pass), held briefly.
                 Pose(_armR, _elbowR, _wristR, releaseArmDegrees * 0.72f, releaseElbowDegrees, releaseWristDegrees);
                 Pose(_armL, _elbowL, _wristL, releaseArmDegrees * 0.72f, releaseElbowDegrees, releaseWristDegrees);
+            }
+            else if (postingMe != null)
+            {
+                // Bracing against the back-down: forearms bar into the poster.
+                Pose(_armR, _elbowR, _wristR, -44f, -95f, 0f);
+                Pose(_armL, _elbowL, _wristL, -44f, -95f, 0f);
             }
             else if (_pc.IsAirborne && !_pc.HasBall)
             {

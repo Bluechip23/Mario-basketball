@@ -23,10 +23,12 @@ namespace MarioBasketball.Bootstrap
     public class GameBootstrap : MonoBehaviour
     {
         [Header("Court dimensions (metres)")]
-        public float courtLength = 28f;
-        public float courtWidth = 15f;
+        public float courtLength = 32f;
+        public float courtWidth = 18f;
         public float rimHeight = 3.05f;
         public float threePointRadius = 6.75f;
+        [Tooltip("Global scale on every player's size — a bit smaller so the action reads more clearly and bodies crowd the view less.")]
+        public float playerHeightScale = 0.85f;
 
         static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
         static readonly Color AwayColor = new Color(0.15f, 0.35f, 0.9f);
@@ -194,7 +196,7 @@ namespace MarioBasketball.Bootstrap
 
         PlayerController BuildPlayer(CharacterStats stats, Vector3 pos, TeamSide side, Color jersey, bool benched)
         {
-            float h = stats.heightMeters;
+            float h = stats.heightMeters * Mathf.Clamp(playerHeightScale, 0.3f, 1.5f);
 
             // Root carries physics/logic; the visual model is built under it,
             // scaled to the character's height (NBA-Street-style big/small bodies).
@@ -416,7 +418,12 @@ namespace MarioBasketball.Bootstrap
 
             var rig = cam.GetComponent<CameraRig>();
             if (rig == null) rig = cam.gameObject.AddComponent<CameraRig>();
-            rig.sideX = -(courtWidth / 2f + 3.5f);
+            // Pulled back and up a touch so the bigger court and the action read
+            // clearly without bodies crowding the frame.
+            rig.sideX = -(courtWidth / 2f + 5f);
+            rig.height = 6f;
+            rig.lookHeight = 1.5f;
+            rig.fieldOfView = 50f;
             rig.zRange = courtLength / 2f - 6f;
             rig.target = target;
         }

@@ -70,8 +70,8 @@ namespace MarioBasketball.AI
         public float sprintDistance = 4f;
         public float stealRange = 1.0f;
         public float pushRange = 1.5f;
-        [Tooltip("Per-frame chance the on-ball defender commits a foul.")]
-        [Range(0f, 1f)] public float pushChance = 0.0015f;
+        [Tooltip("Per-frame chance the on-ball defender commits a foul. Kept low so the AI doesn't rack up fouls into the penalty (which would turn every later foul into free-throw stoppages) or randomly knock the ball loose.")]
+        [Range(0f, 1f)] public float pushChance = 0.0004f;
 
         [Header("Post offense")]
         public float postRange = 4.5f;
@@ -206,11 +206,11 @@ namespace MarioBasketball.AI
 
             if (dist <= shootRange && (quality >= shootQualityThreshold || forced))
             {
-                // Don't tip every rebound straight back: a fresh catch near the rim
-                // gathers a beat first, and only a point-blank ball gets a quick
-                // put-back (and not every time). Forced (shot clock) always shoots.
+                // Don't fling it straight back up off a fresh catch near the rim —
+                // gather a beat first. Only a REBOUND (not a caught pass) point-blank
+                // gets a quick tip, and not every time. Forced (clock) always shoots.
                 bool freshNearRim = dist <= _pc.finishRange && _pc.TimeWithBall < putbackSettle;
-                bool quickTip = dist <= putbackRange && Random.value < putbackChance;
+                bool quickTip = _pc.GainedFromRebound && dist <= putbackRange && Random.value < putbackChance;
                 if (forced || !freshNearRim || quickTip)
                 {
                     _pc.SetMoveIntent(Vector2.zero, false);

@@ -293,6 +293,9 @@ namespace MarioBasketball.Gameplay
         public bool IsSkyingForOop => _skyTimer > 0f;
         /// <summary>Seconds since this player gained the ball (0 if they don't have it).</summary>
         public float TimeWithBall => HasBall ? Time.time - _catchTime : 0f;
+        /// <summary>True if this possession came from a rebound / loose-ball grab
+        /// (not a caught pass) — only these get put-back / tip behaviour.</summary>
+        public bool GainedFromRebound => _gainedFromRebound;
         /// <summary>The human is aiming a directed pass (right stick pushed).</summary>
         public bool IsAimingPass => _passAim.magnitude >= passAimDeadzone && HasBall;
         /// <summary>The teammate currently targeted by the pass aim (for icons).</summary>
@@ -372,6 +375,7 @@ namespace MarioBasketball.Gameplay
         PlayerController _assistPasser;
         float _assistTime;
         bool _assistDribbled;
+        bool _gainedFromRebound;
         float _lastShotDistance;
         int _calledShotsUsed;
         float _passGestureTimer;
@@ -518,6 +522,7 @@ namespace MarioBasketball.Gameplay
             // Track when this player gains the ball (for catch-and-shoot timing).
             bool has = HasBall;
             if (has && !_hadBall) _catchTime = Time.time;
+            if (!has && _hadBall) _gainedFromRebound = false; // cleared when the ball is gone
             _hadBall = has;
 
             // Assist window: voided if it lapses, the ball is gone, or the
@@ -536,7 +541,12 @@ namespace MarioBasketball.Gameplay
             _assistPasser = passer;
             _assistTime = Time.time;
             _assistDribbled = false;
+            _gainedFromRebound = false; // a caught pass is not a rebound/loose ball
         }
+
+        /// <summary>Called when this player collects a rebound / loose ball — marks
+        /// the possession so only these get put-back / tip behaviour.</summary>
+        public void OnGrabbedRebound() => _gainedFromRebound = true;
 
         /// <summary>The teammate whose pass this shot is going up directly off of
         /// (within the assist window, no dribble), or null. Captured by the ball
@@ -1625,6 +1635,13 @@ namespace MarioBasketball.Gameplay
                 if (d < bestD) { bestD = d; best = o; }
             }
             return best;
+        }
+
+        /// <summary>The poster currently backing this player down (engaged as the
+        /// post defender), or null — drives the defensive-stance animation.</summary>
+        public PlayerController PostingMeOnD
+        {
+            get { var post = FindPosterGuardingMe(); return post != null ? post.transform.GetComponent<PlayerController>() : null; }
         }
 
         PostUpController FindPosterGuardingMe()

@@ -90,9 +90,10 @@ namespace MarioBasketball.Gameplay
             if (State == BallState.Held && Holder != null)
             {
                 if (_crossTimer > 0f) _crossTimer -= Time.deltaTime;
-                // Bounce only while actively dribbling (or mid-crossover); held
-                // while stationary it's palmed — no auto-bounce.
-                if (Holder.IsDribbling || _crossTimer > 0f)
+                // Bounce while dribbling (or mid-crossover), and keep the dribble
+                // alive in the post — backing down / posting up does not pick the
+                // ball up. Held still in triple-threat it's palmed (no auto-bounce).
+                if (Holder.IsDribblingBall || _crossTimer > 0f)
                     transform.position = DribblePosition();
                 else
                     transform.position = Vector3.Lerp(transform.position, Holder.CarriedBallPoint, followLerp * Time.deltaTime);
@@ -123,11 +124,14 @@ namespace MarioBasketball.Gameplay
                     _passTimer -= Time.deltaTime;
                     if (_passTimer <= 0f) { IsPass = false; IsAlleyOop = false; }
                 }
-                // A loose ball on the floor sheds speed so the scramble resolves
-                // near the players instead of pinballing around the court.
-                if (!_rb.isKinematic && !IsPass && transform.position.y < looseRollHeight)
+                // A loose ball sheds horizontal speed so the scramble resolves
+                // near the players instead of pinballing around the court — hard on
+                // the floor, gentler in the air so a high bounce still settles down
+                // toward the players rather than rocketing off a wall.
+                if (!_rb.isKinematic && !IsPass)
                 {
-                    float keep = Mathf.Max(0f, 1f - looseRollDamping * Time.deltaTime);
+                    float damp = transform.position.y < looseRollHeight ? looseRollDamping : looseRollDamping * 0.4f;
+                    float keep = Mathf.Max(0f, 1f - damp * Time.deltaTime);
                     Vector3 v = _rb.linearVelocity;
                     _rb.linearVelocity = new Vector3(v.x * keep, v.y, v.z * keep);
                 }

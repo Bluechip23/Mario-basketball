@@ -167,6 +167,12 @@ namespace MarioBasketball.Gameplay
         public float pushKnockLooseBase = 0.2f;
         public float pushKnockLooseScale = 0.06f;
 
+        [Header("Animation gestures (cosmetic timers read by the animator)")]
+        [Tooltip("How long the pass/throw arm pose holds after the ball leaves.")]
+        public float passGestureTime = 0.28f;
+        [Tooltip("How long the cross-body sweep pose holds after a dribble move/flick.")]
+        public float dribbleMoveGestureTime = 0.3f;
+
         /// <summary>Where the carried ball sits — out in front, hip height,
         /// scaled to the character's body size.</summary>
         public Vector3 BallHoldPoint
@@ -224,6 +230,16 @@ namespace MarioBasketball.Gameplay
         /// shoot, finish, post up, leave your feet, get stunned, or lose the
         /// ball. Latched in <see cref="UpdateDribbleState"/>.</summary>
         public bool IsDribbling => _dribbling;
+        /// <summary>Whether the ball should be bouncing as a live dribble. You keep
+        /// your dribble in the post — backing down or posting up does NOT pick the
+        /// ball up; it's only gathered when the post shot actually goes up.</summary>
+        public bool IsDribblingBall => HasBall && (_dribbling || (IsPosting && !IsPostShooting));
+        /// <summary>Briefly true right after a pass/throw (drives the throw pose).</summary>
+        public bool IsPassing => _passGestureTimer > 0f;
+        /// <summary>Briefly true after a dribble move / flick (drives the cross sweep).</summary>
+        public bool IsDribbleMoveGesture => _dribbleMoveGestureTimer > 0f;
+        /// <summary>Contorting a finish in the air (L1 air-adjust) — alters the layup.</summary>
+        public bool IsAdjustingFinish => _finishing && _finishAdjusted;
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
         public bool FinishIsDunk => _finishIsDunk;
@@ -303,6 +319,8 @@ namespace MarioBasketball.Gameplay
         bool _assistDribbled;
         float _lastShotDistance;
         int _calledShotsUsed;
+        float _passGestureTimer;
+        float _dribbleMoveGestureTimer;
 
         void Awake()
         {
@@ -403,6 +421,8 @@ namespace MarioBasketball.Gameplay
             if (_dribbleCooldown > 0f) _dribbleCooldown -= dt;
             if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
             if (_flickCooldown > 0f) _flickCooldown -= dt;
+            if (_passGestureTimer > 0f) _passGestureTimer -= dt;
+            if (_dribbleMoveGestureTimer > 0f) _dribbleMoveGestureTimer -= dt;
             if (_passCharging)
             {
                 _passChargeTime += dt;
@@ -750,6 +770,7 @@ namespace MarioBasketball.Gameplay
 
             Vector3 aim = hoop.AimPoint;
             _lastShotDistance = HorizontalDistance(transform.position, aim); // for Delfan's called shot
+            gm.RecordShotAttempt(this, 2); // an inside finish is always a 2
             // Dunk scores off Dunk, layup off Inside Scoring; +2 off a Playmaker pass.
             StatType scoreStat = isDunk ? StatType.Dunk : StatType.InsideScoring;
             int rawFinish = (_character != null ? _character.stats.Get(scoreStat) : 5) + AssistBonus();
@@ -770,6 +791,7 @@ namespace MarioBasketball.Gameplay
                     {
                         Vector3 away = transform.position - aim; away.y = 0f;
                         Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
+                        GameManager.Instance.RecordBlock(defender);
                         GameManager.Instance.OnShotMissed(this);
                         return;
                     }
@@ -885,6 +907,7 @@ namespace MarioBasketball.Gameplay
             float distance = HorizontalDistance(transform.position, aim);
             _lastShotDistance = distance; // for Delfan's within-half-court called shot
             int points = distance >= threePointDistance ? 3 : 2;
+            GameManager.Instance.RecordShotAttempt(this, points);
 
             StatType shotStat =
                 distance >= threePointDistance ? StatType.ThreePoint :
@@ -914,6 +937,7 @@ namespace MarioBasketball.Gameplay
                     {
                         Vector3 away = transform.position - aim; away.y = 0f;
                         Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
+                        GameManager.Instance.RecordBlock(defender);
                         GameManager.Instance.OnShotMissed(this); // blocked → streak broken
                         return;
                     }
@@ -951,6 +975,7 @@ namespace MarioBasketball.Gameplay
         void ReleasePass(bool hard)
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
+            _passGestureTimer = passGestureTime; // throw animation
             bool fromPost = IsPosting;
             if (IsPosting) _post.End();   // kick out of the post
             _finishing = false;           // or dump it off out of the air
@@ -990,7 +1015,7 @@ namespace MarioBasketball.Gameplay
         void PassToSlot(int index)
         {
             var mate = TeammateSlot(index);
-            if (mate != null) PassToTeammate(mate, fromPost: false, hard: false);
+            if (mate != null) { _passGestureTimer = passGestureTime; PassToTeammate(mate, fromPost: false, hard: false); }
         }
 
         /// <summary>Lead pass to a teammate; Ball Handling sets the accuracy, so
@@ -1073,6 +1098,7 @@ namespace MarioBasketball.Gameplay
         public void PassToward(Vector3 worldPoint)
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
+            _passGestureTimer = passGestureTime; // throw animation
             Ball.PassTo(worldPoint);
         }
 
@@ -1102,6 +1128,7 @@ namespace MarioBasketball.Gameplay
             {
                 gm.ball.PickUp(this);
                 gm.OnPossessionGained(this);
+                gm.RecordSteal(this);
             }
         }
 
@@ -1143,6 +1170,7 @@ namespace MarioBasketball.Gameplay
             }
 
             _dribbleCooldown = dribbleCooldownTime;
+            _dribbleMoveGestureTimer = dribbleMoveGestureTime; // cross-body sweep
             float bh = Effective(StatType.BallHandling, 5f);
             float pd = def.EffectiveStat(StatType.PerimeterDefense);
             float chance = Mathf.Clamp(dribbleBaseChance + dribbleStatScale * (bh - pd), 0.05f, 0.95f);
@@ -1163,6 +1191,7 @@ namespace MarioBasketball.Gameplay
                 {
                     GameManager.Instance.ball.PickUp(def);
                     GameManager.Instance.OnPossessionGained(def);
+                    GameManager.Instance.RecordSteal(def); // defender poked it away
                 }
             }
         }
@@ -1181,6 +1210,7 @@ namespace MarioBasketball.Gameplay
             if (dir.sqrMagnitude < 0.01f) return;
             dir.Normalize();
             _flickCooldown = flickCooldownTime;
+            _dribbleMoveGestureTimer = dribbleMoveGestureTime; // hard-dribble sweep
 
             var ball = Ball;
             if (IsPosting)
@@ -1236,6 +1266,7 @@ namespace MarioBasketball.Gameplay
                 {
                     GameManager.Instance.ball.PickUp(def);
                     GameManager.Instance.OnPossessionGained(def);
+                    GameManager.Instance.RecordSteal(def); // exposed it on the move
                 }
             }
         }

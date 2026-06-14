@@ -59,6 +59,8 @@ namespace MarioBasketball.Core
         public int offensiveReboundRating = 9;
         [Tooltip("A defender must be within this (arms reach) to pick off a pass.")]
         public float passInterceptRadius = 1.1f;
+        [Tooltip("If a loose ball stays uncaught this long it's awarded to the nearest player, so a scramble can never stall the match.")]
+        public float looseBallFailsafe = 2.5f;
 
         [Header("Scene references (auto-wired by GameBootstrap)")]
         public BallController ball;
@@ -82,6 +84,9 @@ namespace MarioBasketball.Core
         public MatchClock Clock { get; private set; }
         public ShotClock Shot { get; private set; }
 
+        /// <summary>Live per-player / per-team box score for this match.</summary>
+        public BoxScore Box { get; private set; }
+
         public bool IsFreeThrow => State == GameState.FreeThrow;
         public PlayerController FreeThrowShooter { get; private set; }
         public int FreeThrowsRemaining { get; private set; }
@@ -91,6 +96,7 @@ namespace MarioBasketball.Core
 
         float _stateTimer;
         float _ftTimer;
+        float _looseTime;
 
         void Awake()
         {
@@ -104,6 +110,7 @@ namespace MarioBasketball.Core
             shotClockSeconds = GameSettings.ShotClockSeconds;
             Clock = new MatchClock(quarterLengthSeconds, totalQuarters);
             Shot = new ShotClock(shotClockSeconds);
+            Box = new BoxScore();
         }
 
         void Start()
@@ -160,6 +167,31 @@ namespace MarioBasketball.Core
                 ResumePlay();
         }
 
+        // ---- Box-score recording (called from gameplay) --------------------
+
+        /// <summary>A field-goal attempt by <paramref name="shooter"/> (2 or 3 by
+        /// <paramref name="points"/>). Record at the moment the shot commits, so a
+        /// blocked attempt still counts as a miss.</summary>
+        public void RecordShotAttempt(PlayerController shooter, int points) => Box.AddFieldGoalAttempt(shooter, points);
+
+        /// <summary>Record a blocked shot for <paramref name="blocker"/> and buzz
+        /// their controller if a human is driving them.</summary>
+        public void RecordBlock(PlayerController blocker)
+        {
+            if (blocker == null) return;
+            Box.AddBlock(blocker);
+            if (blocker.isHuman) Haptics.Play(Haptics.Cue.Block);
+        }
+
+        /// <summary>Record a steal/strip for <paramref name="thief"/> and buzz a
+        /// human controller.</summary>
+        public void RecordSteal(PlayerController thief)
+        {
+            if (thief == null) return;
+            Box.AddSteal(thief);
+            if (thief.isHuman) Haptics.Play(Haptics.Cue.Steal);
+        }
+
         // ---- Rebounding / loose balls --------------------------------------
 
         /// <summary>
@@ -185,11 +217,26 @@ namespace MarioBasketball.Core
                 // Capture pass info before PickUp clears it.
                 bool oop = ball.IsAlleyOop && best.team == ball.PassingTeam && NearOwnRim(best);
                 PlayerController passer = (ball.IsPass && best.team == ball.PassingTeam) ? ball.Passer : null;
+                bool interception = ball.IsPass && best.team != ball.PassingTeam; // picked off
+                bool board = ball.IsRebound;
 
                 ball.PickUp(best);
                 OnPossessionGained(best);
                 if (passer != null) best.OnCaughtPass(passer);
                 if (oop) best.CatchAlleyOop();
+
+                // Box score + feedback: a picked-off pass is a steal, a missed-shot
+                // ball is a rebound.
+                if (interception)
+                {
+                    Box.AddSteal(best);
+                    if (best.isHuman) Haptics.Play(Haptics.Cue.Steal);
+                }
+                else if (board)
+                {
+                    Box.AddRebound(best);
+                    if (best.isHuman) Haptics.Play(Haptics.Cue.Rebound);
+                }
             }
         }
 
@@ -222,6 +269,43 @@ namespace MarioBasketball.Core
                 if (score > bestScore) { bestScore = score; best = p; }
             }
             return best;
+        }
+
+        /// <summary>Watchdog so a loose-ball scramble can never stall: if the ball
+        /// has been free (and not a live in-flight pass) for too long without
+        /// anyone winning it, hand it to the nearest eligible player. Fixes the
+        /// "nobody grabs it and it just bounces around" case.</summary>
+        void TrackLooseBall(float dt)
+        {
+            if (ball == null || ball.State != BallController.BallState.Free || ball.IsPass)
+            {
+                _looseTime = 0f;
+                return;
+            }
+            _looseTime += dt;
+            if (_looseTime < looseBallFailsafe) return;
+            _looseTime = 0f;
+
+            Vector3 ballPos = ball.transform.position;
+            PlayerController nearest = null;
+            float bestD = Mathf.Infinity;
+            foreach (var side in new[] { Home, Away })
+                foreach (var p in side.onCourt)
+                {
+                    if (p == null || !p.enabled || !ball.CanBePickedUpBy(p)) continue;
+                    float d = Horizontal(p.transform.position, ballPos);
+                    if (d < bestD) { bestD = d; nearest = p; }
+                }
+
+            if (nearest == null) return;
+            bool board = ball.IsRebound;
+            ball.PickUp(nearest);
+            OnPossessionGained(nearest);
+            if (board)
+            {
+                Box.AddRebound(nearest);
+                if (nearest.isHuman) Haptics.Play(Haptics.Cue.Rebound);
+            }
         }
 
         float ReboundCatchRadius(PlayerController p)
@@ -276,6 +360,8 @@ namespace MarioBasketball.Core
             UpdateStreaksOnMake(scoringTeam, shooter);
             ApplyAssistEnergy(shooter, assister);
             if (shooter != null && shooter.Character != null) shooter.Character.ShootingRhythm++; // Birdo's Hot Hand
+            Box.AddPoints(shooter, points);
+            Box.AddFieldGoalMade(shooter, points);
             AddPoints(scoringTeam, points);
 
             // Clock stops; the other team will inbound under the basket.
@@ -393,7 +479,10 @@ namespace MarioBasketball.Core
                 float mid = FreeThrowShooter.EffectiveStat(StatType.MidRange);
                 float pct = Mathf.Lerp(freeThrowMinPct, freeThrowMaxPct, Mathf.Clamp01((mid - 1f) / 9f));
                 if (UnityEngine.Random.value < pct)
+                {
+                    Box.AddPoints(FreeThrowShooter, 1);
                     AddPoints(FreeThrowShooter.team, 1);
+                }
             }
             FreeThrowsRemaining--;
         }
@@ -415,21 +504,26 @@ namespace MarioBasketball.Core
             return true;
         }
 
-        /// <summary>Subs are only allowed during a timeout or a quarter break.</summary>
+        /// <summary>Subs are only allowed during a timeout or a quarter break —
+        /// you can't change personnel while the ball is live.</summary>
         public bool CanSubstitute => State == GameState.Timeout || State == GameState.QuarterBreak;
 
-        public void Substitute(TeamSide side, int onCourtIndex, int benchIndex)
+        /// <summary>Swap an on-court player for a bench player. Only legal during a
+        /// timeout or between quarters (<see cref="CanSubstitute"/>); returns false
+        /// if it wasn't allowed or the indices didn't resolve.</summary>
+        public bool Substitute(TeamSide side, int onCourtIndex, int benchIndex)
         {
-            if (!CanSubstitute) return;
+            if (!CanSubstitute) return false;
             var team = TeamFor(side);
             var (leaving, entering) = team.Substitute(onCourtIndex, benchIndex);
-            if (leaving == null || entering == null) return;
+            if (leaving == null || entering == null) return false;
 
             if (ball != null && ball.Holder == leaving)
                 ball.ResetToCentre();
 
             BenchPlayer(leaving, side);
             ActivatePlayer(entering, side == TeamSide.Home ? homeSubEntry : awaySubEntry);
+            return true;
         }
 
         // ---- State machine -------------------------------------------------
@@ -443,6 +537,7 @@ namespace MarioBasketball.Core
                     if (Clock.Tick(dt)) { OnQuarterExpired(); return; }
                     if (Shot.Tick(dt)) { Turnover(Opponent(Possession)); break; }
                     ResolveLooseBall();
+                    TrackLooseBall(dt);
                     break;
 
                 case GameState.TipOff:

@@ -190,12 +190,19 @@ namespace MarioBasketball.Presentation
                 Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees); // two-hand slam
                 Pose(_armL, _elbowL, _wristL, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
             }
+            else if (_pc.IsFinishing && _pc.IsAdjustingFinish)
+            {
+                // Air-adjust (L1): a double-clutch — cradle the ball back in and
+                // shield with the off-hand before laying it up around the block.
+                Pose(_armR, _elbowR, _wristR, layupArmDegrees + 34f, gatherElbowDegrees, gatherWristDegrees);
+                Pose(_armL, _elbowL, _wristL, guideArmDegrees, guideElbowDegrees, 0f);
+            }
             else if (_pc.IsFinishing)
             {
                 Pose(_armR, _elbowR, _wristR, layupArmDegrees, layupElbowDegrees, releaseWristDegrees * 0.5f); // one-hand finish
                 Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
             }
-            else if (_pc.IsDribbling)
+            else if (_pc.IsDribblingBall)
             {
                 // In phase with the actual ball: 0 = hip contact, 0.5 = floor
                 // (see BallController.DribblePosition). The hand pushes down
@@ -206,21 +213,40 @@ namespace MarioBasketball.Presentation
                 bool leftHand = _ball != null && _ball.DribbleHand < 0;
                 Transform pumpArm = leftHand ? _armL : _armR, pumpElbow = leftHand ? _elbowL : _elbowR, pumpWrist = leftHand ? _wristL : _wristR;
                 Transform offArm = leftHand ? _armR : _armL, offElbow = leftHand ? _elbowR : _elbowL, offWrist = leftHand ? _wristR : _wristL;
-                Pose(pumpArm, pumpElbow, pumpWrist,
-                    dribbleArmBase + dribblePushDegrees * push,
-                    Mathf.Lerp(dribbleElbowBent, dribbleElbowPushed, push),
-                    Mathf.Lerp(dribbleWristCocked, dribbleWristPushed, push));
-                Pose(offArm, offElbow, offWrist,
-                    guardArmDegrees + (moving ? swing * armSwingDegrees * 0.4f * speedScale : 0f),
-                    dribbleElbowBent * 0.5f,
-                    0f);
+                if (_pc.IsDribbleMoveGesture)
+                {
+                    // A dribble move / hard flick: both hands drop low and rip the
+                    // ball hard across the body (crossover / step-back).
+                    Pose(pumpArm, pumpElbow, pumpWrist,
+                        dribbleArmBase + dribblePushDegrees, dribbleElbowPushed, dribbleWristPushed);
+                    Pose(offArm, offElbow, offWrist,
+                        dribbleArmBase + dribblePushDegrees * 0.6f, dribbleElbowPushed, dribbleWristPushed * 0.5f);
+                }
+                else
+                {
+                    Pose(pumpArm, pumpElbow, pumpWrist,
+                        dribbleArmBase + dribblePushDegrees * push,
+                        Mathf.Lerp(dribbleElbowBent, dribbleElbowPushed, push),
+                        Mathf.Lerp(dribbleWristCocked, dribbleWristPushed, push));
+                    Pose(offArm, offElbow, offWrist,
+                        guardArmDegrees + (moving ? swing * armSwingDegrees * 0.4f * speedScale : 0f),
+                        dribbleElbowBent * 0.5f,
+                        0f);
+                }
             }
             else if (_pc.HasBall)
             {
-                // Gathered ball (fresh pickup, post-up, airborne rebound):
-                // both hands carry it at the chest instead of hanging loose.
+                // Gathered ball (fresh pickup, airborne rebound): both hands carry
+                // it at the chest instead of hanging loose.
                 Pose(_armL, _elbowL, _wristL, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
                 Pose(_armR, _elbowR, _wristR, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
+            }
+            else if (_pc.IsPassing)
+            {
+                // Just threw a pass: both arms push out toward the target and the
+                // wrists snap through (a chest/push pass), held briefly.
+                Pose(_armR, _elbowR, _wristR, releaseArmDegrees * 0.72f, releaseElbowDegrees, releaseWristDegrees);
+                Pose(_armL, _elbowL, _wristL, releaseArmDegrees * 0.72f, releaseElbowDegrees, releaseWristDegrees);
             }
             else
             {

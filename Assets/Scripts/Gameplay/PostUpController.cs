@@ -256,10 +256,12 @@ namespace MarioBasketball.Gameplay
             if (knockdown)
             {
                 _pc.Stun(knockdownStun, fall: true);
+                if (_pc.isHuman) Haptics.Play(Haptics.Cue.Knockdown);
                 if (gm != null && gm.ball != null && gm.ball.Holder == _pc && _defender != null)
                 {
                     gm.ball.PickUp(_defender);
                     gm.OnPossessionGained(_defender);
+                    gm.RecordSteal(_defender);
                 }
             }
             else
@@ -308,6 +310,7 @@ namespace MarioBasketball.Gameplay
                         // Spun into trouble — stripped.
                         gm.ball.PickUp(_defender);
                         gm.OnPossessionGained(_defender);
+                        gm.RecordSteal(_defender);
                         gm.OnShotMissed(_pc); // lost it — streak broken
                         End();
                         return;
@@ -398,6 +401,8 @@ namespace MarioBasketball.Gameplay
             Hoop hoop = gm != null ? gm.GetAttackingHoop(_pc.team) : null;
             if (hoop == null || !_pc.HasBall) { End(); return; }
 
+            gm.RecordShotAttempt(_pc, 2); // post shots are always 2s
+
             if (blockable && _defender != null)
             {
                 float blk = _defender.EffectiveStat(StatType.Blocks);
@@ -406,6 +411,7 @@ namespace MarioBasketball.Gameplay
                 {
                     Vector3 away = transform.position - hoop.AimPoint; away.y = 0f;
                     gm.ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, shovePower * 0.6f);
+                    gm.RecordBlock(_defender);
                     gm.OnShotMissed(_pc); // blocked → streak broken
                     End();
                     return;

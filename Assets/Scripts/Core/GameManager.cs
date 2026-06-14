@@ -57,6 +57,10 @@ namespace MarioBasketball.Core
         public float reboundRandom = 1.5f;
         [Tooltip("Wario's offensive-rebound trait rating.")]
         public int offensiveReboundRating = 9;
+        [Tooltip("Within this of the rim, an OFFENSIVE rebound grabbed in the air can be tipped straight back up.")]
+        public float tipInRange = 2.0f;
+        [Tooltip("Chance an airborne offensive rebound at the rim is tipped straight back in (not every time).")]
+        [Range(0f, 1f)] public float tipInChance = 0.45f;
         [Tooltip("Catch-score edge the intended pass receiver gets, so passes complete unless a defender is right on the ball.")]
         public float receiverCatchBonus = 7f;
         [Tooltip("Extra catch radius (m) for the intended pass receiver — a generous catching pocket.")]
@@ -255,6 +259,7 @@ namespace MarioBasketball.Core
                 PlayerController passer = (ball.IsPass && best.team == ball.PassingTeam) ? ball.Passer : null;
                 bool interception = ball.IsPass && best.team != ball.PassingTeam; // picked off
                 bool board = ball.IsRebound;
+                TeamSide shooterTeam = ball.ShooterTeam;
 
                 ball.PickUp(best);
                 OnPossessionGained(best);
@@ -274,8 +279,19 @@ namespace MarioBasketball.Core
                     Box.AddRebound(best);
                     best.OnGrabbedRebound();
                     Shot.Reset(); // fresh shot clock off the board (incl. offensive rebounds)
-                    if (best.team != ball.ShooterTeam) BeginFastBreak(best.team); // defensive board → run
+                    if (best.team != shooterTeam) BeginFastBreak(best.team); // defensive board → run
                     if (best.isHuman) Haptics.Play(Haptics.Cue.Rebound);
+
+                    // The ONLY tip-in: jumped up for your own close miss at the rim →
+                    // put it straight back. Not on passes, not on loose balls on the
+                    // floor, not every time.
+                    if (best.team == shooterTeam && best.IsAirborne)
+                    {
+                        Hoop ah = GetAttackingHoop(best.team);
+                        if (ah != null && Horizontal(best.transform.position, ah.AimPoint) <= tipInRange
+                            && UnityEngine.Random.value < tipInChance)
+                            best.TipIn();
+                    }
                 }
             }
         }

@@ -26,8 +26,10 @@ namespace MarioBasketball.Gameplay
         public bool isHuman = false;
 
         [Header("Movement (mapped from the Speed stat)")]
-        public float minMoveSpeed = 4f;
-        public float maxMoveSpeed = 9f;
+        [Tooltip("Run speed (m/s) at Speed 1 — a slow player. The wide gap to maxMoveSpeed makes fast vs slow clearly matter.")]
+        public float minMoveSpeed = 2.8f;
+        [Tooltip("Run speed (m/s) at Speed 10 — a burner.")]
+        public float maxMoveSpeed = 7f;
         public float sprintMultiplier = 1.4f;
         public float turnSpeed = 720f;
         public float gravity = -25f;
@@ -1153,12 +1155,9 @@ namespace MarioBasketball.Gameplay
 
         bool IsOopTarget(PlayerController mate)
         {
-            var gm = GameManager.Instance;
-            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
-            // Only an alley-oop if the teammate has actually left their feet near
-            // the rim (skied for it) — a loft to a grounded teammate is just a pass.
-            return hoop != null && mate != null && mate.IsAirborne
-                && HorizontalDistance(mate.transform.position, hoop.AimPoint) <= oopRange;
+            // Only an alley-oop if the teammate is actively skying for one — never
+            // off a normal pass to a teammate who just happens to be near the rim.
+            return mate != null && mate.IsSkyingForOop;
         }
 
         /// <summary>AI entry: lob an alley-oop to a teammate who's skying for it.</summary>
@@ -1222,6 +1221,16 @@ namespace MarioBasketball.Gameplay
             _skyTimer = 0f;
             bool dunk = (_character != null ? _character.stats.Get(StatType.Dunk) : 5) >= dunkThreshold;
             FinishShot(dunk, adjusted: false, makeBonus: alleyOopBonus);
+        }
+
+        /// <summary>Tip your own close miss straight back up while still in the air
+        /// — a true put-back (GameManager calls this when you grab an offensive
+        /// rebound airborne at the rim). It's a touch finish, so a hair tougher.</summary>
+        public void TipIn()
+        {
+            if (!HasBall) return;
+            bool dunk = (_character != null ? _character.stats.Get(StatType.Dunk) : 5) >= dunkThreshold;
+            FinishShot(dunk, adjusted: false, makeBonus: -0.08f);
         }
 
         /// <summary>Pre-emptively leap and hang above the rim, calling for a lob —

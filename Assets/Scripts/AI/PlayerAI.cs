@@ -28,12 +28,9 @@ namespace MarioBasketball.AI
         public float lowShotClock = 4f;
         public float passUpgradeMargin = 1.5f;
 
-        [Header("Put-backs (don't tip every rebound straight back in)")]
-        [Tooltip("Gather a fresh inside catch for this long before putting it up (breaks the insta-tip loop).")]
-        public float putbackSettle = 0.5f;
-        [Tooltip("Distance from the rim a fresh catch may be tipped straight back up.")]
-        public float putbackRange = 1.4f;
-        [Range(0f, 1f)] public float putbackChance = 0.35f;
+        [Header("Catch-and-gather (no instant put-ups off a catch)")]
+        [Tooltip("Gather any fresh catch near the rim for this long before shooting, so players don't fling it straight back up off a pass/loose ball. A real tip-in happens only on an airborne rebound (handled in GameManager).")]
+        public float putbackSettle = 0.7f;
 
         [Header("Spacing / cuts")]
         public float wingSpacing = 3.5f;
@@ -206,18 +203,17 @@ namespace MarioBasketball.AI
 
             if (dist <= shootRange && (quality >= shootQualityThreshold || forced))
             {
-                // Don't fling it straight back up off a fresh catch near the rim —
-                // gather a beat first. Only a REBOUND (not a caught pass) point-blank
-                // gets a quick tip, and not every time. Forced (clock) always shoots.
+                // Never fling it straight back up off a fresh catch (pass OR loose
+                // ball) near the rim — gather a beat and play. A genuine tip-in only
+                // happens jumping for a rebound (GameManager handles that).
                 bool freshNearRim = dist <= _pc.finishRange && _pc.TimeWithBall < putbackSettle;
-                bool quickTip = _pc.GainedFromRebound && dist <= putbackRange && Random.value < putbackChance;
-                if (forced || !freshNearRim || quickTip)
+                if (forced || !freshNearRim)
                 {
                     _pc.SetMoveIntent(Vector2.zero, false);
                     _pc.TriggerShoot();
                     return;
                 }
-                // else: gather and reset rather than auto-tipping it in.
+                // else: gather and reset rather than auto-shooting off the catch.
             }
 
             // Smothered → look for a meaningfully better shot elsewhere.

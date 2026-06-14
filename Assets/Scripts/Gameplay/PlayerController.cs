@@ -105,6 +105,14 @@ namespace MarioBasketball.Gameplay
         public float finishFlightTime = 0.32f;
         [Tooltip("How long a two-hand slam grabs the rim and hangs.")]
         public float dunkHangTime = 0.25f;
+        [Tooltip("Layup hop height (m) — a small one-legged jump.")]
+        public float layupJumpHeight = 1.0f;
+        [Tooltip("Dunk leap height (m) at Dunk 10 — arcade air, soaring over the rim. Scales up from the normal jump by the Dunk stat.")]
+        public float dunkJumpHeightMax = 2.4f;
+        [Tooltip("Contest leap height (m) at Blocks 10 — a great shot-blocker matches a big dunker in the air.")]
+        public float contestJumpHeightMax = 2.4f;
+        [Tooltip("How fast the slammer settles onto the rim for the hang.")]
+        public float hangSettleLerp = 12f;
         [Tooltip("Effective Dunk at/above this goes up for a dunk; below, a layup.")]
         public float dunkThreshold = 6f;
         [Tooltip("Dunk block resistance per point of Power.")]
@@ -334,6 +342,7 @@ namespace MarioBasketball.Gameplay
         FinishStyle _finishStyle;
         bool _finishTakeoffLeft;
         float _hangTimer;
+        Vector3 _hangTarget;
         Vector2 _passAim;
         bool _iconHeld;
         float _dribbleCooldown;
@@ -584,12 +593,15 @@ namespace MarioBasketball.Gameplay
             bool rotateToMove = false;
             Vector3 faceDir = Vector3.zero;
 
-            // Hanging on the rim after a slam: hold up there a beat, then drop.
+            // Hanging on the rim after a slam: settle onto the rim grip and hold a
+            // beat (arms up, hands on the rim), then drop off and fall.
             if (_hangTimer > 0f)
             {
                 _verticalVelocity = 0f;
                 PlanarSpeed = 0f;
                 _character?.ReportActivity(false, false);
+                Vector3 to = _hangTarget - transform.position;
+                _cc.Move(to * Mathf.Clamp01(hangSettleLerp * dt));
                 return;
             }
 
@@ -811,7 +823,26 @@ namespace MarioBasketball.Gameplay
             _finishIsDunk = Effective(StatType.Dunk, 5f) >= dunkThreshold;
             _finishStyle = PickFinishStyle(_finishIsDunk);
             _finishTakeoffLeft = Random.value < 0.5f;
-            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // go up
+            // Arcade air: layups are a small hop, dunks soar (over the rim for big
+            // dunkers) — the leap scales with the Dunk stat.
+            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * FinishJumpHeight());
+        }
+
+        float FinishJumpHeight()
+        {
+            if (!_finishIsDunk) return layupJumpHeight;
+            float dunk01 = Mathf.Clamp01((Effective(StatType.Dunk, 5f) - 1f) / 9f);
+            return Mathf.Lerp(jumpHeight, dunkJumpHeightMax, dunk01);
+        }
+
+        /// <summary>Leap to contest a shot/dunk — a high-Blocks defender rises as
+        /// high as a big dunker. Called by the AI (and usable by the human).</summary>
+        public void ContestJump()
+        {
+            if (MatchPause.IsPaused || IsStunned || IsPosting || _hangTimer > 0f) return;
+            if (!_cc.isGrounded) return;
+            float block01 = Mathf.Clamp01((Effective(StatType.Blocks, 5f) - 1f) / 9f);
+            _verticalVelocity = Mathf.Sqrt(-2f * gravity * Mathf.Lerp(jumpHeight, contestJumpHeightMax, block01));
         }
 
         /// <summary>A layup off one foot when it's not a dunk; otherwise mix the
@@ -832,7 +863,24 @@ namespace MarioBasketball.Gameplay
             _finishing = false;
             FinishShot(_finishIsDunk, _finishAdjusted);
             // The big slam grabs the rim and hangs for a beat before dropping off.
-            if (_finishStyle == FinishStyle.TwoHandSlam) _hangTimer = dunkHangTime;
+            if (_finishStyle == FinishStyle.TwoHandSlam) { _hangTimer = dunkHangTime; PositionForHang(); }
+        }
+
+        /// <summary>Work out where to hang: the near edge of the rim, at a height
+        /// where the player's straight-up arms put their hands on it. They settle
+        /// onto it smoothly during the hang (see <see cref="Move"/>).</summary>
+        void PositionForHang()
+        {
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            if (hoop == null) { _hangTarget = transform.position; return; }
+            Vector3 rim = hoop.AimPoint;
+            Vector3 toCourt = transform.position - rim; toCourt.y = 0f;
+            toCourt = toCourt.sqrMagnitude > 0.01f ? toCourt.normalized : -transform.forward;
+            _hangTarget = rim + toCourt * 0.35f;            // hang on the near edge
+            _hangTarget.y = rim.y - 0.85f * BodyHeight;     // hands reach up to the rim
+            Vector3 face = rim - transform.position; face.y = 0f;
+            if (face.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(face.normalized, Vector3.up);
         }
 
         /// <summary>Resolve a dunk or layup: a block roll first (reduced by an

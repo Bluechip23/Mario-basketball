@@ -73,6 +73,9 @@ namespace MarioBasketball.Gameplay
         /// <summary>The teammate a pass is aimed at — they get a big edge winning it
         /// so passes actually complete unless a defender is right on the ball.</summary>
         public PlayerController IntendedReceiver { get; private set; }
+        /// <summary>Set once a defender has had their single interception attempt on
+        /// the current pass, so a pass can't be re-rolled every frame.</summary>
+        public bool PassContested { get; set; }
         /// <summary>True while a lob is an alley-oop — a teammate catching it near
         /// the rim finishes immediately.</summary>
         public bool IsAlleyOop { get; private set; }
@@ -349,6 +352,7 @@ namespace MarioBasketball.Gameplay
             Passer = passer;
             IntendedReceiver = receiver;
             PassOrigin = transform.position;
+            PassContested = false;
             _passTimer = passLiveTime;
             _passArmTimer = passArmTime; // brief window where it can't be grabbed
             GoLive();

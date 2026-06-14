@@ -18,13 +18,14 @@ namespace MarioBasketball.UI
         /// <summary>Invoked when the player backs out (the opener restores itself).</summary>
         public Action onClose;
 
-        // Row order: volume, quarter length, shot clock, vibration, box score,
-        // controls, back.
-        const int RowCount = 7;
-        const int VibrationRow = 3;
-        const int BoxScoreRow = 4;
-        const int ControlsRow = 5;
-        const int BackRow = 6;
+        // Row order: volume, quarter length, shot clock, timeouts, vibration,
+        // box score, controls, back.
+        const int RowCount = 8;
+        const int TimeoutsRow = 3;
+        const int VibrationRow = 4;
+        const int BoxScoreRow = 5;
+        const int ControlsRow = 6;
+        const int BackRow = 7;
         int _row;
         bool _showControls;
         MenuNav _nav;
@@ -103,6 +104,7 @@ namespace MarioBasketball.UI
                 case 0: GameSettings.MasterVolume += dir * 5; break;
                 case 1: GameSettings.QuarterMinutes += dir; break;
                 case 2: GameSettings.ShotClockSeconds += dir; break;
+                case TimeoutsRow: GameSettings.TimeoutsPerTeam += dir; break;
                 case VibrationRow: GameSettings.Vibration = !GameSettings.Vibration; break;
                 case BoxScoreRow: GameSettings.ShowBoxScore = !GameSettings.ShowBoxScore; break;
             }
@@ -119,7 +121,7 @@ namespace MarioBasketball.UI
 
             if (_showControls) { DrawControls(); return; }
 
-            float w = 520f, h = 560f;
+            float w = 520f, h = 620f;
             var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             GUI.Box(area, GUIContent.none);
             GUI.Label(new Rect(area.x, area.y + 12, area.width, 36), "SETTINGS", _title);
@@ -127,6 +129,7 @@ namespace MarioBasketball.UI
             DrawRow(area, 0, "Master Volume", $"{GameSettings.MasterVolume}%");
             DrawRow(area, 1, "Quarter Length", $"{GameSettings.QuarterMinutes} min");
             DrawRow(area, 2, "Shot Clock", $"{GameSettings.ShotClockSeconds} s");
+            DrawRow(area, TimeoutsRow, "Timeouts / Team", $"{GameSettings.TimeoutsPerTeam}");
             DrawRow(area, VibrationRow, "Vibration", GameSettings.Vibration ? "On" : "Off");
             DrawRow(area, BoxScoreRow, "Box Score", GameSettings.ShowBoxScore ? "Shown" : "Hidden");
             DrawButtonRow(area, ControlsRow, "Controls");
@@ -189,7 +192,6 @@ namespace MarioBasketball.UI
                 ("Post up (hold)", "RB", "R"),
                 ("Back down in the post", "RT", "B"),
                 ("Post: hook / drop step / spin / fake", "Y / A / B / LB", "H / G / V / C"),
-                ("Called shot (Delfan)", "Double-tap LT", "Double-tap Shift"),
             }),
             ("OFFENSE — OFF BALL", new[]
             {

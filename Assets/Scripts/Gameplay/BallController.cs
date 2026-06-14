@@ -70,6 +70,9 @@ namespace MarioBasketball.Gameplay
         /// <summary>Where the current in-flight pass was released (so a defender
         /// can't pick it off until it's travelled past them).</summary>
         public Vector3 PassOrigin { get; private set; }
+        /// <summary>The teammate a pass is aimed at — they get a big edge winning it
+        /// so passes actually complete unless a defender is right on the ball.</summary>
+        public PlayerController IntendedReceiver { get; private set; }
         /// <summary>True while a lob is an alley-oop — a teammate catching it near
         /// the rim finishes immediately.</summary>
         public bool IsAlleyOop { get; private set; }
@@ -134,7 +137,7 @@ namespace MarioBasketball.Gameplay
                 {
                     // An uncaught pass eventually becomes a plain loose ball.
                     _passTimer -= Time.deltaTime;
-                    if (_passTimer <= 0f) { IsPass = false; IsAlleyOop = false; }
+                    if (_passTimer <= 0f) { IsPass = false; IsAlleyOop = false; IntendedReceiver = null; }
                 }
                 // A loose ball sheds horizontal speed so the scramble resolves
                 // near the players instead of pinballing around the court — hard on
@@ -290,6 +293,7 @@ namespace MarioBasketball.Gameplay
             IsRebound = false;
             IsPass = false;
             IsAlleyOop = false;
+            IntendedReceiver = null;
             _wasDribbling = false; // re-anchor the bounce on the next dribble
             _rb.isKinematic = true;
             _rb.detectCollisions = false;
@@ -332,7 +336,7 @@ namespace MarioBasketball.Gameplay
         /// loose ball — a teammate (or a defender) can pick it off.
         /// <paramref name="flightTime"/> shapes it: short = a fast, flat bullet
         /// through the lane; long = a slow lob that arcs over defenders.</summary>
-        public void PassTo(Vector3 target, float flightTime = 0.5f, bool alleyOop = false)
+        public void PassTo(Vector3 target, float flightTime = 0.5f, bool alleyOop = false, PlayerController receiver = null)
         {
             PlayerController passer = Holder;
             TeamSide thrower = Holder != null ? Holder.team : ShooterTeam;
@@ -343,6 +347,7 @@ namespace MarioBasketball.Gameplay
             IsAlleyOop = alleyOop;
             PassingTeam = thrower;
             Passer = passer;
+            IntendedReceiver = receiver;
             PassOrigin = transform.position;
             _passTimer = passLiveTime;
             _passArmTimer = passArmTime; // brief window where it can't be grabbed
@@ -378,6 +383,7 @@ namespace MarioBasketball.Gameplay
             IsRebound = false;
             IsPass = false;
             IsAlleyOop = false;
+            IntendedReceiver = null;
             GoLive();
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
@@ -392,6 +398,7 @@ namespace MarioBasketball.Gameplay
             IsRebound = false;
             IsPass = false;
             IsAlleyOop = false;
+            IntendedReceiver = null;
             State = BallState.Free;
         }
 
@@ -403,6 +410,7 @@ namespace MarioBasketball.Gameplay
             IsRebound = false;
             IsPass = false;
             IsAlleyOop = false;
+            IntendedReceiver = null;
             Assister = null;
             Holder = null;
         }

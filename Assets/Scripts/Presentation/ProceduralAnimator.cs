@@ -175,6 +175,27 @@ namespace MarioBasketball.Presentation
                 SetX(_kneeR, 52f);
             }
 
+            // Leg work for a finish: one-foot takeoff drives the opposite knee up
+            // hard while the jump leg trails; a rim hang leaves the legs dangling.
+            if (_pc.IsHanging)
+            {
+                SetX(_legL, 6f); SetX(_legR, -6f);
+                SetX(_kneeL, 18f); SetX(_kneeR, 22f);
+            }
+            else if (_pc.IsFinishing && _pc.FinishOneFoot && _pc.IsAirborne)
+            {
+                if (_pc.FinishTakeoffLeft)
+                {
+                    SetX(_legL, -12f); SetX(_kneeL, 12f);  // jump leg trails, fairly straight
+                    SetX(_legR, -45f); SetX(_kneeR, 80f);  // drive knee up
+                }
+                else
+                {
+                    SetX(_legR, -12f); SetX(_kneeR, 12f);
+                    SetX(_legL, -45f); SetX(_kneeL, 80f);
+                }
+            }
+
             // A released jump shot (or timed post shot) holds its follow-through.
             bool shooting = _pc.IsShooting || _pc.IsPostShooting;
             if (_wasShooting && !shooting) _followThrough = followThroughTime;
@@ -203,10 +224,11 @@ namespace MarioBasketball.Presentation
                 Pose(_armR, _elbowR, _wristR, releaseArmDegrees, releaseElbowDegrees, releaseWristDegrees);
                 Pose(_armL, _elbowL, _wristL, guideArmDegrees, guideElbowDegrees, 0f);
             }
-            else if (_pc.IsFinishing && _pc.FinishIsDunk)
+            else if (_pc.IsHanging)
             {
-                Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees); // two-hand slam
-                Pose(_armL, _elbowL, _wristL, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
+                // Grab the rim with both hands and hang straight down.
+                Pose(_armR, _elbowR, _wristR, -178f, -2f, 0f);
+                Pose(_armL, _elbowL, _wristL, -178f, -2f, 0f);
             }
             else if (_pc.IsFinishing && _pc.IsAdjustingFinish)
             {
@@ -215,10 +237,24 @@ namespace MarioBasketball.Presentation
                 Pose(_armR, _elbowR, _wristR, layupArmDegrees + 34f, gatherElbowDegrees, gatherWristDegrees);
                 Pose(_armL, _elbowL, _wristL, guideArmDegrees, guideElbowDegrees, 0f);
             }
+            else if (_pc.IsFinishing && _pc.CurrentFinishStyle == FinishStyle.Layup)
+            {
+                // One-hand layup, laid up high off the glass.
+                Pose(_armR, _elbowR, _wristR, layupArmDegrees, layupElbowDegrees, releaseWristDegrees * 0.5f);
+                Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
+            }
+            else if (_pc.IsFinishing && _pc.CurrentFinishStyle == FinishStyle.OneFootOneHandDunk)
+            {
+                // One-handed flush: cock the ball overhead in the dunking hand.
+                Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
+                Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
+            }
             else if (_pc.IsFinishing)
             {
-                Pose(_armR, _elbowR, _wristR, layupArmDegrees, layupElbowDegrees, releaseWristDegrees * 0.5f); // one-hand finish
-                Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
+                // Two-hand flush (one-foot two-hand, or the gather slam): both arms
+                // drive the ball up and over the rim.
+                Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
+                Pose(_armL, _elbowL, _wristL, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
             }
             else if (_pc.IsDribblingBall || _pc.IsDribbleMoveGesture)
             {

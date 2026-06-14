@@ -38,6 +38,8 @@ namespace MarioBasketball.Gameplay
         public float threePointDistance = 6.75f;
         [Tooltip("Within this radius a shot uses Inside Scoring, not Mid Range.")]
         public float paintRadius = 2.5f;
+        [Tooltip("Press shoot within this of the rim to drive in for a dunk/layup (sky for it from in the paint), not pull up for a jumper.")]
+        public float finishRange = 3.2f;
 
         [Header("Shooting")]
         [Tooltip("Make odds, distance falloff and contest live in ShotMath.")]
@@ -114,7 +116,7 @@ namespace MarioBasketball.Gameplay
         [Tooltip("How fast the slammer settles onto the rim for the hang.")]
         public float hangSettleLerp = 12f;
         [Tooltip("Effective Dunk at/above this goes up for a dunk; below, a layup.")]
-        public float dunkThreshold = 6f;
+        public float dunkThreshold = 5f;
         [Tooltip("Dunk block resistance per point of Power.")]
         public float dunkPowerBlockResist = 0.3f;
         [Tooltip("Block chance multiplier when the shot is air-adjusted.")]
@@ -123,9 +125,15 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float maxAdjustPenalty = 0.35f;
 
         [Header("Alley-oop")]
-        [Tooltip("A loft to a teammate within this of the rim becomes an alley-oop.")]
+        [Tooltip("A loft to a teammate skying within this of the rim becomes an alley-oop.")]
         public float oopRange = 3.0f;
-        public float oopFlightTime = 1.0f;
+        public float oopFlightTime = 0.65f;
+        [Tooltip("How high a player skies when calling for an alley-oop (well above the rim).")]
+        public float oopSkyHeight = 2.2f;
+        [Tooltip("How long the sky hangs (gravity is softened) so there's time to lob it.")]
+        public float oopSkyHang = 0.85f;
+        [Tooltip("Gravity multiplier while hanging on an oop sky (lower = floats longer).")]
+        [Range(0.1f, 1f)] public float oopSkyGravityScale = 0.4f;
         [Tooltip("Make% bonus on an alley-oop finish (it's a high-percentage play).")]
         [Range(0f, 1f)] public float alleyOopBonus = 0.2f;
 
@@ -278,6 +286,10 @@ namespace MarioBasketball.Gameplay
         public bool FinishTakeoffLeft => _finishTakeoffLeft;
         /// <summary>Hanging on the rim after a two-hand slam (held a beat).</summary>
         public bool IsHanging => _hangTimer > 0f;
+        /// <summary>Skying for an alley-oop — up above the rim, hands ready, hanging.</summary>
+        public bool IsSkyingForOop => _skyTimer > 0f;
+        /// <summary>Seconds since this player gained the ball (0 if they don't have it).</summary>
+        public float TimeWithBall => HasBall ? Time.time - _catchTime : 0f;
         /// <summary>The human is aiming a directed pass (right stick pushed).</summary>
         public bool IsAimingPass => _passAim.magnitude >= passAimDeadzone && HasBall;
         /// <summary>The teammate currently targeted by the pass aim (for icons).</summary>
@@ -343,6 +355,7 @@ namespace MarioBasketball.Gameplay
         bool _finishTakeoffLeft;
         float _hangTimer;
         Vector3 _hangTarget;
+        float _skyTimer;
         Vector2 _passAim;
         bool _iconHeld;
         float _dribbleCooldown;
@@ -458,6 +471,7 @@ namespace MarioBasketball.Gameplay
             if (_stunTimer > 0f) _stunTimer -= dt;
             if (_fallTimer > 0f) _fallTimer -= dt;
             if (_hangTimer > 0f) _hangTimer -= dt;
+            if (_skyTimer > 0f) _skyTimer -= dt;
             if (_diveTimer > 0f) _diveTimer -= dt;
             if (_shoveTimer > 0f) _shoveTimer -= dt;
             if (_pushCooldown > 0f) _pushCooldown -= dt;
@@ -676,7 +690,11 @@ namespace MarioBasketball.Gameplay
             PlanarSpeed = horizontal.magnitude;
 
             if (_cc.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
-            _verticalVelocity += gravity * dt;
+            // Skying for an oop: rise normally to the peak, then soften gravity on
+            // the way down so the player hangs above the rim while the lob arrives.
+            float g = gravity;
+            if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
+            _verticalVelocity += g * dt;
 
             Vector3 velocity = horizontal + Vector3.up * _verticalVelocity;
             _cc.Move(velocity * dt);
@@ -743,7 +761,7 @@ namespace MarioBasketball.Gameplay
                     float dist = d.magnitude;
                     if (dist >= minDist) continue;
                     Vector3 dir = dist > 0.01f ? d / dist : new Vector3(Random.value - 0.5f, 0f, Random.value - 0.5f).normalized;
-                    push += dir * (minDist - dist) * 6f; // proportional to overlap
+                    push += dir * (minDist - dist) * 8f; // proportional to overlap
                 }
             }
             return push;
@@ -801,7 +819,7 @@ namespace MarioBasketball.Gameplay
         {
             var gm = GameManager.Instance;
             Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
-            return hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= paintRadius;
+            return hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= finishRange;
         }
 
         Vector3 RimDirection()
@@ -820,7 +838,9 @@ namespace MarioBasketball.Gameplay
             _finishing = true;
             _finishTimer = 0f;
             _finishAdjusted = false;
-            _finishIsDunk = Effective(StatType.Dunk, 5f) >= dunkThreshold;
+            // Decide dunk vs layup off the base Dunk rating so fatigue doesn't quietly
+            // demote a real dunker to layups — a decent dunker skies for the dunk.
+            _finishIsDunk = (_character != null ? _character.stats.Get(StatType.Dunk) : 5) >= dunkThreshold;
             _finishStyle = PickFinishStyle(_finishIsDunk);
             _finishTakeoffLeft = Random.value < 0.5f;
             // Arcade air: layups are a small hop, dunks soar (over the rim for big
@@ -1120,7 +1140,19 @@ namespace MarioBasketball.Gameplay
         {
             var gm = GameManager.Instance;
             Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
-            return hoop != null && HorizontalDistance(mate.transform.position, hoop.AimPoint) <= oopRange;
+            // Only an alley-oop if the teammate has actually left their feet near
+            // the rim (skied for it) — a loft to a grounded teammate is just a pass.
+            return hoop != null && mate != null && mate.IsAirborne
+                && HorizontalDistance(mate.transform.position, hoop.AimPoint) <= oopRange;
+        }
+
+        /// <summary>AI entry: lob an alley-oop to a teammate who's skying for it.</summary>
+        public void ThrowAlleyOop(PlayerController mate)
+        {
+            if (MatchPause.IsPaused || IsStunned || !HasBall || mate == null) return;
+            _passGestureTimer = passGestureTime;
+            if (GameManager.Instance != null) GameManager.Instance.TryStartFromInbound();
+            ThrowOop(mate, IsPosting);
         }
 
         void ThrowOop(PlayerController mate, bool fromPost)
@@ -1172,8 +1204,18 @@ namespace MarioBasketball.Gameplay
         public void CatchAlleyOop()
         {
             if (!HasBall) return;
-            bool dunk = Effective(StatType.Dunk, 5f) >= dunkThreshold;
+            _skyTimer = 0f;
+            bool dunk = (_character != null ? _character.stats.Get(StatType.Dunk) : 5) >= dunkThreshold;
             FinishShot(dunk, adjusted: false, makeBonus: alleyOopBonus);
+        }
+
+        /// <summary>Pre-emptively leap and hang above the rim, calling for a lob —
+        /// the only way an alley-oop happens. No-op without the ball already gone.</summary>
+        public void SkyForOop()
+        {
+            if (MatchPause.IsPaused || IsStunned || HasBall || IsPosting || !_cc.isGrounded) return;
+            _verticalVelocity = Mathf.Sqrt(-2f * gravity * oopSkyHeight);
+            _skyTimer = oopSkyHang;
         }
 
         /// <summary>The index-th on-court teammate (excluding self) — for icon passing.</summary>

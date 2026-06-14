@@ -91,6 +91,9 @@ namespace MarioBasketball.Bootstrap
             // settles into someone's hands instead of bouncing around wildly. The
             // ball still clanks off the rim, backboard and walls.
             IgnoreBallVsPlayers(gm);
+            // Players don't physically collide with each other — no climbing or
+            // standing on heads; the soft Separation push keeps them spaced out.
+            IgnorePlayerVsPlayers(gm);
 
             // Substitution anchors: benches sit outside each sideline.
             gm.homeBenchAnchor = new Vector3(-(courtWidth / 2f + 1.5f), 1.1f, -2f);
@@ -138,6 +141,29 @@ namespace MarioBasketball.Bootstrap
                 if (p == null) continue;
                 var cc = p.GetComponent<CharacterController>();
                 if (cc != null) Physics.IgnoreCollision(ballCol, cc, true);
+            }
+        }
+
+        void IgnorePlayerVsPlayers(GameManager gm)
+        {
+            var all = new List<CharacterController>();
+            foreach (var team in new[] { gm.Home, gm.Away })
+            {
+                CollectControllers(all, team.onCourt);
+                CollectControllers(all, team.bench);
+            }
+            for (int i = 0; i < all.Count; i++)
+                for (int j = i + 1; j < all.Count; j++)
+                    Physics.IgnoreCollision(all[i], all[j], true);
+        }
+
+        static void CollectControllers(List<CharacterController> list, List<PlayerController> players)
+        {
+            foreach (var p in players)
+            {
+                if (p == null) continue;
+                var cc = p.GetComponent<CharacterController>();
+                if (cc != null) list.Add(cc);
             }
         }
 

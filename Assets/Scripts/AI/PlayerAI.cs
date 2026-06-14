@@ -28,6 +28,13 @@ namespace MarioBasketball.AI
         public float lowShotClock = 4f;
         public float passUpgradeMargin = 1.5f;
 
+        [Header("Put-backs (don't tip every rebound straight back in)")]
+        [Tooltip("Gather a fresh inside catch for this long before putting it up (breaks the insta-tip loop).")]
+        public float putbackSettle = 0.5f;
+        [Tooltip("Distance from the rim a fresh catch may be tipped straight back up.")]
+        public float putbackRange = 1.4f;
+        [Range(0f, 1f)] public float putbackChance = 0.35f;
+
         [Header("Spacing / cuts")]
         public float wingSpacing = 3.5f;
         public float cutTriggerDistance = 3.5f;
@@ -47,6 +54,12 @@ namespace MarioBasketball.AI
         [Header("Alley-oop catch")]
         public float oopChaseRange = 6f;
         public float oopJumpDistance = 2.2f;
+        [Tooltip("A cutter this close to the rim, open, with a good dunk may sky for an oop.")]
+        public float oopSkyDistance = 2.6f;
+        [Tooltip("Per-decision chance an open cutter skies for an alley-oop (kept rare).")]
+        [Range(0f, 1f)] public float oopSkyChance = 0.02f;
+        [Tooltip("Min Dunk to bother skying for an oop.")]
+        public float oopSkyDunkMin = 6f;
 
         [Header("Defense")]
         public float onBallGap = 1.0f;
@@ -156,6 +169,13 @@ namespace MarioBasketball.AI
             float nearestDef = NearestOpponentDistance(gm, transform.position);
             float shotClock = gm.Shot != null ? gm.Shot.Remaining : 20f;
 
+            // A teammate skying for an oop is the priority — lob it up to them.
+            if (_passTimer <= 0f)
+            {
+                var skyer = SkyingTeammate(gm, aim);
+                if (skyer != null) { _pc.ThrowAlleyOop(skyer); _passTimer = passCooldown; return; }
+            }
+
             // Fast break: a big/wing who grabbed the board outlets to a guard who's
             // come back for it, then everyone runs. Otherwise just push it up.
             if (gm.IsFastBreak(_pc.team) && !IsGuard() && _passTimer <= 0f)
@@ -186,9 +206,18 @@ namespace MarioBasketball.AI
 
             if (dist <= shootRange && (quality >= shootQualityThreshold || forced))
             {
-                _pc.SetMoveIntent(Vector2.zero, false);
-                _pc.TriggerShoot();
-                return;
+                // Don't tip every rebound straight back: a fresh catch near the rim
+                // gathers a beat first, and only a point-blank ball gets a quick
+                // put-back (and not every time). Forced (shot clock) always shoots.
+                bool freshNearRim = dist <= _pc.finishRange && _pc.TimeWithBall < putbackSettle;
+                bool quickTip = dist <= putbackRange && Random.value < putbackChance;
+                if (forced || !freshNearRim || quickTip)
+                {
+                    _pc.SetMoveIntent(Vector2.zero, false);
+                    _pc.TriggerShoot();
+                    return;
+                }
+                // else: gather and reset rather than auto-tipping it in.
             }
 
             // Smothered → look for a meaningfully better shot elsewhere.
@@ -271,7 +300,14 @@ namespace MarioBasketball.AI
                 Hoop hoop = gm.GetAttackingHoop(_pc.team);
                 Vector3 aim = hoop != null ? hoop.AimPoint : Vector3.zero;
                 MoveTo(aim, sprint: true);
-                if (HDist(transform.position, aim) < cutReachDistance) _cutting = false;
+                float d = HDist(transform.position, aim);
+                // Open, near the rim, can throw it down → occasionally sky for a lob.
+                if (d < oopSkyDistance && !_pc.IsAirborne
+                    && _pc.EffectiveStat(StatType.Dunk) >= oopSkyDunkMin
+                    && NearestOpponentDistance(gm, transform.position) > openThreshold
+                    && Random.value < oopSkyChance)
+                    _pc.SkyForOop();
+                if (d < cutReachDistance) _cutting = false;
             }
             else
             {
@@ -299,6 +335,18 @@ namespace MarioBasketball.AI
             {
                 MoveTo(SpacingSpot(gm), sprint: true);
             }
+        }
+
+        /// <summary>A teammate currently skying for an oop near the rim, or null.</summary>
+        PlayerController SkyingTeammate(GameManager gm, Vector3 rim)
+        {
+            foreach (var mate in gm.TeamFor(_pc.team).onCourt)
+            {
+                if (mate == null || mate == _pc || !mate.enabled) continue;
+                if (mate.IsSkyingForOop && HDist(mate.transform.position, rim) <= _pc.oopRange + 0.5f)
+                    return mate;
+            }
+            return null;
         }
 
         bool IsGuard() =>

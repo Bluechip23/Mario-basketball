@@ -29,6 +29,8 @@ namespace MarioBasketball.Core
         public int totalQuarters = 4;
         public float shotClockSeconds = 20f;
         public float timeoutEnergyBonus = 30f;
+        [Tooltip("Stamina an Energizer's assist partner gains (Jonah Guy) on a made, assisted basket.")]
+        public float assistEnergyBonus = 8f;
 
         [Header("Stoppage durations (seconds)")]
         public float tipOffDuration = 1.5f;
@@ -267,11 +269,13 @@ namespace MarioBasketball.Core
                 Shot.Reset();
         }
 
-        public void RegisterBasket(TeamSide scoringTeam, int points, PlayerController shooter)
+        public void RegisterBasket(TeamSide scoringTeam, int points, PlayerController shooter, PlayerController assister = null)
         {
             if (State != GameState.Playing) return;
 
             UpdateStreaksOnMake(scoringTeam, shooter);
+            ApplyAssistEnergy(shooter, assister);
+            if (shooter != null && shooter.Character != null) shooter.Character.ShootingRhythm++; // Birdo's Hot Hand
             AddPoints(scoringTeam, points);
 
             // Clock stops; the other team will inbound under the basket.
@@ -281,6 +285,21 @@ namespace MarioBasketball.Core
             _stateTimer = basketMadePause;
         }
 
+        /// <summary>Energizer trait (Jonah Guy): when he's on either end of an
+        /// assisted make — the scorer off a teammate's pass, or the passer of a
+        /// teammate's bucket — that teammate ("the other player") gets a small
+        /// stamina boost.</summary>
+        void ApplyAssistEnergy(PlayerController shooter, PlayerController assister)
+        {
+            if (assister == null || shooter == null) return;
+            if (IsEnergizer(shooter)) assister.Character?.AddEnergy(assistEnergyBonus);
+            if (IsEnergizer(assister)) shooter.Character?.AddEnergy(assistEnergyBonus);
+        }
+
+        static bool IsEnergizer(PlayerController p)
+            => p != null && p.Character != null && p.Character.stats != null
+               && p.Character.stats.hiddenTrait == HiddenTrait.Energizer;
+
         /// <summary>A field-goal miss (rim time-out or a block) — break the
         /// shooter's make streak. Being on fire is unaffected (only the opponent
         /// scoring puts the fire out).</summary>
@@ -289,6 +308,7 @@ namespace MarioBasketball.Core
             if (shooter == null || shooter.Character == null) return;
             shooter.Character.ConsecutiveMakes = 0;
             shooter.Character.OpponentScoredDuringRun = false;
+            shooter.Character.ShootingRhythm--; // Birdo's Hot Hand cools off
         }
 
         /// <summary>

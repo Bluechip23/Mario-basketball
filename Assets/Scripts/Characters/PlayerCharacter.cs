@@ -52,6 +52,12 @@ namespace MarioBasketball.Characters
         public float EnergyFraction => maxEnergy > 0f ? energy / maxEnergy : 0f;
         public bool OnFire { get; private set; }
 
+        /// <summary>Daisy's Killer Instinct bonus: a flat boost the owning
+        /// controller refreshes each frame, scaled by how gassed the opponents
+        /// are (0 for everyone else). It only sharpens her scoring touch and
+        /// on-ball defence — see <see cref="TraitBonusForStat"/>.</summary>
+        public float KillerBonus { get; set; }
+
         // Heat-check streak state, driven by GameManager:
         /// <summary>This player's consecutive made shots (broken by a miss or a
         /// teammate scoring).</summary>
@@ -60,6 +66,15 @@ namespace MarioBasketball.Characters
         /// (disqualifies the 3-in-a-row path to on-fire; the 6-in-a-row path
         /// ignores it).</summary>
         public bool OpponentScoredDuringRun;
+
+        /// <summary>Birdo's Hot Hand running tally: +1 per made field goal, -1 per
+        /// miss (a whole-game total). Her shooting bonus is half of this, truncated
+        /// toward zero — see <see cref="HotHandBonus"/>.</summary>
+        public int ShootingRhythm;
+
+        /// <summary>The Hot Hand rating bonus: +1 for every two net makes, rounded
+        /// toward zero (two misses to drop a tier, symmetric when negative).</summary>
+        public int HotHandBonus => ShootingRhythm / 2;
 
         bool _movingThisFrame;
         bool _sprintingThisFrame;
@@ -122,18 +137,64 @@ namespace MarioBasketball.Characters
             OnFire ? Mathf.Max(EnergyFraction, onFireEffectivenessFloor) : EnergyFraction;
 
         /// <summary>
-        /// The in-game value of a stat after stamina scaling and the on-fire
-        /// bonus. This is what gameplay systems should consume.
+        /// The in-game value of a stat after stamina scaling, the on-fire bonus,
+        /// and any Killer Instinct boost. This is what gameplay systems consume.
         /// </summary>
-        public float GetEffective(StatType stat) => GetEffectiveFor(stats.Get(stat));
+        public float GetEffective(StatType stat) => GetEffectiveForStat(stats.Get(stat), stat);
 
         /// <summary>Apply the same stamina + on-fire scaling to an arbitrary base
-        /// rating (used by traits that override a stat, e.g. quick catch-and-shoot).</summary>
+        /// rating with no trait boost — used by traits that override a stat
+        /// (quick catch-and-shoot, offensive rebound, smooth passer).</summary>
         public float GetEffectiveFor(float rawStat)
         {
             float value = rawStat * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f);
             return Mathf.Clamp(value, 0f, CharacterStats.Max + onFireStatBonus);
         }
+
+        /// <summary>Scale a raw rating for a specific stat, folding in any hidden-
+        /// trait shooting boost (Daisy's Killer Instinct, Birdo's Hot Hand). A
+        /// trait may let one of its stats climb to 11; everything else caps at 10.</summary>
+        public float GetEffectiveForStat(float rawRating, StatType stat)
+        {
+            rawRating += TraitBonusForStat(stat);
+            float ceiling = TraitCeilingForStat(stat);
+            rawRating = Mathf.Min(rawRating, ceiling);
+            float value = rawRating * EffectivenessMultiplier + (OnFire ? onFireStatBonus : 0f);
+            return Mathf.Clamp(value, 0f, ceiling + onFireStatBonus);
+        }
+
+        /// <summary>Hidden-trait bonus to a stat's raw rating: Daisy's Killer
+        /// Instinct (scaled by opponent fatigue) on Mid/3PT/Inside/Perimeter-D,
+        /// or Birdo's Hot Hand (her make/miss rhythm) on 3PT/Mid.</summary>
+        float TraitBonusForStat(StatType stat)
+        {
+            if (stats == null) return 0f;
+            switch (stats.hiddenTrait)
+            {
+                case HiddenTrait.KillerInstinct: return IsKillerStat(stat) ? KillerBonus : 0f;
+                case HiddenTrait.HotHand:        return IsHotHandStat(stat) ? HotHandBonus : 0f;
+                default:                         return 0f;
+            }
+        }
+
+        /// <summary>A trait may lift one of its stats to 11; otherwise stats cap at 10.</summary>
+        float TraitCeilingForStat(StatType stat)
+        {
+            if (stats != null)
+            {
+                if (stats.hiddenTrait == HiddenTrait.KillerInstinct && stat == StatType.MidRange) return 11f;
+                if (stats.hiddenTrait == HiddenTrait.HotHand && IsHotHandStat(stat)) return 11f;
+            }
+            return CharacterStats.Max;
+        }
+
+        // Killer Instinct sharpens shot-making and on-ball defence; Hot Hand only
+        // her jump shot.
+        static bool IsKillerStat(StatType s) =>
+            s == StatType.MidRange || s == StatType.ThreePoint
+            || s == StatType.InsideScoring || s == StatType.PerimeterDefense;
+        static bool IsHotHandStat(StatType s) =>
+            s == StatType.ThreePoint || s == StatType.MidRange;
 
         public void SetOnFire(bool value) => OnFire = value;
 

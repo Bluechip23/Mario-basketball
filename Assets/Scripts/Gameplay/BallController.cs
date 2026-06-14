@@ -52,6 +52,9 @@ namespace MarioBasketball.Gameplay
         public TeamSide ShooterTeam { get; private set; }
         /// <summary>Who launched the current shot (for streak attribution).</summary>
         public PlayerController Shooter { get; private set; }
+        /// <summary>The teammate who assisted the current shot (a valid pass it was
+        /// taken directly off of), or null. Read on a make for assist effects.</summary>
+        public PlayerController Assister { get; private set; }
         /// <summary>True while the current loose ball is a missed-shot rebound
         /// (vs. a steal/pass scramble) — used for offensive-rebound bonuses.</summary>
         public bool IsRebound { get; private set; }
@@ -211,6 +214,7 @@ namespace MarioBasketball.Gameplay
             MarkReleased();
             ShooterTeam = team;
             Shooter = shooter;
+            Assister = shooter != null ? shooter.AssistingPasser : null; // for assist effects on a make
             PendingPoints = points;
             State = BallState.Shot;
             _shotPending = true;
@@ -305,7 +309,33 @@ namespace MarioBasketball.Gameplay
             IsRebound = false;
             IsPass = false;
             IsAlleyOop = false;
+            Assister = null;
             Holder = null;
+        }
+
+        /// <summary>Force the in-flight shot to drop cleanly through the rim
+        /// (Delfan's called shot). Re-arcs the ball from where it is to the
+        /// attacking hoop so it scores. No-op unless a shot is in the air.</summary>
+        public bool ForceMake()
+        {
+            if (State != BallState.Shot) return false;
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(ShooterTeam) : null;
+            if (hoop == null) return false;
+
+            Vector3 target = hoop.AimPoint + ShotMath.AimOffset(true); // dead-centre drop
+            Vector3 start = transform.position;
+            Vector3 to = target - start;
+            const float t = 0.55f;
+            Vector3 v;
+            v.x = to.x / t;
+            v.z = to.z / t;
+            v.y = (to.y - 0.5f * Physics.gravity.y * t * t) / t;
+            _rb.linearVelocity = v;
+            _rb.angularVelocity = Vector3.zero;
+            _shotPending = true;       // still a live shot — the score zone will count it
+            _shotTimer = t + 3f;
+            return true;
         }
 
         void GoLive()

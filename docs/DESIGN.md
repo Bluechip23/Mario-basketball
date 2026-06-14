@@ -172,9 +172,10 @@ and the shooter **fades that way** — the body leans and drifts off the
 square-up while staying faced to the rim; let go and they rise **straight up**
 for a normal shot. A fadeaway is a trade: the separation **lowers the
 defender's block and contest** (scaled by how hard you fade), but it's a
-**harder shot** — a make penalty mitigated by **Mid Range** (fully gone at
-Mid Range 10). Inside finishes (dunks/layups) are unaffected; this is the
-jump-shot game.
+**harder shot** — a **flat make penalty** (`ShotMath.FadeMakePenalty`, scaled
+by how hard you fade) that is **the same for every shooter**; no stat softens
+it. The lone exception is the **Acrobat** trait (Baby Mario), who pays nothing.
+Inside finishes (dunks/layups) are unaffected; this is the jump-shot game.
 
 **Momentum matters.** The fade you actually get depends on the direction you
 were already running. Leaning **with** your momentum gives the full lean;
@@ -208,6 +209,15 @@ unlocks the step-through:
   the fade nearly kills the block.
 - **Up & Under** (A while a bitten fake is live): step through under the
   airborne defender for a nearly free finish.
+
+**Timing the shot.** The footwork (the lunge, spin, power bulldoze, shove) is
+instant — but the **shot at the end is timed**, like a jump shot. Triggering a
+move plants the player and starts a short release meter (the arms and ball rise
+to a peak); press a post button again near the top to release. A clean release
+shoots at full make%, an early or late one drops it (down to
+`postMinTimingMultiplier`). The AI releases on time automatically. Baby Mario's
+**Acrobat** trait applies here too — he barely suffers from a mistimed post
+release (so a hook fired the instant he goes up still drops).
 
 > **Controller-first.** The prototype uses a contextual gamepad layout (face
 > buttons are shot/pass on offense and post moves while posting; D-pad handles
@@ -279,7 +289,27 @@ Hidden traits (wired):
   out of a post-up), despite his real 6.
 - **Koopa — Playmaker**: a teammate who shoots/dunks **directly off his pass**
   (within ~1 s, before driving/dribbling) gets **+2** to the scoring attribute
-  they use. Everyone else `None`.
+  they use.
+- **Baby Mario — Acrobat**: pays **no** make penalty for altering a shot in the
+  air — neither the fadeaway lean nor the L1 air-adjust on a dunk/layup — and
+  suffers **~80% less** from a mistimed release (firing the instant he leaves
+  the floor or holding it too long). He still gets only the same fade
+  *separation* everyone does; he just skips the difficulty.
+- **Daisy — Killer Instinct**: a closer who feeds on tired legs. As the opposing
+  on-court team's energy drains, a bonus (up to `killerMaxBonus`) is added to her
+  **Mid Range, 3-Point, Inside Scoring and Perimeter Defense** only — run them
+  ragged and her scoring touch and on-ball D take over. Only **Mid Range** can be
+  lifted past 10 (it caps at **11**); the other three cap at 10.
+- **Jonah Guy — Energizer**: glue guy. Whenever he scores **off a teammate's
+  assist** or **assists a teammate's score**, that teammate gets a small stamina
+  boost (`assistEnergyBonus`).
+- **Delfan — Called Shot**: twice a game, **double-tap turbo** while one of his
+  shots (taken from within half court) is in the air to **guarantee** it drops.
+- **Birdo — Hot Hand**: a rhythm shooter. A whole-game tally ticks +1 per made
+  field goal and −1 per miss; her **3-Point and Mid Range** gain **+1 for every
+  two net makes** (rounded toward zero — so two misses are needed to drop a tier,
+  and it works the same going negative). Those two stats can climb to **11**.
+  Everyone else `None`.
 
 Lineups are chosen on the pre-match **team select** screen (see below).
 

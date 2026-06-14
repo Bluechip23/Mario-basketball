@@ -30,7 +30,7 @@ namespace MarioBasketball.Gameplay
                 return;
 
             if (GameManager.Instance != null)
-                GameManager.Instance.RegisterBasket(ball.ShooterTeam, ball.PendingPoints, ball.Shooter);
+                GameManager.Instance.RegisterBasket(ball.ShooterTeam, ball.PendingPoints, ball.Shooter, ball.Assister);
 
             // Snap the net.
             if (transform.parent != null)

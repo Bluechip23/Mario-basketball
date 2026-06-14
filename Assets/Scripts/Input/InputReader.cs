@@ -30,6 +30,10 @@ namespace MarioBasketball.InputControl
         /// held is a pass aim, not a flick.</summary>
         public event Action<Vector2> DribbleFlick;
 
+        /// <summary>Turbo (sprint) tapped twice in quick succession — Delfan's
+        /// "called shot" gesture while a shot is in the air.</summary>
+        public event Action TurboDoubleTap;
+
         public event Action ShootPressed;
         public event Action ShootReleased;
         public event Action PassPressed;
@@ -151,6 +155,27 @@ namespace MarioBasketball.InputControl
             PostUpHeld = _postUp.IsPressed();
             IconHeld = _fake.IsPressed(); // LB / C held = pass-icon modifier
             DetectFlick();
+            DetectTurboDoubleTap();
+        }
+
+        /// <summary>Max seconds between the two turbo taps to count as a double-tap.</summary>
+        public float turboDoubleTapWindow = 0.3f;
+        bool _prevSprint;
+        float _lastSprintPressTime = -10f;
+
+        // Two quick presses of turbo fire TurboDoubleTap (the called-shot gesture).
+        void DetectTurboDoubleTap()
+        {
+            if (SprintHeld && !_prevSprint) // a fresh turbo press
+            {
+                if (Time.unscaledTime - _lastSprintPressTime <= turboDoubleTapWindow)
+                {
+                    TurboDoubleTap?.Invoke();
+                    _lastSprintPressTime = -10f; // consume, so a third tap doesn't re-fire
+                }
+                else _lastSprintPressTime = Time.unscaledTime;
+            }
+            _prevSprint = SprintHeld;
         }
 
         /// <summary>Stick magnitude that arms a flick.</summary>

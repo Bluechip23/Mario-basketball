@@ -157,8 +157,8 @@ namespace MarioBasketball.Presentation
                 SetX(_kneeR, idleKneeDegrees + Mathf.Max(0f, -recover) * runKneeDegrees * speedScale);
             }
 
-            // A released jump shot holds its follow-through briefly.
-            bool shooting = _pc.IsShooting;
+            // A released jump shot (or timed post shot) holds its follow-through.
+            bool shooting = _pc.IsShooting || _pc.IsPostShooting;
             if (_wasShooting && !shooting) _followThrough = followThroughTime;
             else if (_followThrough > 0f) _followThrough -= Time.deltaTime;
             _wasShooting = shooting;
@@ -166,8 +166,11 @@ namespace MarioBasketball.Presentation
             if (shooting)
             {
                 // Form tracks the shot meter: gather → set → release at the apex.
-                // The wrist stays cocked back under the ball until the flick.
-                float k = Mathf.Clamp01(_pc.ShotChargeFraction / Mathf.Max(0.01f, _pc.ShotPerfectFraction));
+                // The wrist stays cocked back under the ball until the flick. A
+                // post shot rides its own release meter the same way.
+                float charge = _pc.IsPostShooting ? _pc.PostShotChargeFraction : _pc.ShotChargeFraction;
+                float perfect = _pc.IsPostShooting ? _pc.PostShotPerfectFraction : _pc.ShotPerfectFraction;
+                float k = Mathf.Clamp01(charge / Mathf.Max(0.01f, perfect));
                 Pose(_armR, _elbowR, _wristR,
                     Mathf.Lerp(gatherArmDegrees, releaseArmDegrees, k),
                     Mathf.Lerp(gatherElbowDegrees, releaseElbowDegrees, k),

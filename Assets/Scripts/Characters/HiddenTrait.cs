@@ -50,6 +50,49 @@ namespace MarioBasketball.Characters
         /// (within ~1 s of the catch, before dribbling) gets +2 to the scoring
         /// attribute they use (Koopa).
         /// </summary>
-        Playmaker
+        Playmaker,
+
+        /// <summary>
+        /// Acrobat: improvises shots with no cost. Pays <b>no</b> make penalty
+        /// for altering a shot in mid-air (a fadeaway lean, or the L1 air-adjust
+        /// on a dunk/layup), and suffers ~80% less from shot mistiming (firing
+        /// the instant he goes up, or holding the release too long). The fade
+        /// still buys him the same separation everyone gets — he just doesn't eat
+        /// the difficulty. See <c>ShotMath</c> / <c>PlayerController</c> (Baby Mario).
+        /// </summary>
+        Acrobat,
+
+        /// <summary>
+        /// Killer Instinct: a closer who feeds on tired legs. As the opposing
+        /// on-court team's energy drains, <i>every</i> one of her effective stats
+        /// climbs (up to a cap at full opponent fatigue) — run them ragged and
+        /// she takes over. See <c>PlayerController</c> (Daisy).
+        /// </summary>
+        KillerInstinct,
+
+        /// <summary>
+        /// Energizer: a glue guy whose connections lift his teammates. Whenever
+        /// he scores off a teammate's assist, or assists a teammate's score, that
+        /// teammate gets a small stamina boost. See <c>GameManager.RegisterBasket</c>
+        /// (Jonah Guy).
+        /// </summary>
+        Energizer,
+
+        /// <summary>
+        /// Called Shot: twice a game, double-tap turbo while one of his shots
+        /// (taken from within half court) is in the air to guarantee it drops.
+        /// See <c>PlayerController</c> / <c>BallController.ForceMake</c> (Delfan).
+        /// </summary>
+        CalledShot,
+
+        /// <summary>
+        /// Hot Hand: a rhythm shooter who rides streaks. A running counter ticks
+        /// up on each make and down on each miss; her <b>3-Point and Mid Range</b>
+        /// gain +1 for every two net makes (truncated toward zero, so it takes two
+        /// misses to drop a tier, and it works the same going negative). Those two
+        /// stats can climb to 11. See <c>PlayerCharacter</c> /
+        /// <c>GameManager</c> (Birdo).
+        /// </summary>
+        HotHand
     }
 }

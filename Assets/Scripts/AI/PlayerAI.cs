@@ -51,6 +51,8 @@ namespace MarioBasketball.AI
         [Header("Defense")]
         public float onBallGap = 1.0f;
         public float offBallGap = 1.3f;
+        [Tooltip("Jump to contest a shot/dunk within this distance of the ball-handler.")]
+        public float contestRange = 2.4f;
         [Range(0f, 1f)] public float helpSag = 0.25f;
         public float sprintDistance = 4f;
         public float stealRange = 1.0f;
@@ -399,6 +401,8 @@ namespace MarioBasketball.AI
                 MoveTo(target, sprint: transition || HDist(transform.position, target) > sprintDistance);
 
                 float onBall = HDist(transform.position, holder.transform.position);
+                // Go up with the dunker/shooter — a great shot-blocker rises high.
+                if ((holder.IsShooting || holder.IsFinishing) && onBall <= contestRange) _pc.ContestJump();
                 if (onBall <= stealRange) _pc.TriggerSteal();
                 if (onBall <= pushRange && Random.value < pushChance) _pc.AttemptPush();
                 return;

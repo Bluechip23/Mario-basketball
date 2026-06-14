@@ -65,6 +65,11 @@ namespace MarioBasketball.Core
         public float passInterceptRadius = 1.1f;
         [Tooltip("A pass must travel at least this far from the passer before a defender can intercept — stops the passer's own man stealing it the instant it's released.")]
         public float passInterceptMinTravel = 1.6f;
+        [Header("Pass interception (one Steals-vs-handling roll per pass)")]
+        [Range(0f, 1f)] public float passInterceptBase = 0.12f;
+        public float passInterceptScale = 0.035f;
+        [Range(0f, 1f)] public float passInterceptMin = 0.02f;
+        [Range(0f, 1f)] public float passInterceptMax = 0.45f;
         [Tooltip("If a loose ball stays uncaught this long it's awarded to the nearest player, so a scramble can never stall the match.")]
         public float looseBallFailsafe = 2.5f;
 
@@ -235,6 +240,16 @@ namespace MarioBasketball.Core
 
             if (best != null)
             {
+                // A defender picking off a pass isn't automatic: it's a single
+                // Steals-vs-Ball-Handling roll per pass. Miss it and the ball flies
+                // on to its target instead of being plucked for free.
+                if (ball.IsPass && best.team != ball.PassingTeam)
+                {
+                    if (ball.PassContested) return; // already had its one shot
+                    ball.PassContested = true;
+                    if (UnityEngine.Random.value >= InterceptChance(best, ball.Passer)) return;
+                }
+
                 // Capture pass info before PickUp clears it.
                 bool oop = ball.IsAlleyOop && best.team == ball.PassingTeam && NearOwnRim(best);
                 PlayerController passer = (ball.IsPass && best.team == ball.PassingTeam) ? ball.Passer : null;
@@ -261,6 +276,16 @@ namespace MarioBasketball.Core
                     if (best.isHuman) Haptics.Play(Haptics.Cue.Rebound);
                 }
             }
+        }
+
+        /// <summary>Chance a defender picks off a pass — Steals vs the passer's
+        /// Ball Handling, low and clamped (one roll per pass).</summary>
+        float InterceptChance(PlayerController defender, PlayerController passer)
+        {
+            float steal = defender.EffectiveStat(StatType.Steals);
+            float handle = passer != null ? passer.EffectiveStat(StatType.BallHandling) : 5f;
+            return Mathf.Clamp(passInterceptBase + passInterceptScale * (steal - handle),
+                passInterceptMin, passInterceptMax);
         }
 
         bool NearOwnRim(PlayerController p)
@@ -733,13 +758,22 @@ namespace MarioBasketball.Core
             Vector3 elbowSpot   = new Vector3(2.45f, 1.1f, ftZ);                   // free-throw elbow
             Vector3 wingSpot    = new Vector3(-4.7f, 1.1f, hp.z - dir * 5.1f);     // opposite wing, beyond the arc
 
-            PlayerController big   = Take(pool, PlayerArchetype.Big)   ?? TakeAny(pool);
-            PlayerController guard = Take(pool, PlayerArchetype.Guard) ?? TakeAny(pool);
-            PlayerController wing  = Take(pool, PlayerArchetype.Wing)  ?? TakeAny(pool);
+            // The human inbounds for their team so they can dribble it in (not be
+            // stuck only able to pass); otherwise the big takes it out.
+            PlayerController inb = TakeHuman(pool) ?? Take(pool, PlayerArchetype.Big) ?? TakeAny(pool);
+            PlayerController second = Take(pool, PlayerArchetype.Guard) ?? TakeAny(pool);
+            PlayerController third  = Take(pool, PlayerArchetype.Wing)  ?? TakeAny(pool);
 
-            if (big != null)   { big.Teleport(inboundSpot); inbounder = big; }
-            if (guard != null) guard.Teleport(elbowSpot);
-            if (wing != null)  wing.Teleport(wingSpot);
+            if (inb != null)    { inb.Teleport(inboundSpot); inbounder = inb; }
+            if (second != null) second.Teleport(elbowSpot);
+            if (third != null)  third.Teleport(wingSpot);
+        }
+
+        static PlayerController TakeHuman(List<PlayerController> pool)
+        {
+            for (int i = 0; i < pool.Count; i++)
+                if (pool[i].isHuman) { var p = pool[i]; pool.RemoveAt(i); return p; }
+            return null;
         }
 
         static PlayerController Take(List<PlayerController> pool, PlayerArchetype arch)

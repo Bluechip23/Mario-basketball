@@ -154,6 +154,19 @@ namespace MarioBasketball.AI
             float nearestDef = NearestOpponentDistance(gm, transform.position);
             float shotClock = gm.Shot != null ? gm.Shot.Remaining : 20f;
 
+            // Fast break: a big/wing who grabbed the board outlets to a guard who's
+            // come back for it, then everyone runs. Otherwise just push it up.
+            if (gm.IsFastBreak(_pc.team) && !IsGuard() && _passTimer <= 0f)
+            {
+                var outlet = OpenGuard(gm);
+                if (outlet != null)
+                {
+                    _pc.PassToward(outlet.transform.position + Vector3.up * 0.6f);
+                    _passTimer = passCooldown;
+                    return;
+                }
+            }
+
             // Back a smaller, guarding defender down when we're a post threat.
             if (ShouldPostUp(dist, nearestDef))
             {
@@ -236,6 +249,14 @@ namespace MarioBasketball.AI
 
         void OffenseOffBall(GameManager gm)
         {
+            // On a fast break, leak out: non-guards sprint to fill the lanes at the
+            // rim we're attacking; the guard comes back to receive the outlet.
+            if (gm.IsFastBreak(_pc.team))
+            {
+                FillFastBreakLane(gm);
+                return;
+            }
+
             if (_cutTimer <= 0f)
             {
                 _cutTimer = cutRepathInterval;
@@ -254,6 +275,46 @@ namespace MarioBasketball.AI
             {
                 MoveTo(SpacingSpot(gm), sprint: false);
             }
+        }
+
+        /// <summary>Transition off-ball: the guard peels back toward the ball for
+        /// the outlet (offset to the side for a passing angle); everyone else
+        /// sprints out to fill a lane near the basket we're attacking.</summary>
+        void FillFastBreakLane(GameManager gm)
+        {
+            var handler = gm.ball != null ? gm.ball.Holder : null;
+            if (IsGuard() && handler != null && handler != _pc)
+            {
+                Hoop hoop = gm.GetAttackingHoop(_pc.team);
+                Vector3 toAim = (hoop != null ? hoop.AimPoint : Vector3.zero) - handler.transform.position;
+                toAim.y = 0f;
+                Vector3 fwd = toAim.sqrMagnitude > 0.01f ? toAim.normalized : Vector3.forward;
+                Vector3 lane = Vector3.Cross(Vector3.up, fwd);
+                float side = (GetInstanceID() & 1) == 0 ? 1f : -1f;
+                MoveTo(handler.transform.position + lane * side * 2.5f, sprint: true);
+            }
+            else
+            {
+                MoveTo(SpacingSpot(gm), sprint: true);
+            }
+        }
+
+        bool IsGuard() =>
+            _pc.Character != null && _pc.Character.stats != null
+            && _pc.Character.stats.Archetype == PlayerArchetype.Guard;
+
+        /// <summary>An open guard teammate to outlet the break to, or null.</summary>
+        PlayerController OpenGuard(GameManager gm)
+        {
+            foreach (var mate in gm.TeamFor(_pc.team).onCourt)
+            {
+                if (mate == null || mate == _pc || !mate.enabled) continue;
+                if (mate.Character == null || mate.Character.stats == null) continue;
+                if (mate.Character.stats.Archetype != PlayerArchetype.Guard) continue;
+                if (NearestOpponentDistance(gm, mate.transform.position) < openThreshold * 0.6f) continue;
+                return mate;
+            }
+            return null;
         }
 
         /// <summary>How good a shot from here is: scoring stat for the range
@@ -317,6 +378,8 @@ namespace MarioBasketball.AI
         void Defense(GameManager gm, PlayerController holder)
         {
             Vector3 defendHoop = DefendedHoop(gm);
+            // Opponent fast break: get back, don't jog — follow your man down court.
+            bool transition = gm.IsFastBreak(GameManager.Opponent(_pc.team));
 
             // If I'm being backed down, hold goal-side; my resistance is automatic.
             if (holder != null && holder.IsPosting && holder.Post != null && holder.Post.EngagedDefender == _pc)
@@ -333,7 +396,7 @@ namespace MarioBasketball.AI
                 Vector3 toHoop = (defendHoop - holder.transform.position);
                 toHoop.y = 0f;
                 Vector3 target = holder.transform.position + toHoop.normalized * onBallGap;
-                MoveTo(target, sprint: HDist(transform.position, target) > sprintDistance);
+                MoveTo(target, sprint: transition || HDist(transform.position, target) > sprintDistance);
 
                 float onBall = HDist(transform.position, holder.transform.position);
                 if (onBall <= stealRange) _pc.TriggerSteal();
@@ -345,7 +408,7 @@ namespace MarioBasketball.AI
                                    ?? NearestOpponent(gm, transform.position, exclude: null);
             if (man == null)
             {
-                MoveTo(defendHoop, sprint: false);
+                MoveTo(defendHoop, sprint: transition);
                 return;
             }
 
@@ -357,7 +420,7 @@ namespace MarioBasketball.AI
             Vector3 ballPos = gm.ball != null ? gm.ball.transform.position : basePos;
             Vector3 help = ballPos - basePos; help.y = 0f;
             Vector3 target2 = basePos + help * helpSag;
-            MoveTo(target2, sprint: HDist(transform.position, target2) > sprintDistance);
+            MoveTo(target2, sprint: transition || HDist(transform.position, target2) > sprintDistance);
         }
 
         // ---- Shared queries ------------------------------------------------

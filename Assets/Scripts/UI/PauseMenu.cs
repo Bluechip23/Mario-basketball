@@ -16,10 +16,11 @@ namespace MarioBasketball.UI
     /// </summary>
     public class PauseMenu : MonoBehaviour
     {
-        static readonly string[] Items = { "Resume", "Stats", "Settings", "Restart", "Quit" };
+        static readonly string[] Items = { "Resume", "Stats", "Box Score", "Settings", "Restart", "Quit" };
 
         InputAction _pause;
         bool _showStats;
+        bool _showBox;
         bool _inSettings;
         int _sel;
         MenuNav _nav;
@@ -70,6 +71,7 @@ namespace MarioBasketball.UI
             else
             {
                 _showStats = false;
+                _showBox = false;
                 CloseSettings();
             }
         }
@@ -82,6 +84,11 @@ namespace MarioBasketball.UI
             if (_showStats)
             {
                 if (_nav.East || _nav.Submit) _showStats = false;
+                return;
+            }
+            if (_showBox)
+            {
+                if (_nav.East || _nav.Submit) _showBox = false;
                 return;
             }
 
@@ -97,9 +104,10 @@ namespace MarioBasketball.UI
             {
                 case 0: SetPaused(false); break;
                 case 1: _showStats = true; break;
-                case 2: OpenSettings(); break;
-                case 3: Restart(); break;
-                case 4: Application.Quit(); break;
+                case 2: _showBox = true; break;
+                case 3: OpenSettings(); break;
+                case 4: Restart(); break;
+                case 5: Application.Quit(); break;
             }
         }
 
@@ -131,12 +139,29 @@ namespace MarioBasketball.UI
             GUI.color = prev;
 
             if (_showStats) DrawStats();
+            else if (_showBox) DrawBoxScore();
             else DrawMenu();
+        }
+
+        void DrawBoxScore()
+        {
+            float w = Mathf.Min(Screen.width - 40f, 760f);
+            float h = Screen.height - 80f;
+            var rect = new Rect((Screen.width - w) / 2f, 40f, w, h);
+            GUILayout.BeginArea(rect, GUI.skin.box);
+
+            GUILayout.Label("BOX SCORE", _title);
+            _scroll = GUILayout.BeginScrollView(_scroll);
+            BoxScoreView.Draw(GameManager.Instance, _header, _row);
+            GUILayout.EndScrollView();
+
+            if (GUILayout.Button("Back", _button, GUILayout.Height(36))) _showBox = false;
+            GUILayout.EndArea();
         }
 
         void DrawMenu()
         {
-            float w = 320f, h = 340f;
+            float w = 320f, h = 400f;
             var rect = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             GUI.Box(rect, GUIContent.none);
             GUI.Label(new Rect(rect.x, rect.y + 10, rect.width, 32), "PAUSED", _title);

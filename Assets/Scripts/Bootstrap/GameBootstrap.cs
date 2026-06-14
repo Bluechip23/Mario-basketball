@@ -86,6 +86,12 @@ namespace MarioBasketball.Bootstrap
 
             gm.ball = BuildBall(new Vector3(0f, 1.1f, 0f));
 
+            // Stop the loose ball from pinballing off the players' capsules — it
+            // passes through bodies and is resolved by the rebound contest, so it
+            // settles into someone's hands instead of bouncing around wildly. The
+            // ball still clanks off the rim, backboard and walls.
+            IgnoreBallVsPlayers(gm);
+
             // Substitution anchors: benches sit outside each sideline.
             gm.homeBenchAnchor = new Vector3(-(courtWidth / 2f + 1.5f), 1.1f, -2f);
             gm.awayBenchAnchor = new Vector3(courtWidth / 2f + 1.5f, 1.1f, 2f);
@@ -105,8 +111,34 @@ namespace MarioBasketball.Bootstrap
             switcher.initial = gm.humanPlayer;
 
             gameObject.AddComponent<DebugHUD>();
+            gameObject.AddComponent<BoxScoreHUD>();
             gameObject.AddComponent<DebugMatchControls>();
             gameObject.AddComponent<PauseMenu>();
+            gameObject.AddComponent<MarioBasketball.Core.Haptics>();
+        }
+
+        /// <summary>Disable physical collisions between the ball and every player's
+        /// body capsule (both teams, court and bench), so a loose ball doesn't
+        /// ricochet off players.</summary>
+        void IgnoreBallVsPlayers(GameManager gm)
+        {
+            var ballCol = gm.ball != null ? gm.ball.GetComponent<Collider>() : null;
+            if (ballCol == null) return;
+            foreach (var team in new[] { gm.Home, gm.Away })
+            {
+                IgnoreList(ballCol, team.onCourt);
+                IgnoreList(ballCol, team.bench);
+            }
+        }
+
+        static void IgnoreList(Collider ballCol, List<PlayerController> players)
+        {
+            foreach (var p in players)
+            {
+                if (p == null) continue;
+                var cc = p.GetComponent<CharacterController>();
+                if (cc != null) Physics.IgnoreCollision(ballCol, cc, true);
+            }
         }
 
         // ---- Teams ---------------------------------------------------------

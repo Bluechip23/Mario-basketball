@@ -37,6 +37,8 @@ namespace MarioBasketball.Gameplay
         public float dribbleSpeed = 6f; // legacy; kept for the animator
         [Tooltip("Seconds the releaser can't re-grab after shooting/passing.")]
         public float releaseLockDuration = 0.4f;
+        [Tooltip("Seconds a thrown pass is in the air before ANYONE can grab it, so the passer's own defender can't pick it off the instant it leaves the hand.")]
+        public float passArmTime = 0.16f;
         [Tooltip("A missed shot becomes a live (grabbable) rebound once it falls below this height.")]
         public float reboundHeight = 2.2f;
         [Tooltip("How long a thrown pass stays an 'in-flight pass' (Steals to intercept) before becoming a true loose ball (Rebounds).")]
@@ -65,6 +67,9 @@ namespace MarioBasketball.Gameplay
         public TeamSide PassingTeam { get; private set; }
         /// <summary>The player who threw the in-flight pass (for assist traits).</summary>
         public PlayerController Passer { get; private set; }
+        /// <summary>Where the current in-flight pass was released (so a defender
+        /// can't pick it off until it's travelled past them).</summary>
+        public Vector3 PassOrigin { get; private set; }
         /// <summary>True while a lob is an alley-oop — a teammate catching it near
         /// the rim finishes immediately.</summary>
         public bool IsAlleyOop { get; private set; }
@@ -75,6 +80,7 @@ namespace MarioBasketball.Gameplay
         bool _shotPending;
         PlayerController _recentReleaser;
         float _releaseLockTimer;
+        float _passArmTimer;
 
         void Awake()
         {
@@ -86,13 +92,20 @@ namespace MarioBasketball.Gameplay
         {
             if (_releaseLockTimer > 0f)
                 _releaseLockTimer -= Time.deltaTime;
+            if (_passArmTimer > 0f)
+                _passArmTimer -= Time.deltaTime;
 
             if (State == BallState.Held && Holder != null)
             {
-                if (_crossTimer > 0f) _crossTimer -= Time.deltaTime;
-                // Bounce only while actively dribbling (or mid-crossover); held
-                // while stationary it's palmed — no auto-bounce.
-                if (Holder.IsDribbling || _crossTimer > 0f)
+                if (_moveTimer > 0f)
+                {
+                    _moveTimer -= Time.deltaTime;
+                    if (_moveTimer <= 0f && DribbleMoves.SwitchesHands(_moveType)) _handSign = -_handSign;
+                }
+                // Bounce while dribbling (or mid-move), and keep the dribble alive
+                // in the post — backing down / posting up does not pick the ball
+                // up. Held still in triple-threat it's palmed (no auto-bounce).
+                if (Holder.IsDribblingBall || _moveTimer > 0f)
                     transform.position = DribblePosition();
                 else
                     transform.position = Vector3.Lerp(transform.position, Holder.CarriedBallPoint, followLerp * Time.deltaTime);
@@ -123,11 +136,14 @@ namespace MarioBasketball.Gameplay
                     _passTimer -= Time.deltaTime;
                     if (_passTimer <= 0f) { IsPass = false; IsAlleyOop = false; }
                 }
-                // A loose ball on the floor sheds speed so the scramble resolves
-                // near the players instead of pinballing around the court.
-                if (!_rb.isKinematic && !IsPass && transform.position.y < looseRollHeight)
+                // A loose ball sheds horizontal speed so the scramble resolves
+                // near the players instead of pinballing around the court — hard on
+                // the floor, gentler in the air so a high bounce still settles down
+                // toward the players rather than rocketing off a wall.
+                if (!_rb.isKinematic && !IsPass)
                 {
-                    float keep = Mathf.Max(0f, 1f - looseRollDamping * Time.deltaTime);
+                    float damp = transform.position.y < looseRollHeight ? looseRollDamping : looseRollDamping * 0.4f;
+                    float keep = Mathf.Max(0f, 1f - damp * Time.deltaTime);
                     Vector3 v = _rb.linearVelocity;
                     _rb.linearVelocity = new Vector3(v.x * keep, v.y, v.z * keep);
                 }
@@ -136,7 +152,9 @@ namespace MarioBasketball.Gameplay
 
         float _passTimer;
         int _handSign = 1;     // which hand the ball is on (+1 right, -1 left)
-        float _crossTimer;     // a low crossover sweep in progress
+        DribbleMoveType _moveType;
+        float _moveTimer;      // a dribble move's ball path in progress
+        float _moveDuration;
         bool _wasDribbling;
         float _dribbleStart;   // when the current dribble began (phase anchor)
 
@@ -150,43 +168,117 @@ namespace MarioBasketball.Gameplay
         public float DribblePhase01 => ((Time.time - _dribbleStart) * dribbleHz) % 1f;
 
         /// <summary>Sweep the ball low across to the other hand (a crossover).</summary>
-        public void Crossover() => _crossTimer = crossoverDuration;
+        public void Crossover() => DribbleMove(DribbleMoveType.Crossover);
 
-        /// <summary>A real bouncing dribble beside the ball-handler (drops to the
-        /// floor and back to hip height), with a low cross-sweep during a move.</summary>
+        /// <summary>Run a specific dribble move's ball path. The matching body pose
+        /// is driven by <c>ProceduralAnimator</c> from the holder's move state.</summary>
+        public void DribbleMove(DribbleMoveType type)
+        {
+            _moveType = type;
+            _moveDuration = DribbleMoves.Duration(type);
+            _moveTimer = _moveDuration;
+        }
+
+        /// <summary>Where the ball sits this frame: a real bouncing dribble beside
+        /// the handler, or the distinct path of a dribble move in progress.</summary>
         Vector3 DribblePosition()
         {
             float ballRadius = transform.localScale.x * 0.5f;
             float groundY = Holder.transform.position.y - Holder.BodyHeight * 0.5f;
             float hipY = Holder.transform.position.y;            // ~hip/waist
             Vector3 ground = Holder.transform.position;
+            Vector3 right = Holder.transform.right;
+            Vector3 fwd = Holder.transform.forward;
+            float lowY = groundY + ballRadius;
 
-            if (_crossTimer > 0f)
+            if (_moveTimer > 0f)
             {
-                // Stays low and sweeps from one hand to the other.
-                float k = 1f - _crossTimer / crossoverDuration;
-                float side = Mathf.Lerp(_handSign, -_handSign, k) * dribbleHandSide;
-                if (_crossTimer - Time.deltaTime <= 0f) _handSign = -_handSign;
-                Vector3 cp = ground + Holder.transform.right * side + Holder.transform.forward * dribbleForward;
-                cp.y = groundY + ballRadius + 0.12f;
-                return cp;
+                float p = _moveDuration > 0.0001f ? Mathf.Clamp01(1f - _moveTimer / _moveDuration) : 1f;
+                float s = _handSign; // starting hand (sign)
+                switch (_moveType)
+                {
+                    case DribbleMoveType.Crossover:
+                    {
+                        // Wide and hard across to the other hand, kept low.
+                        float x = Mathf.Lerp(s, -s, Smooth(p)) * dribbleHandSide * 1.7f;
+                        return At(ground, right, fwd, x, dribbleForward, lowY + 0.10f);
+                    }
+                    case DribbleMoveType.Hesitation:
+                    {
+                        // Hold the ball out, hitch, then rip it across.
+                        float k = p < 0.45f ? 0f : (p - 0.45f) / 0.55f;
+                        float x = Mathf.Lerp(s, -s, Smooth(k)) * dribbleHandSide * 1.5f;
+                        return At(ground, right, fwd, x, dribbleForward * 1.2f, lowY + 0.12f);
+                    }
+                    case DribbleMoveType.BehindBack:
+                    {
+                        // Crosses while wrapping behind the hips.
+                        float x = Mathf.Lerp(s, -s, Smooth(p)) * dribbleHandSide * 1.2f;
+                        float behind = -Mathf.Sin(Mathf.PI * p) * dribbleHandSide * 1.6f;
+                        return At(ground, right, fwd, x, dribbleForward + behind, lowY + 0.20f);
+                    }
+                    case DribbleMoveType.BetweenLegs:
+                    {
+                        // Dips to the floor between the feet, crossing to the other hand.
+                        float x = Mathf.Lerp(s, -s, Smooth(p)) * dribbleHandSide * 0.7f;
+                        float dip = Mathf.Abs(2f * p - 1f); // lowest at the midpoint
+                        return At(ground, right, fwd, x, dribbleForward * 0.6f, lowY + dip * 0.22f);
+                    }
+                    case DribbleMoveType.Spin:
+                    {
+                        // Cradled close and orbiting as the body whips around.
+                        float ang = p * Mathf.PI * 2f;
+                        float r = dribbleHandSide * 0.55f;
+                        Vector3 sp = ground + right * (Mathf.Cos(ang) * r)
+                                   + fwd * (dribbleForward * 0.4f + Mathf.Sin(ang) * r * 0.3f);
+                        sp.y = hipY - 0.05f;
+                        return sp;
+                    }
+                    case DribbleMoveType.OffTheHead:
+                    {
+                        // Tossed up and forward over the defender, then back down.
+                        float lift = Mathf.Sin(Mathf.PI * p);
+                        float fwdAmt = dribbleForward + lift * 1.2f;
+                        Vector3 op = ground + right * (s * dribbleHandSide * 0.2f) + fwd * fwdAmt;
+                        op.y = hipY + lift * Holder.BodyHeight * 0.95f;
+                        return op;
+                    }
+                    case DribbleMoveType.StepBack:
+                    {
+                        // Pushed back behind the body to open up shooting space.
+                        float back = -Mathf.Sin(Mathf.PI * p) * 0.55f;
+                        return At(ground, right, fwd, s * dribbleHandSide, dribbleForward + back, lowY + 0.12f);
+                    }
+                }
             }
 
             // Parabolic bounce: hip at the ends of the cycle, floor in the middle.
             float frac = DribblePhase01;
             float u = 2f * frac - 1f;
-            float y = Mathf.Lerp(groundY + ballRadius, hipY, u * u);
+            float y = Mathf.Lerp(lowY, hipY, u * u);
             // On the move the ball is pushed out ahead of the body.
             float lead = dribbleForward + dribbleForwardPerSpeed * Holder.PlanarSpeed;
-            Vector3 pos = ground + Holder.transform.right * (_handSign * dribbleHandSide) + Holder.transform.forward * lead;
+            Vector3 pos = ground + right * (_handSign * dribbleHandSide) + fwd * lead;
             pos.y = y;
             return pos;
+        }
+
+        static float Smooth(float t) => Mathf.SmoothStep(0f, 1f, t);
+
+        static Vector3 At(Vector3 ground, Vector3 right, Vector3 fwd, float x, float z, float y)
+        {
+            Vector3 p = ground + right * x + fwd * z;
+            p.y = y;
+            return p;
         }
 
         /// <summary>Whether <paramref name="player"/> may scoop up this loose ball.</summary>
         public bool CanBePickedUpBy(PlayerController player)
         {
             if (State != BallState.Free) return false;
+            // A just-thrown pass is briefly untouchable so it actually leaves the
+            // passer instead of being scooped by the defender right next to them.
+            if (_passArmTimer > 0f) return false;
             if (player != null && player == _recentReleaser && _releaseLockTimer > 0f) return false;
             return true;
         }
@@ -251,7 +343,9 @@ namespace MarioBasketball.Gameplay
             IsAlleyOop = alleyOop;
             PassingTeam = thrower;
             Passer = passer;
+            PassOrigin = transform.position;
             _passTimer = passLiveTime;
+            _passArmTimer = passArmTime; // brief window where it can't be grabbed
             GoLive();
 
             Vector3 start = transform.position;

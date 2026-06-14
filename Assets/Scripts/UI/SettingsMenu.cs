@@ -18,10 +18,13 @@ namespace MarioBasketball.UI
         /// <summary>Invoked when the player backs out (the opener restores itself).</summary>
         public Action onClose;
 
-        // Row order: volume, quarter length, shot clock, controls, back.
-        const int RowCount = 5;
-        const int ControlsRow = 3;
-        const int BackRow = 4;
+        // Row order: volume, quarter length, shot clock, vibration, box score,
+        // controls, back.
+        const int RowCount = 7;
+        const int VibrationRow = 3;
+        const int BoxScoreRow = 4;
+        const int ControlsRow = 5;
+        const int BackRow = 6;
         int _row;
         bool _showControls;
         MenuNav _nav;
@@ -79,6 +82,8 @@ namespace MarioBasketball.UI
             // so we must return immediately and never touch _nav again this frame.
             if (_nav.Submit)
             {
+                if (_row == VibrationRow) { GameSettings.Vibration = !GameSettings.Vibration; return; }
+                if (_row == BoxScoreRow) { GameSettings.ShowBoxScore = !GameSettings.ShowBoxScore; return; }
                 if (_row == ControlsRow) { _showControls = true; return; }
                 if (_row == BackRow) { Close(); return; }
             }
@@ -98,6 +103,8 @@ namespace MarioBasketball.UI
                 case 0: GameSettings.MasterVolume += dir * 5; break;
                 case 1: GameSettings.QuarterMinutes += dir; break;
                 case 2: GameSettings.ShotClockSeconds += dir; break;
+                case VibrationRow: GameSettings.Vibration = !GameSettings.Vibration; break;
+                case BoxScoreRow: GameSettings.ShowBoxScore = !GameSettings.ShowBoxScore; break;
             }
         }
 
@@ -112,7 +119,7 @@ namespace MarioBasketball.UI
 
             if (_showControls) { DrawControls(); return; }
 
-            float w = 520f, h = 430f;
+            float w = 520f, h = 560f;
             var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             GUI.Box(area, GUIContent.none);
             GUI.Label(new Rect(area.x, area.y + 12, area.width, 36), "SETTINGS", _title);
@@ -120,6 +127,8 @@ namespace MarioBasketball.UI
             DrawRow(area, 0, "Master Volume", $"{GameSettings.MasterVolume}%");
             DrawRow(area, 1, "Quarter Length", $"{GameSettings.QuarterMinutes} min");
             DrawRow(area, 2, "Shot Clock", $"{GameSettings.ShotClockSeconds} s");
+            DrawRow(area, VibrationRow, "Vibration", GameSettings.Vibration ? "On" : "Off");
+            DrawRow(area, BoxScoreRow, "Box Score", GameSettings.ShowBoxScore ? "Shown" : "Hidden");
             DrawButtonRow(area, ControlsRow, "Controls");
 
             GUI.Label(new Rect(area.x + 30, RowRect(area, ControlsRow).yMax + 8, area.width - 60, 24),

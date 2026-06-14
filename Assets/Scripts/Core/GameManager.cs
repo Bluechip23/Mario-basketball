@@ -59,6 +59,8 @@ namespace MarioBasketball.Core
         public int offensiveReboundRating = 9;
         [Tooltip("A defender must be within this (arms reach) to pick off a pass.")]
         public float passInterceptRadius = 1.1f;
+        [Tooltip("A pass must travel at least this far from the passer before a defender can intercept — stops the passer's own man stealing it the instant it's released.")]
+        public float passInterceptMinTravel = 1.6f;
         [Tooltip("If a loose ball stays uncaught this long it's awarded to the nearest player, so a scramble can never stall the match.")]
         public float looseBallFailsafe = 2.5f;
 
@@ -269,12 +271,19 @@ namespace MarioBasketball.Core
             {
                 if (p == null || !p.enabled || !ball.CanBePickedUpBy(p)) continue;
 
+                // A defender can't pick a pass until it's cleared the passer — no
+                // free steals of the ball the moment it leaves the hand.
+                if (ball.IsPass && p.team != ball.PassingTeam
+                    && Horizontal(ballPos, ball.PassOrigin) < passInterceptMinTravel) continue;
+
                 float dist = Horizontal(p.transform.position, ballPos);
                 if (dist > ReboundCatchRadius(p)) continue;
 
-                // Vertical reach: a lofted pass sails over a defender's head
-                // (their centre is at half height; arms add roughly the rest).
-                float reachTop = p.transform.position.y + p.BodyHeight;
+                // Vertical reach: standing, you reach about fingertip height (≈ the
+                // body above the controller centre); leaving your feet adds the jump
+                // reach, so high balls genuinely have to be gone up and got.
+                float reachTop = p.transform.position.y + p.BodyHeight * 0.9f
+                               + (p.IsAirborne ? reboundJumpReach : 0f);
                 if (ballPos.y > reachTop) continue;
 
                 float score = GrabStat(p) + reboundHeightScore * p.BodyHeight

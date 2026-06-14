@@ -93,10 +93,16 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float fadeAgainstMomentumMin = 0.25f;
 
         [Header("Inside finishing (dunk / layup)")]
-        [Tooltip("Time in the air before an unheld finish auto-resolves.")]
-        public float finishAirTime = 0.45f;
-        public float finishApproachSpeed = 4f;
-        public float finishFlightTime = 0.5f;
+        [Tooltip("Max time in the air before a finish auto-resolves (the late cap).")]
+        public float finishAirTime = 0.6f;
+        [Tooltip("Minimum air time before a finish can release — you always leave the floor and rise toward the rim first.")]
+        public float finishMinAirTime = 0.22f;
+        [Tooltip("Once you've driven this close to the rim (and cleared the min air time) the finish releases at the basket, not from distance.")]
+        public float finishReleaseDistance = 1.0f;
+        [Tooltip("How hard you attack the rim on a finish (m/s toward the hoop).")]
+        public float finishApproachSpeed = 7f;
+        [Tooltip("Flight time of the finish itself — short, so it drops in at the rim instead of lazily arcing in from distance.")]
+        public float finishFlightTime = 0.32f;
         [Tooltip("Effective Dunk at/above this goes up for a dunk; below, a layup.")]
         public float dunkThreshold = 6f;
         [Tooltip("Dunk block resistance per point of Power.")]
@@ -143,9 +149,12 @@ namespace MarioBasketball.Gameplay
         public float blockKnockPower = 4f;
 
         [Header("Steal (Steals vs Ball Handling)")]
-        public float stealReach = 0.95f;
+        [Tooltip("How far you can reach in to poke at the ball (body separation keeps players ~0.8 m apart, so this needs headroom above that).")]
+        public float stealReach = 1.25f;
         public float stealCooldown = 1.0f;
-        public float stealWhiffCooldown = 0.4f;
+        public float stealWhiffCooldown = 0.35f;
+        [Tooltip("How long the arm-swipe animation holds after a steal attempt.")]
+        public float stealGestureTime = 0.28f;
         public float stealBaseChance = 0.04f;
         public float stealStatScale = 0.035f;
         public float stealMinChance = 0.02f;
@@ -234,6 +243,11 @@ namespace MarioBasketball.Gameplay
         public bool IsDribblingBall => HasBall && (_dribbling || (IsPosting && !IsPostShooting));
         /// <summary>Briefly true right after a pass/throw (drives the throw pose).</summary>
         public bool IsPassing => _passGestureTimer > 0f;
+        /// <summary>Briefly true while swiping for a steal (drives the swipe pose).</summary>
+        public bool IsStealing => _stealGestureTimer > 0f;
+        /// <summary>How far through the steal swipe (0-1).</summary>
+        public float StealProgress01 =>
+            stealGestureTime > 0.0001f ? Mathf.Clamp01(1f - _stealGestureTimer / stealGestureTime) : 0f;
         /// <summary>A flashy dribble move is mid-animation (drives its body pose).</summary>
         public bool IsDribbleMoveGesture => _dribbleMoveTimer > 0f;
         /// <summary>Which dribble move is currently animating.</summary>
@@ -323,6 +337,7 @@ namespace MarioBasketball.Gameplay
         float _lastShotDistance;
         int _calledShotsUsed;
         float _passGestureTimer;
+        float _stealGestureTimer;
         DribbleMoveType _dribbleMoveType;
         float _dribbleMoveTimer;
         float _dribbleMoveDuration;
@@ -427,6 +442,7 @@ namespace MarioBasketball.Gameplay
             if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
             if (_flickCooldown > 0f) _flickCooldown -= dt;
             if (_passGestureTimer > 0f) _passGestureTimer -= dt;
+            if (_stealGestureTimer > 0f) _stealGestureTimer -= dt;
             if (_dribbleMoveTimer > 0f) _dribbleMoveTimer -= dt;
             if (_passCharging)
             {
@@ -510,7 +526,13 @@ namespace MarioBasketball.Gameplay
             if (!_finishing) return;
             if (IsStunned || !HasBall) { _finishing = false; return; }
             _finishTimer += dt;
-            if (_finishTimer >= finishAirTime) ResolveFinish(); // committed at the rim
+            // Release at the rim: once you've leapt (min air time) and driven to the
+            // basket, finish there — otherwise the late cap resolves it in the air.
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
+            bool atRim = hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= finishReleaseDistance;
+            if ((atRim && _finishTimer >= finishMinAirTime) || _finishTimer >= finishAirTime)
+                ResolveFinish();
         }
 
         void HandlePostHold()
@@ -697,8 +719,10 @@ namespace MarioBasketball.Gameplay
         /// the paint it finishes (dunk/layup) with no air-adjust.</summary>
         public void TriggerShoot()
         {
-            if (MatchPause.IsPaused || IsStunned || IsPosting) return;
-            if (InsideRange()) FinishShot(Effective(StatType.Dunk, 5f) >= dunkThreshold, adjusted: false);
+            if (MatchPause.IsPaused || IsStunned || IsPosting || _shooting || _finishing) return;
+            // Inside, leap and attack the rim (same as the human) rather than firing
+            // the ball off from the ground; the finish auto-resolves at the basket.
+            if (InsideRange()) StartFinish();
             else ExecuteShot(1f, QuickCatchReady());
         }
 
@@ -726,7 +750,10 @@ namespace MarioBasketball.Gameplay
         void OnShootReleased()
         {
             if (_shooting) ReleaseJumpShot();
-            else if (_finishing) ResolveFinish();
+            // A finish commits to the rim: a quick tap still leaps and lays it in
+            // (AdvanceFinish resolves it at the basket). Releasing only finishes
+            // early once you've actually left the floor and risen toward the rim.
+            else if (_finishing && _finishTimer >= finishMinAirTime) ResolveFinish();
         }
 
         bool InsideRange()
@@ -1121,6 +1148,8 @@ namespace MarioBasketball.Gameplay
 
             var holder = gm.ball.Holder;
             if (holder == null || holder == this || holder.team == team) return;
+
+            _stealGestureTimer = stealGestureTime; // swipe at the ball whether or not it lands
 
             float dist = HorizontalDistance(transform.position, holder.transform.position);
             if (dist > stealReach) { _stealCooldown = stealWhiffCooldown; return; }

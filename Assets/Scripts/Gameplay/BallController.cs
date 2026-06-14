@@ -37,6 +37,8 @@ namespace MarioBasketball.Gameplay
         public float dribbleSpeed = 6f; // legacy; kept for the animator
         [Tooltip("Seconds the releaser can't re-grab after shooting/passing.")]
         public float releaseLockDuration = 0.4f;
+        [Tooltip("Seconds a thrown pass is in the air before ANYONE can grab it, so the passer's own defender can't pick it off the instant it leaves the hand.")]
+        public float passArmTime = 0.16f;
         [Tooltip("A missed shot becomes a live (grabbable) rebound once it falls below this height.")]
         public float reboundHeight = 2.2f;
         [Tooltip("How long a thrown pass stays an 'in-flight pass' (Steals to intercept) before becoming a true loose ball (Rebounds).")]
@@ -65,6 +67,9 @@ namespace MarioBasketball.Gameplay
         public TeamSide PassingTeam { get; private set; }
         /// <summary>The player who threw the in-flight pass (for assist traits).</summary>
         public PlayerController Passer { get; private set; }
+        /// <summary>Where the current in-flight pass was released (so a defender
+        /// can't pick it off until it's travelled past them).</summary>
+        public Vector3 PassOrigin { get; private set; }
         /// <summary>True while a lob is an alley-oop — a teammate catching it near
         /// the rim finishes immediately.</summary>
         public bool IsAlleyOop { get; private set; }
@@ -75,6 +80,7 @@ namespace MarioBasketball.Gameplay
         bool _shotPending;
         PlayerController _recentReleaser;
         float _releaseLockTimer;
+        float _passArmTimer;
 
         void Awake()
         {
@@ -86,6 +92,8 @@ namespace MarioBasketball.Gameplay
         {
             if (_releaseLockTimer > 0f)
                 _releaseLockTimer -= Time.deltaTime;
+            if (_passArmTimer > 0f)
+                _passArmTimer -= Time.deltaTime;
 
             if (State == BallState.Held && Holder != null)
             {
@@ -268,6 +276,9 @@ namespace MarioBasketball.Gameplay
         public bool CanBePickedUpBy(PlayerController player)
         {
             if (State != BallState.Free) return false;
+            // A just-thrown pass is briefly untouchable so it actually leaves the
+            // passer instead of being scooped by the defender right next to them.
+            if (_passArmTimer > 0f) return false;
             if (player != null && player == _recentReleaser && _releaseLockTimer > 0f) return false;
             return true;
         }
@@ -332,7 +343,9 @@ namespace MarioBasketball.Gameplay
             IsAlleyOop = alleyOop;
             PassingTeam = thrower;
             Passer = passer;
+            PassOrigin = transform.position;
             _passTimer = passLiveTime;
+            _passArmTimer = passArmTime; // brief window where it can't be grabbed
             GoLive();
 
             Vector3 start = transform.position;

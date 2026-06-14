@@ -255,6 +255,16 @@ namespace MarioBasketball.Presentation
                 Pose(_armL, _elbowL, _wristL, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
                 Pose(_armR, _elbowR, _wristR, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
             }
+            else if (_pc.IsStealing)
+            {
+                // Swipe at the ball: the lead arm jabs out and snaps back through.
+                float sw = Mathf.Sin(Mathf.PI * _pc.StealProgress01);
+                Pose(_armR, _elbowR, _wristR,
+                    Mathf.Lerp(guardArmDegrees, -120f, sw),
+                    Mathf.Lerp(dribbleElbowBent, -10f, sw),
+                    Mathf.Lerp(0f, -45f, sw));
+                Pose(_armL, _elbowL, _wristL, guardArmDegrees, idleElbowDegrees, 0f);
+            }
             else if (_pc.IsPassing)
             {
                 // Just threw a pass: both arms push out toward the target and the

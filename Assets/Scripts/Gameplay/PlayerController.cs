@@ -170,8 +170,6 @@ namespace MarioBasketball.Gameplay
         [Header("Animation gestures (cosmetic timers read by the animator)")]
         [Tooltip("How long the pass/throw arm pose holds after the ball leaves.")]
         public float passGestureTime = 0.28f;
-        [Tooltip("How long the cross-body sweep pose holds after a dribble move/flick.")]
-        public float dribbleMoveGestureTime = 0.3f;
 
         /// <summary>Where the carried ball sits — out in front, hip height,
         /// scaled to the character's body size.</summary>
@@ -236,8 +234,13 @@ namespace MarioBasketball.Gameplay
         public bool IsDribblingBall => HasBall && (_dribbling || (IsPosting && !IsPostShooting));
         /// <summary>Briefly true right after a pass/throw (drives the throw pose).</summary>
         public bool IsPassing => _passGestureTimer > 0f;
-        /// <summary>Briefly true after a dribble move / flick (drives the cross sweep).</summary>
-        public bool IsDribbleMoveGesture => _dribbleMoveGestureTimer > 0f;
+        /// <summary>A flashy dribble move is mid-animation (drives its body pose).</summary>
+        public bool IsDribbleMoveGesture => _dribbleMoveTimer > 0f;
+        /// <summary>Which dribble move is currently animating.</summary>
+        public DribbleMoveType CurrentDribbleMove => _dribbleMoveType;
+        /// <summary>How far through the current dribble move's animation (0-1).</summary>
+        public float DribbleMoveProgress01 =>
+            _dribbleMoveDuration > 0.0001f ? Mathf.Clamp01(1f - _dribbleMoveTimer / _dribbleMoveDuration) : 0f;
         /// <summary>Contorting a finish in the air (L1 air-adjust) — alters the layup.</summary>
         public bool IsAdjustingFinish => _finishing && _finishAdjusted;
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
@@ -320,7 +323,9 @@ namespace MarioBasketball.Gameplay
         float _lastShotDistance;
         int _calledShotsUsed;
         float _passGestureTimer;
-        float _dribbleMoveGestureTimer;
+        DribbleMoveType _dribbleMoveType;
+        float _dribbleMoveTimer;
+        float _dribbleMoveDuration;
 
         void Awake()
         {
@@ -422,7 +427,7 @@ namespace MarioBasketball.Gameplay
             if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
             if (_flickCooldown > 0f) _flickCooldown -= dt;
             if (_passGestureTimer > 0f) _passGestureTimer -= dt;
-            if (_dribbleMoveGestureTimer > 0f) _dribbleMoveGestureTimer -= dt;
+            if (_dribbleMoveTimer > 0f) _dribbleMoveTimer -= dt;
             if (_passCharging)
             {
                 _passChargeTime += dt;
@@ -1170,7 +1175,7 @@ namespace MarioBasketball.Gameplay
             }
 
             _dribbleCooldown = dribbleCooldownTime;
-            _dribbleMoveGestureTimer = dribbleMoveGestureTime; // cross-body sweep
+            StartDribbleMove(PickBreakdownMove(def)); // a flashy move + matching ball path
             float bh = Effective(StatType.BallHandling, 5f);
             float pd = def.EffectiveStat(StatType.PerimeterDefense);
             float chance = Mathf.Clamp(dribbleBaseChance + dribbleStatScale * (bh - pd), 0.05f, 0.95f);
@@ -1179,8 +1184,6 @@ namespace MarioBasketball.Gameplay
             {
                 def.Stun(ankleStun, fall: true);  // broken ankles — they hit the deck
                 _dribbleBoostTimer = dribbleBoostTime; // separation
-                if (GameManager.Instance != null && GameManager.Instance.ball != null)
-                    GameManager.Instance.ball.Crossover(); // sweep the ball across
                 if (RimDirection().sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(RimDirection().normalized, Vector3.up);
             }
             else
@@ -1194,6 +1197,37 @@ namespace MarioBasketball.Gameplay
                     GameManager.Instance.RecordSteal(def); // defender poked it away
                 }
             }
+        }
+
+        /// <summary>Kick off a dribble move: drives both the ball path and the body
+        /// pose (the animator reads <see cref="CurrentDribbleMove"/>).</summary>
+        void StartDribbleMove(DribbleMoveType type)
+        {
+            _dribbleMoveType = type;
+            _dribbleMoveDuration = DribbleMoves.Duration(type);
+            _dribbleMoveTimer = _dribbleMoveDuration;
+            if (Ball != null) Ball.DribbleMove(type);
+        }
+
+        /// <summary>Pick a flashy breakdown move off the dribble button: throw it
+        /// off a defender square in front of you, otherwise mix spins, behind-the-
+        /// back, between-the-legs and crossovers.</summary>
+        DribbleMoveType PickBreakdownMove(PlayerController def)
+        {
+            bool inFront = false;
+            if (def != null)
+            {
+                Vector3 toDef = def.transform.position - transform.position; toDef.y = 0f;
+                inFront = toDef.sqrMagnitude > 0.01f
+                          && Vector3.Dot(toDef.normalized, transform.forward) > 0.4f
+                          && toDef.magnitude < dribbleRange * 0.8f;
+            }
+            float r = Random.value;
+            if (inFront && r < 0.2f) return DribbleMoveType.OffTheHead; // in their face — over the top
+            if (r < 0.4f) return DribbleMoveType.Spin;
+            if (r < 0.62f) return DribbleMoveType.BehindBack;
+            if (r < 0.82f) return DribbleMoveType.BetweenLegs;
+            return DribbleMoveType.Crossover;
         }
 
         /// <summary>A right-stick flick — a hard dribble in that direction to
@@ -1210,13 +1244,11 @@ namespace MarioBasketball.Gameplay
             if (dir.sqrMagnitude < 0.01f) return;
             dir.Normalize();
             _flickCooldown = flickCooldownTime;
-            _dribbleMoveGestureTimer = dribbleMoveGestureTime; // hard-dribble sweep
 
-            var ball = Ball;
             if (IsPosting)
             {
                 _post.Shimmy(dir);
-                if (ball != null) ball.Crossover();
+                StartDribbleMove(DribbleMoveType.Crossover); // hard shimmy dribble
                 return;
             }
 
@@ -1238,10 +1270,14 @@ namespace MarioBasketball.Gameplay
                 _lastLateralFlickSign = side;
             }
 
-            // The dribble itself always happens: a burst in the flick direction.
+            // The dribble itself always happens: a burst in the flick direction,
+            // with the move (and its ball path / pose) chosen from the gesture.
             ApplyShove(dir * (stepBack ? stepBackPower : flickBurstPower));
             _dribbleBoostTimer = attack || hesitationCross ? dribbleBoostTime : dribbleBoostTime * 0.5f;
-            if (ball != null) ball.Crossover();
+            StartDribbleMove(stepBack ? DribbleMoveType.StepBack
+                : hesitationCross ? DribbleMoveType.Hesitation
+                : attack ? DribbleMoveType.BetweenLegs
+                : Random.value < 0.5f ? DribbleMoveType.Crossover : DribbleMoveType.BehindBack);
             // A step-back squares you to the hoop for the shot; otherwise face the move.
             transform.rotation = Quaternion.LookRotation(stepBack ? toBasket : dir, Vector3.up);
 

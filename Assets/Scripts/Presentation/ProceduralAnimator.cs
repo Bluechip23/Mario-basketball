@@ -114,24 +114,35 @@ namespace MarioBasketball.Presentation
             if (_ball == null && MarioBasketball.Core.GameManager.Instance != null)
                 _ball = MarioBasketball.Core.GameManager.Instance.ball;
 
-            // Body tilt: sprawl to the floor when knocked down, or lean into a
-            // fadeaway jump shot (the shooter holds the stick to fade that way).
+            // Body tilt: whip around on a spin move, sprawl to the floor when
+            // knocked down, or lean into a fadeaway jump shot.
+            bool spinMove = _pc.IsDribbleMoveGesture && _pc.CurrentDribbleMove == DribbleMoveType.Spin;
             if (_model != null)
             {
-                Quaternion want;
-                if (_pc.IsFallen)
-                    want = Quaternion.Euler(fallAngle, 0f, _fallTilt);
-                else if (_pc.IsShooting && _pc.FadeAmount > 0.05f)
+                if (spinMove && !_pc.IsFallen)
                 {
-                    // Convert the world fade into the body's own frame: a fade
-                    // away from the rim pitches the torso back, a sideways fade
-                    // rolls it over that hip.
-                    Vector3 local = transform.InverseTransformDirection(_pc.FadeDirection);
-                    float amt = _pc.FadeAmount * fadeLeanAngle;
-                    want = Quaternion.Euler(local.z * amt, 0f, -local.x * amt);
+                    // Snap the whole body through a full rotation (no slerp, so it
+                    // actually whips); direction follows the dribbling hand.
+                    float spinDir = _ball != null && _ball.DribbleHand < 0 ? -1f : 1f;
+                    _model.localRotation = Quaternion.Euler(0f, spinDir * 360f * _pc.DribbleMoveProgress01, 0f);
                 }
-                else want = Quaternion.identity;
-                _model.localRotation = Quaternion.Slerp(_model.localRotation, want, poseLerp * Time.deltaTime);
+                else
+                {
+                    Quaternion want;
+                    if (_pc.IsFallen)
+                        want = Quaternion.Euler(fallAngle, 0f, _fallTilt);
+                    else if (_pc.IsShooting && _pc.FadeAmount > 0.05f)
+                    {
+                        // Convert the world fade into the body's own frame: a fade
+                        // away from the rim pitches the torso back, a sideways fade
+                        // rolls it over that hip.
+                        Vector3 local = transform.InverseTransformDirection(_pc.FadeDirection);
+                        float amt = _pc.FadeAmount * fadeLeanAngle;
+                        want = Quaternion.Euler(local.z * amt, 0f, -local.x * amt);
+                    }
+                    else want = Quaternion.identity;
+                    _model.localRotation = Quaternion.Slerp(_model.localRotation, want, poseLerp * Time.deltaTime);
+                }
             }
             if (_pc.IsFallen) return;
 
@@ -155,6 +166,13 @@ namespace MarioBasketball.Presentation
                 float recover = moving ? Mathf.Cos(_phase) : 0f;
                 SetX(_kneeL, idleKneeDegrees + Mathf.Max(0f, recover) * runKneeDegrees * speedScale);
                 SetX(_kneeR, idleKneeDegrees + Mathf.Max(0f, -recover) * runKneeDegrees * speedScale);
+            }
+
+            // Crouch low to drop the ball between the knees.
+            if (!_pc.IsAirborne && _pc.IsDribbleMoveGesture && _pc.CurrentDribbleMove == DribbleMoveType.BetweenLegs)
+            {
+                SetX(_kneeL, 52f);
+                SetX(_kneeR, 52f);
             }
 
             // A released jump shot (or timed post shot) holds its follow-through.
@@ -202,7 +220,7 @@ namespace MarioBasketball.Presentation
                 Pose(_armR, _elbowR, _wristR, layupArmDegrees, layupElbowDegrees, releaseWristDegrees * 0.5f); // one-hand finish
                 Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
             }
-            else if (_pc.IsDribblingBall)
+            else if (_pc.IsDribblingBall || _pc.IsDribbleMoveGesture)
             {
                 // In phase with the actual ball: 0 = hip contact, 0.5 = floor
                 // (see BallController.DribblePosition). The hand pushes down
@@ -215,12 +233,8 @@ namespace MarioBasketball.Presentation
                 Transform offArm = leftHand ? _armR : _armL, offElbow = leftHand ? _elbowR : _elbowL, offWrist = leftHand ? _wristR : _wristL;
                 if (_pc.IsDribbleMoveGesture)
                 {
-                    // A dribble move / hard flick: both hands drop low and rip the
-                    // ball hard across the body (crossover / step-back).
-                    Pose(pumpArm, pumpElbow, pumpWrist,
-                        dribbleArmBase + dribblePushDegrees, dribbleElbowPushed, dribbleWristPushed);
-                    Pose(offArm, offElbow, offWrist,
-                        dribbleArmBase + dribblePushDegrees * 0.6f, dribbleElbowPushed, dribbleWristPushed * 0.5f);
+                    DribbleMovePose(_pc.CurrentDribbleMove, _pc.DribbleMoveProgress01, leftHand,
+                        pumpArm, pumpElbow, pumpWrist, offArm, offElbow, offWrist);
                 }
                 else
                 {
@@ -256,11 +270,92 @@ namespace MarioBasketball.Presentation
             }
         }
 
+        /// <summary>Distinct arm work for each dribble move (the ball path lives in
+        /// <see cref="BallController.DribblePosition"/>; here we sell the hands).</summary>
+        void DribbleMovePose(DribbleMoveType move, float p, bool leftHand,
+            Transform pumpArm, Transform pumpElbow, Transform pumpWrist,
+            Transform offArm, Transform offElbow, Transform offWrist)
+        {
+            switch (move)
+            {
+                case DribbleMoveType.Crossover:
+                case DribbleMoveType.Hesitation:
+                {
+                    // Arms spread wide, ball ripped hard and low across the body.
+                    const float spread = 52f;
+                    float pumpRoll = leftHand ? -spread : spread;
+                    float offRoll = leftHand ? spread : -spread;
+                    PoseRoll(pumpArm, pumpElbow, pumpWrist,
+                        dribbleArmBase + dribblePushDegrees, dribbleElbowPushed, dribbleWristPushed, pumpRoll);
+                    PoseRoll(offArm, offElbow, offWrist,
+                        dribbleArmBase + dribblePushDegrees * 0.7f, dribbleElbowPushed, 0f, offRoll);
+                    break;
+                }
+                case DribbleMoveType.BehindBack:
+                {
+                    // The ball hand wraps from behind the hip around to the front.
+                    float pitch = Mathf.Lerp(45f, -70f, p);
+                    Pose(pumpArm, pumpElbow, pumpWrist, pitch, dribbleElbowBent, dribbleWristPushed);
+                    Pose(offArm, offElbow, offWrist, guardArmDegrees, dribbleElbowBent * 0.5f, 0f);
+                    break;
+                }
+                case DribbleMoveType.BetweenLegs:
+                {
+                    // Both hands reach down low (paired with the knee crouch).
+                    Pose(pumpArm, pumpElbow, pumpWrist,
+                        dribbleArmBase + dribblePushDegrees, dribbleElbowPushed, dribbleWristPushed);
+                    Pose(offArm, offElbow, offWrist,
+                        dribbleArmBase + dribblePushDegrees, dribbleElbowPushed, dribbleWristPushed);
+                    break;
+                }
+                case DribbleMoveType.Spin:
+                {
+                    // Ball cradled tight to the chest while the body whips around.
+                    Pose(pumpArm, pumpElbow, pumpWrist, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
+                    Pose(offArm, offElbow, offWrist, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
+                    break;
+                }
+                case DribbleMoveType.OffTheHead:
+                {
+                    // Toss it up and over: the ball arm flicks overhead at the peak.
+                    float up = Mathf.Sin(Mathf.PI * p);
+                    Pose(pumpArm, pumpElbow, pumpWrist,
+                        Mathf.Lerp(dribbleArmBase, releaseArmDegrees, up),
+                        Mathf.Lerp(dribbleElbowBent, releaseElbowDegrees, up),
+                        releaseWristDegrees);
+                    Pose(offArm, offElbow, offWrist, guideArmDegrees * 0.6f, guideElbowDegrees, 0f);
+                    break;
+                }
+                default: // StepBack
+                {
+                    // Shove the ball back low; the off arm rides up for balance.
+                    Pose(pumpArm, pumpElbow, pumpWrist,
+                        dribbleArmBase + dribblePushDegrees, dribbleElbowPushed, dribbleWristPushed);
+                    Pose(offArm, offElbow, offWrist, guardArmDegrees, dribbleElbowBent * 0.5f, 0f);
+                    break;
+                }
+            }
+        }
+
         void Pose(Transform shoulder, Transform elbow, Transform wrist, float shoulderDeg, float elbowDeg, float wristDeg)
         {
             SetX(shoulder, shoulderDeg);
             SetX(elbow, elbowDeg);
             SetX(wrist, wristDeg);
+        }
+
+        void PoseRoll(Transform shoulder, Transform elbow, Transform wrist,
+            float shoulderPitch, float elbowDeg, float wristDeg, float shoulderRoll)
+        {
+            SetRot(shoulder, shoulderPitch, 0f, shoulderRoll);
+            SetX(elbow, elbowDeg);
+            SetX(wrist, wristDeg);
+        }
+
+        void SetRot(Transform joint, float x, float y, float z)
+        {
+            if (joint == null) return;
+            joint.localRotation = Quaternion.Slerp(joint.localRotation, Quaternion.Euler(x, y, z), poseLerp * Time.deltaTime);
         }
 
         void SetX(Transform joint, float degrees)

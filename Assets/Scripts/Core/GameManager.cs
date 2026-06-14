@@ -62,6 +62,10 @@ namespace MarioBasketball.Core
         [Tooltip("If a loose ball stays uncaught this long it's awarded to the nearest player, so a scramble can never stall the match.")]
         public float looseBallFailsafe = 2.5f;
 
+        [Header("Transition")]
+        [Tooltip("Seconds the AI runs a fast break after a steal or defensive rebound (wings sprint out, the guard comes back for the outlet).")]
+        public float fastBreakWindow = 4f;
+
         [Header("Scene references (auto-wired by GameBootstrap)")]
         public BallController ball;
         public PlayerController humanPlayer;
@@ -86,6 +90,16 @@ namespace MarioBasketball.Core
 
         /// <summary>Live per-player / per-team box score for this match.</summary>
         public BoxScore Box { get; private set; }
+
+        /// <summary>The team currently running a fast break (after a steal /
+        /// defensive board), or whoever last did — check <see cref="IsFastBreak"/>.</summary>
+        public TeamSide FastBreakTeam { get; private set; }
+        /// <summary>Seconds left in the current fast-break window (0 = none).</summary>
+        public float FastBreakRemaining { get; private set; }
+        /// <summary>True while <paramref name="team"/> is on a live fast break.</summary>
+        public bool IsFastBreak(TeamSide team) => FastBreakRemaining > 0f && FastBreakTeam == team;
+        /// <summary>Kick off a fast break for <paramref name="team"/> (transition AI).</summary>
+        public void BeginFastBreak(TeamSide team) { FastBreakTeam = team; FastBreakRemaining = fastBreakWindow; }
 
         public bool IsFreeThrow => State == GameState.FreeThrow;
         public PlayerController FreeThrowShooter { get; private set; }
@@ -189,6 +203,7 @@ namespace MarioBasketball.Core
         {
             if (thief == null) return;
             Box.AddSteal(thief);
+            BeginFastBreak(thief.team); // take off the other way
             if (thief.isHuman) Haptics.Play(Haptics.Cue.Steal);
         }
 
@@ -230,11 +245,13 @@ namespace MarioBasketball.Core
                 if (interception)
                 {
                     Box.AddSteal(best);
+                    BeginFastBreak(best.team);
                     if (best.isHuman) Haptics.Play(Haptics.Cue.Steal);
                 }
                 else if (board)
                 {
                     Box.AddRebound(best);
+                    if (best.team != ball.ShooterTeam) BeginFastBreak(best.team); // defensive board → run
                     if (best.isHuman) Haptics.Play(Haptics.Cue.Rebound);
                 }
             }
@@ -299,11 +316,13 @@ namespace MarioBasketball.Core
 
             if (nearest == null) return;
             bool board = ball.IsRebound;
+            TeamSide shooterTeam = ball.ShooterTeam;
             ball.PickUp(nearest);
             OnPossessionGained(nearest);
             if (board)
             {
                 Box.AddRebound(nearest);
+                if (nearest.team != shooterTeam) BeginFastBreak(nearest.team);
                 if (nearest.isHuman) Haptics.Play(Haptics.Cue.Rebound);
             }
         }
@@ -534,6 +553,7 @@ namespace MarioBasketball.Core
             switch (State)
             {
                 case GameState.Playing:
+                    if (FastBreakRemaining > 0f) FastBreakRemaining -= dt;
                     if (Clock.Tick(dt)) { OnQuarterExpired(); return; }
                     if (Shot.Tick(dt)) { Turnover(Opponent(Possession)); break; }
                     ResolveLooseBall();

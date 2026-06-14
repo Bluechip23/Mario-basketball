@@ -217,12 +217,13 @@ namespace MarioBasketball.Gameplay
         public bool IsStunned => _stunTimer > 0f;
         /// <summary>Knocked down (ankle-broken / leveled) — sprawls on the floor.</summary>
         public bool IsFallen => _fallTimer > 0f;
-        /// <summary>Actively dribbling: moving with the ball on the floor. Holding
-        /// it while stationary is a palmed/triple-threat (the ball does NOT
-        /// auto-bounce).</summary>
-        public bool IsDribbling => HasBall && _cc != null && _cc.isGrounded
-                                   && PlanarSpeed > dribbleMoveThreshold
-                                   && !IsShooting && !IsFinishing && !IsPosting && !IsStunned;
+        /// <summary>Dribbling: you've put the ball on the floor and are live with
+        /// it. A fresh catch does NOT auto-dribble — you stay in triple-threat
+        /// until you actually move with it. Once dribbling, simply stopping does
+        /// not end it (you keep your dribble standing still); it ends when you
+        /// shoot, finish, post up, leave your feet, get stunned, or lose the
+        /// ball. Latched in <see cref="UpdateDribbleState"/>.</summary>
+        public bool IsDribbling => _dribbling;
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
         public bool FinishIsDunk => _finishIsDunk;
@@ -261,6 +262,8 @@ namespace MarioBasketball.Gameplay
         PlayerCharacter _character;
         PostUpController _post;
         InputReader _input;
+        Camera _cam;
+        bool _dribbling;
         float _verticalVelocity;
         Vector2 _moveIntent;
         bool _sprintIntent;
@@ -409,7 +412,9 @@ namespace MarioBasketball.Gameplay
             if (isHuman && _input != null)
             {
                 _input.Tick();
-                _moveIntent = _input.Move;
+                // The stick is read relative to the camera, so "up" on the stick
+                // is "up the screen" regardless of where the sideline camera sits.
+                _moveIntent = CameraRelative(_input.Move);
                 _passAim = _input.PassAim;
                 _sprintIntent = _input.SprintHeld;
                 _iconHeld = _input.IconHeld;
@@ -420,6 +425,7 @@ namespace MarioBasketball.Gameplay
             AdvanceShotMeter(dt);
             AdvanceFinish(dt);
             Move();
+            UpdateDribbleState();
             // Loose balls / rebounds are resolved centrally (GameManager) so it's
             // a Rebounds + height + jump contest, not a first-come grab.
 
@@ -593,6 +599,42 @@ namespace MarioBasketball.Gameplay
                 Quaternion want = Quaternion.LookRotation(faceDir, Vector3.up);
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, want, turnSpeed * dt);
             }
+        }
+
+        /// <summary>Latch the dribble state. You start dribbling the moment you
+        /// move with the ball; once started, standing still keeps the dribble
+        /// alive. It ends when you no longer have the ball, leave your feet, or
+        /// go into a shot / finish / post / stun.</summary>
+        void UpdateDribbleState()
+        {
+            if (!HasBall || _cc == null || !_cc.isGrounded
+                || IsShooting || IsFinishing || IsPosting || IsStunned)
+            {
+                _dribbling = false;
+                return;
+            }
+            // Putting it on the floor (any real movement) starts the dribble.
+            if (PlanarSpeed > dribbleMoveThreshold) _dribbling = true;
+        }
+
+        /// <summary>Convert a raw stick vector into a world-plane move direction
+        /// relative to the camera, so pushing the stick "up" drives the player up
+        /// the screen no matter where the sideline camera is. Returned as an XZ
+        /// vector (x → world X, y → world Z) to match how <see cref="Move"/> reads
+        /// the intent. AI intents bypass this — they're already world-space.</summary>
+        Vector2 CameraRelative(Vector2 stick)
+        {
+            if (_cam == null) _cam = Camera.main;
+            if (_cam == null) return stick;
+
+            Vector3 fwd = _cam.transform.forward; fwd.y = 0f;
+            Vector3 right = _cam.transform.right; right.y = 0f;
+            if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.forward;
+            fwd.Normalize();
+            right.Normalize();
+
+            Vector3 world = right * stick.x + fwd * stick.y;
+            return new Vector2(world.x, world.z);
         }
 
         /// <summary>Soft body separation: if another player is overlapping us

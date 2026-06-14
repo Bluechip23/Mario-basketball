@@ -237,6 +237,9 @@ namespace MarioBasketball.Gameplay
                     Vector3 set = transform.position + Vector3.up * (0.66f * h);
                     return Vector3.Lerp(gather, set, k);
                 }
+                // Snagged a board in the air — the ball is up in the raised hands.
+                if (IsAirborne)
+                    return transform.position + transform.forward * (0.12f * h) + Vector3.up * (0.72f * h);
                 return BallHoldPoint;
             }
         }
@@ -790,7 +793,6 @@ namespace MarioBasketball.Gameplay
         void OnShootPressed()
         {
             if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _shooting || _finishing) return;
-            if (IconPassActive) { PassToSlot(0); return; } // LB + A → pass to teammate 1
             GameManager.Instance.TryStartFromInbound(); // shooting it in puts the ball live
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
@@ -1105,7 +1107,10 @@ namespace MarioBasketball.Gameplay
         // passHoldThreshold → hard pass (fast, flat, lives in the steal lane).
         void OnPassPressed()
         {
-            if (MatchPause.IsPaused || IsStunned || !HasBall || _passCharging) return;
+            // A is also the post Drop Step — don't start a pass while posting, so
+            // the two don't fight (exit the post to pass it out).
+            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _passCharging) return;
+            if (IconPassActive) { PassToSlot(0); return; } // LB + A → pass to teammate 1
             _passCharging = true;
             _passChargeTime = 0f;
         }

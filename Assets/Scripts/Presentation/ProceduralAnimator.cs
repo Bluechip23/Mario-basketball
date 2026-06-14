@@ -29,18 +29,20 @@ namespace MarioBasketball.Presentation
     public class ProceduralAnimator : MonoBehaviour
     {
         [Header("Run cycle")]
-        public float strideFrequency = 1.5f;
-        public float strideFrequencyPerSpeed = 0.2f;
-        public float legSwingDegrees = 50f;
-        public float armSwingDegrees = 38f;
-        [Tooltip("Elbow bend while running (arms pump bent, not straight).")]
-        public float runElbowDegrees = -40f;
+        public float strideFrequency = 1.6f;
+        public float strideFrequencyPerSpeed = 0.22f;
+        public float legSwingDegrees = 60f;
+        public float armSwingDegrees = 55f;
+        [Tooltip("Elbow bend while running (arms pump at ~90°, not straight nutcrackers).")]
+        public float runElbowDegrees = -88f;
         public float idleElbowDegrees = -10f;
-        [Tooltip("Knee bend as the trailing leg swings back through under the body.")]
-        public float runKneeDegrees = 65f;
+        [Tooltip("How high the knee drives up as the leg swings forward (high-knee run).")]
+        public float runKneeDegrees = 88f;
         public float idleKneeDegrees = 4f;
         [Tooltip("Knee tuck while off the ground (jump shot, dunk, rebound).")]
         public float airTuckKneeDegrees = 75f;
+        [Tooltip("Forward torso lean (degrees) at full running speed.")]
+        public float runLeanAngle = 14f;
 
         [Header("Dribble")]
         [Tooltip("Shoulder raise when the hand meets the ball at the hip.")]
@@ -82,6 +84,8 @@ namespace MarioBasketball.Presentation
         public float fallAngle = 80f;
         [Tooltip("Body lean (degrees) at a full fadeaway jump shot.")]
         public float fadeLeanAngle = 24f;
+        [Tooltip("A loose/shot ball within this of an airborne player makes them reach for the board (vs hands straight up to contest).")]
+        public float reboundReachDistance = 2.6f;
 
         PlayerController _pc;
         BallController _ball;
@@ -140,6 +144,12 @@ namespace MarioBasketball.Presentation
                         float amt = _pc.FadeAmount * fadeLeanAngle;
                         want = Quaternion.Euler(local.z * amt, 0f, -local.x * amt);
                     }
+                    else if (!_pc.IsAirborne && !_pc.IsHanging && !_pc.IsSkyingForOop
+                             && !_pc.IsFinishing && _pc.PlanarSpeed > 0.6f)
+                    {
+                        // Lean into the run, scaled by speed — drives the whole gait.
+                        want = Quaternion.Euler(runLeanAngle * Mathf.Clamp01(_pc.PlanarSpeed / 7f), 0f, 0f);
+                    }
                     else want = Quaternion.identity;
                     _model.localRotation = Quaternion.Slerp(_model.localRotation, want, poseLerp * Time.deltaTime);
                 }
@@ -161,11 +171,10 @@ namespace MarioBasketball.Presentation
             }
             else
             {
-                // The knee folds while its leg recovers forward and is straight
-                // for the planted half of the stride.
-                float recover = moving ? Mathf.Cos(_phase) : 0f;
-                SetX(_kneeL, idleKneeDegrees + Mathf.Max(0f, recover) * runKneeDegrees * speedScale);
-                SetX(_kneeR, idleKneeDegrees + Mathf.Max(0f, -recover) * runKneeDegrees * speedScale);
+                // High knees: the leg swinging forward drives its knee up; the
+                // trailing leg straightens to push off — a real running gait.
+                SetX(_kneeL, idleKneeDegrees + Mathf.Max(0f, swing) * runKneeDegrees * speedScale);
+                SetX(_kneeR, idleKneeDegrees + Mathf.Max(0f, -swing) * runKneeDegrees * speedScale);
             }
 
             // Crouch low to drop the ball between the knees.
@@ -284,10 +293,16 @@ namespace MarioBasketball.Presentation
                         0f);
                 }
             }
+            else if (_pc.HasBall && _pc.IsAirborne)
+            {
+                // Just grabbed a board in the air — secure it overhead in both hands.
+                Pose(_armR, _elbowR, _wristR, -168f, -10f, 0f);
+                Pose(_armL, _elbowL, _wristL, -168f, -10f, 0f);
+            }
             else if (_pc.HasBall)
             {
-                // Gathered ball (fresh pickup, airborne rebound): both hands carry
-                // it at the chest instead of hanging loose.
+                // Gathered ball (fresh pickup, triple threat): both hands carry it
+                // at the chest instead of hanging loose.
                 Pose(_armL, _elbowL, _wristL, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
                 Pose(_armR, _elbowR, _wristR, holdArmDegrees, holdElbowDegrees, holdWristDegrees);
             }
@@ -307,6 +322,16 @@ namespace MarioBasketball.Presentation
                 // wrists snap through (a chest/push pass), held briefly.
                 Pose(_armR, _elbowR, _wristR, releaseArmDegrees * 0.72f, releaseElbowDegrees, releaseWristDegrees);
                 Pose(_armL, _elbowL, _wristL, releaseArmDegrees * 0.72f, releaseElbowDegrees, releaseWristDegrees);
+            }
+            else if (_pc.IsAirborne && !_pc.HasBall)
+            {
+                // Up off the ball: reach both hands toward a loose/shot ball to grab
+                // the board, or throw them straight up to contest/block a shot.
+                bool reachBall = _ball != null && _ball.State != BallController.BallState.Held
+                    && Vector3.Distance(_ball.transform.position, transform.position) < reboundReachDistance;
+                float pitch = reachBall ? -165f : -178f; // toward the ball, or straight up
+                Pose(_armR, _elbowR, _wristR, pitch, -6f, 0f);
+                Pose(_armL, _elbowL, _wristL, pitch, -6f, 0f);
             }
             else
             {

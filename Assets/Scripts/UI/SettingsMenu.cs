@@ -180,10 +180,10 @@ namespace MarioBasketball.UI
             }),
             ("OFFENSE — WITH BALL", new[]
             {
-                ("Shoot jumper (release at the marker)", "A", "Space"),
-                ("Dunk / layup inside (hold)", "A", "Space"),
+                ("Shoot jumper (release at the marker)", "X", "Space"),
+                ("Dunk / layup inside (hold)", "X", "Space"),
                 ("Air-adjust a finish", "LB", "C"),
-                ("Pass — tap = loft, hold = bullet", "X", "E"),
+                ("Pass — tap = loft, hold = bullet", "A", "E"),
                 ("Aim the pass", "Right stick", "IJKL"),
                 ("Pass to a teammate icon", "Hold LB + A/B", "Hold C + A/B"),
                 ("Fade on a jumper", "Hold Move", "Hold Move"),

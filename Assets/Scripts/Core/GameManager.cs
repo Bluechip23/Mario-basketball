@@ -251,7 +251,7 @@ namespace MarioBasketball.Core
                 }
 
                 // Capture pass info before PickUp clears it.
-                bool oop = ball.IsAlleyOop && best.team == ball.PassingTeam && NearOwnRim(best);
+                bool oop = ball.IsAlleyOop && best.team == ball.PassingTeam && best.IsAirborne && NearOwnRim(best);
                 PlayerController passer = (ball.IsPass && best.team == ball.PassingTeam) ? ball.Passer : null;
                 bool interception = ball.IsPass && best.team != ball.PassingTeam; // picked off
                 bool board = ball.IsRebound;

@@ -88,16 +88,16 @@ namespace MarioBasketball.InputControl
             _postUp.AddBinding("<Gamepad>/rightShoulder");
 
             _shoot = new InputAction("Shoot", InputActionType.Button, "<Keyboard>/space");
-            _shoot.AddBinding("<Gamepad>/buttonSouth");
+            _shoot.AddBinding("<Gamepad>/buttonWest"); // X
 
             _pass = new InputAction("Pass", InputActionType.Button, "<Keyboard>/e");
-            _pass.AddBinding("<Gamepad>/buttonWest");
+            _pass.AddBinding("<Gamepad>/buttonSouth"); // A
 
             _jump = new InputAction("Jump", InputActionType.Button, "<Keyboard>/leftCtrl");
             _jump.AddBinding("<Gamepad>/buttonNorth");
 
             _steal = new InputAction("Steal", InputActionType.Button, "<Keyboard>/f");
-            _steal.AddBinding("<Gamepad>/buttonWest"); // X — same button passes when you have the ball
+            _steal.AddBinding("<Gamepad>/buttonWest"); // X — shares the shoot button; only acts on defense
 
             _dive = new InputAction("Dive", InputActionType.Button, "<Keyboard>/x");
             _dive.AddBinding("<Gamepad>/buttonEast"); // B (when not posting)

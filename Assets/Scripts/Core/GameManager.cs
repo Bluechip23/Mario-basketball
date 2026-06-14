@@ -272,6 +272,8 @@ namespace MarioBasketball.Core
                 else if (board)
                 {
                     Box.AddRebound(best);
+                    best.OnGrabbedRebound();
+                    Shot.Reset(); // fresh shot clock off the board (incl. offensive rebounds)
                     if (best.team != ball.ShooterTeam) BeginFastBreak(best.team); // defensive board → run
                     if (best.isHuman) Haptics.Play(Haptics.Cue.Rebound);
                 }
@@ -361,6 +363,8 @@ namespace MarioBasketball.Core
             if (board)
             {
                 Box.AddRebound(nearest);
+                nearest.OnGrabbedRebound();
+                Shot.Reset();
                 if (nearest.team != shooterTeam) BeginFastBreak(nearest.team);
                 if (nearest.isHuman) Haptics.Play(Haptics.Cue.Rebound);
             }

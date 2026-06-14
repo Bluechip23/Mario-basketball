@@ -45,6 +45,12 @@ namespace MarioBasketball.Gameplay
         public float knockdownStun = 1.1f;
         public float faceLerp = 10f;
 
+        [Header("Defender disengage (RT / bump)")]
+        [Tooltip("Leverage at/above which the offense is overwhelming the defender — trying to push off now risks getting sealed and put on the floor.")]
+        public float overwhelmLeverage = 6f;
+        [Range(0f, 1f)] public float overwhelmFallChance = 0.3f;
+        public float overwhelmFallStun = 0.8f;
+
         [Header("Post moves")]
         public float moveFlightTime = 0.9f;
         public float dropStepLungeLeverage = 2f;
@@ -145,11 +151,24 @@ namespace MarioBasketball.Gameplay
             _leverage = Mathf.Min(_leverage, maxLeverage);
         }
 
-        /// <summary>Called when the (human) defender taps to bump the poster.</summary>
+        /// <summary>The defender taps RT to push off and disengage from the
+        /// back-down. While they're holding their ground it drives the leverage
+        /// down toward a shove-off (breaking free). But once the offense is
+        /// overwhelming them (high leverage) pushing back barely budges them and
+        /// can get them sealed and put on the floor.</summary>
         public void DefenderTap()
         {
             if (!IsPosting || _defender == null) return;
-            _leverage -= _defender.EffectiveStat(StatType.Power) * tapImpulse;
+            float power = _defender.EffectiveStat(StatType.Power);
+            if (_leverage >= overwhelmLeverage)
+            {
+                if (Random.value < overwhelmFallChance) { _defender.Stun(overwhelmFallStun, fall: true); return; }
+                _leverage -= power * tapImpulse * 0.5f; // can barely move them
+            }
+            else
+            {
+                _leverage -= power * tapImpulse;        // push off toward breaking free
+            }
         }
 
         /// <summary>A right-stick hard dribble while posting: a quick shimmy in

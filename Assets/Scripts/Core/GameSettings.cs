@@ -12,10 +12,12 @@ namespace MarioBasketball.Core
     {
         public const int QuarterMinutesMin = 1, QuarterMinutesMax = 12;
         public const int ShotClockMin = 12, ShotClockMax = 24;
+        public const int TimeoutsMin = 0, TimeoutsMax = 9;
 
         static int _masterVolume = 100;
         static int _quarterMinutes = 4;
         static int _shotClockSeconds = 20;
+        static int _timeoutsPerTeam = 2;
         static bool _vibration = true;
         static bool _showBoxScore;
         static bool _loaded;
@@ -39,6 +41,13 @@ namespace MarioBasketball.Core
         {
             get { Load(); return _shotClockSeconds; }
             set { Load(); _shotClockSeconds = Mathf.Clamp(value, ShotClockMin, ShotClockMax); Save(); }
+        }
+
+        /// <summary>Timeouts each team starts the match with (next match).</summary>
+        public static int TimeoutsPerTeam
+        {
+            get { Load(); return _timeoutsPerTeam; }
+            set { Load(); _timeoutsPerTeam = Mathf.Clamp(value, TimeoutsMin, TimeoutsMax); Save(); }
         }
 
         /// <summary>Controller rumble on blocks/steals/rebounds etc. (can be off).</summary>
@@ -69,6 +78,7 @@ namespace MarioBasketball.Core
             _masterVolume = PlayerPrefs.GetInt("settings.masterVolume", _masterVolume);
             _quarterMinutes = PlayerPrefs.GetInt("settings.quarterMinutes", _quarterMinutes);
             _shotClockSeconds = PlayerPrefs.GetInt("settings.shotClockSeconds", _shotClockSeconds);
+            _timeoutsPerTeam = PlayerPrefs.GetInt("settings.timeoutsPerTeam", _timeoutsPerTeam);
             _vibration = PlayerPrefs.GetInt("settings.vibration", _vibration ? 1 : 0) != 0;
             _showBoxScore = PlayerPrefs.GetInt("settings.showBoxScore", _showBoxScore ? 1 : 0) != 0;
         }
@@ -78,6 +88,7 @@ namespace MarioBasketball.Core
             PlayerPrefs.SetInt("settings.masterVolume", _masterVolume);
             PlayerPrefs.SetInt("settings.quarterMinutes", _quarterMinutes);
             PlayerPrefs.SetInt("settings.shotClockSeconds", _shotClockSeconds);
+            PlayerPrefs.SetInt("settings.timeoutsPerTeam", _timeoutsPerTeam);
             PlayerPrefs.SetInt("settings.vibration", _vibration ? 1 : 0);
             PlayerPrefs.SetInt("settings.showBoxScore", _showBoxScore ? 1 : 0);
             PlayerPrefs.Save();

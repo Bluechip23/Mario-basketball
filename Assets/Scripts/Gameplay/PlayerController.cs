@@ -103,6 +103,8 @@ namespace MarioBasketball.Gameplay
         public float finishApproachSpeed = 7f;
         [Tooltip("Flight time of the finish itself — short, so it drops in at the rim instead of lazily arcing in from distance.")]
         public float finishFlightTime = 0.32f;
+        [Tooltip("How long a two-hand slam grabs the rim and hangs.")]
+        public float dunkHangTime = 0.25f;
         [Tooltip("Effective Dunk at/above this goes up for a dunk; below, a layup.")]
         public float dunkThreshold = 6f;
         [Tooltip("Dunk block resistance per point of Power.")]
@@ -122,8 +124,8 @@ namespace MarioBasketball.Gameplay
         [Header("Dribble move (Ball Handling vs Perimeter Defense)")]
         public float dribbleRange = 2.0f;
         public float dribbleCooldownTime = 0.8f;
-        public float dribbleBoostTime = 0.7f;
-        public float dribbleBoostMult = 1.5f;
+        public float dribbleBoostTime = 0.5f;
+        public float dribbleBoostMult = 1.3f;
         [Tooltip("How long the beaten defender is frozen on a successful move.")]
         public float ankleStun = 0.9f;
         public float dribbleBaseChance = 0.45f;
@@ -132,9 +134,9 @@ namespace MarioBasketball.Gameplay
         [Header("Dribble flicks (right-stick hard dribbles for separation)")]
         public float flickCooldownTime = 0.45f;
         [Tooltip("Burst impulse on a flick toward / across the defender.")]
-        public float flickBurstPower = 6f;
+        public float flickBurstPower = 4f;
         [Tooltip("Backward impulse on a step-back (flick away from the basket).")]
-        public float stepBackPower = 7.5f;
+        public float stepBackPower = 5f;
         [Tooltip("Opposite lateral flicks within this window chain into a hesitation cross.")]
         public float hesitationWindow = 0.6f;
         [Tooltip("How long the defender freezes when a flick move shakes them (the full ankleStun is reserved for the hesitation cross).")]
@@ -260,6 +262,14 @@ namespace MarioBasketball.Gameplay
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
         public bool FinishIsDunk => _finishIsDunk;
+        /// <summary>How the current finish looks (layup / one-foot dunk / slam).</summary>
+        public FinishStyle CurrentFinishStyle => _finishStyle;
+        /// <summary>This finish leaves off one foot (layups and the one-foot dunks).</summary>
+        public bool FinishOneFoot => _finishStyle != FinishStyle.TwoHandSlam;
+        /// <summary>Which foot the one-foot finish leaves from (drives the leg pose).</summary>
+        public bool FinishTakeoffLeft => _finishTakeoffLeft;
+        /// <summary>Hanging on the rim after a two-hand slam (held a beat).</summary>
+        public bool IsHanging => _hangTimer > 0f;
         /// <summary>The human is aiming a directed pass (right stick pushed).</summary>
         public bool IsAimingPass => _passAim.magnitude >= passAimDeadzone && HasBall;
         /// <summary>The teammate currently targeted by the pass aim (for icons).</summary>
@@ -321,6 +331,9 @@ namespace MarioBasketball.Gameplay
         float _finishTimer;
         bool _finishIsDunk;
         bool _finishAdjusted;
+        FinishStyle _finishStyle;
+        bool _finishTakeoffLeft;
+        float _hangTimer;
         Vector2 _passAim;
         bool _iconHeld;
         float _dribbleCooldown;
@@ -435,6 +448,7 @@ namespace MarioBasketball.Gameplay
             if (_stealCooldown > 0f) _stealCooldown -= dt;
             if (_stunTimer > 0f) _stunTimer -= dt;
             if (_fallTimer > 0f) _fallTimer -= dt;
+            if (_hangTimer > 0f) _hangTimer -= dt;
             if (_diveTimer > 0f) _diveTimer -= dt;
             if (_shoveTimer > 0f) _shoveTimer -= dt;
             if (_pushCooldown > 0f) _pushCooldown -= dt;
@@ -467,6 +481,11 @@ namespace MarioBasketball.Gameplay
             AdvanceFinish(dt);
             Move();
             UpdateDribbleState();
+
+            // Dribbling/driving with the ball puts it into play straight off an
+            // inbound — the inbounder isn't forced to stand and pass it in.
+            if (isHuman && HasBall && _moveIntent.sqrMagnitude > 0.02f && GameManager.Instance != null)
+                GameManager.Instance.TryStartFromInbound();
             // Loose balls / rebounds are resolved centrally (GameManager) so it's
             // a Rebounds + height + jump contest, not a first-come grab.
 
@@ -564,6 +583,15 @@ namespace MarioBasketball.Gameplay
             Vector3 horizontal;
             bool rotateToMove = false;
             Vector3 faceDir = Vector3.zero;
+
+            // Hanging on the rim after a slam: hold up there a beat, then drop.
+            if (_hangTimer > 0f)
+            {
+                _verticalVelocity = 0f;
+                PlanarSpeed = 0f;
+                _character?.ReportActivity(false, false);
+                return;
+            }
 
             if (IsStunned)
             {
@@ -733,6 +761,7 @@ namespace MarioBasketball.Gameplay
         {
             if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _shooting || _finishing) return;
             if (IconPassActive) { PassToSlot(0); return; } // LB + A → pass to teammate 1
+            GameManager.Instance.TryStartFromInbound(); // shooting it in puts the ball live
             Hoop hoop = GameManager.Instance.GetAttackingHoop(team);
             if (hoop == null) return;
 
@@ -780,7 +809,21 @@ namespace MarioBasketball.Gameplay
             _finishTimer = 0f;
             _finishAdjusted = false;
             _finishIsDunk = Effective(StatType.Dunk, 5f) >= dunkThreshold;
+            _finishStyle = PickFinishStyle(_finishIsDunk);
+            _finishTakeoffLeft = Random.value < 0.5f;
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // go up
+        }
+
+        /// <summary>A layup off one foot when it's not a dunk; otherwise mix the
+        /// dunk styles — stronger finishers favour the two-hand rim-grab slam,
+        /// athletic ones explode off one foot.</summary>
+        FinishStyle PickFinishStyle(bool dunk)
+        {
+            if (!dunk) return FinishStyle.Layup;
+            float power = Effective(StatType.Power, 5f);
+            float slamBias = 0.35f + 0.4f * Mathf.Clamp01((power - 4f) / 6f);
+            if (Random.value < slamBias) return FinishStyle.TwoHandSlam;
+            return Random.value < 0.5f ? FinishStyle.OneFootOneHandDunk : FinishStyle.OneFootTwoHandDunk;
         }
 
         void ResolveFinish()
@@ -788,6 +831,8 @@ namespace MarioBasketball.Gameplay
             if (!_finishing) return;
             _finishing = false;
             FinishShot(_finishIsDunk, _finishAdjusted);
+            // The big slam grabs the rim and hangs for a beat before dropping off.
+            if (_finishStyle == FinishStyle.TwoHandSlam) _hangTimer = dunkHangTime;
         }
 
         /// <summary>Resolve a dunk or layup: a block roll first (reduced by an
@@ -1008,6 +1053,7 @@ namespace MarioBasketball.Gameplay
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
             _passGestureTimer = passGestureTime; // throw animation
+            if (GameManager.Instance != null) GameManager.Instance.TryStartFromInbound(); // a pass-in goes live
             bool fromPost = IsPosting;
             if (IsPosting) _post.End();   // kick out of the post
             _finishing = false;           // or dump it off out of the air
@@ -1041,13 +1087,16 @@ namespace MarioBasketball.Gameplay
             float err = PassError(PassBallHandling(fromPost));
             Vector2 j = Random.insideUnitCircle * err;
             target += new Vector3(j.x, 0f, j.y);
-            Ball.PassTo(target, oopFlightTime, alleyOop: true);
+            Ball.PassTo(target, oopFlightTime, alleyOop: true, receiver: mate);
         }
 
         void PassToSlot(int index)
         {
             var mate = TeammateSlot(index);
-            if (mate != null) { _passGestureTimer = passGestureTime; PassToTeammate(mate, fromPost: false, hard: false); }
+            if (mate == null) return;
+            _passGestureTimer = passGestureTime;
+            if (GameManager.Instance != null) GameManager.Instance.TryStartFromInbound();
+            PassToTeammate(mate, fromPost: false, hard: false);
         }
 
         /// <summary>Lead pass to a teammate; Ball Handling sets the accuracy, so
@@ -1058,7 +1107,7 @@ namespace MarioBasketball.Gameplay
             float err = PassError(PassBallHandling(fromPost));
             Vector2 j = Random.insideUnitCircle * err;
             Vector3 dest = mate.transform.position + new Vector3(j.x, 0.6f, j.y);
-            Ball.PassTo(dest, hard ? hardPassTime : loftPassTime);
+            Ball.PassTo(dest, hard ? hardPassTime : loftPassTime, receiver: mate);
         }
 
         float PassBallHandling(bool fromPost)
@@ -1131,7 +1180,24 @@ namespace MarioBasketball.Gameplay
         {
             if (MatchPause.IsPaused || IsStunned || !HasBall) return;
             _passGestureTimer = passGestureTime; // throw animation
-            Ball.PassTo(worldPoint);
+            if (GameManager.Instance != null) GameManager.Instance.TryStartFromInbound();
+            Ball.PassTo(worldPoint, receiver: NearestTeammateTo(worldPoint));
+        }
+
+        /// <summary>The on-court teammate closest to a world point (pass target).</summary>
+        PlayerController NearestTeammateTo(Vector3 point)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null) return null;
+            PlayerController best = null;
+            float bestD = Mathf.Infinity;
+            foreach (var m in gm.TeamFor(team).onCourt)
+            {
+                if (m == null || m == this || !m.enabled) continue;
+                float d = HorizontalDistance(m.transform.position, point);
+                if (d < bestD) { bestD = d; best = m; }
+            }
+            return best;
         }
 
         public void TriggerJump()

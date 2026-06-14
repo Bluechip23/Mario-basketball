@@ -20,11 +20,13 @@ namespace MarioBasketball.Core
         public readonly List<PlayerController> bench = new List<PlayerController>();
 
         public int Fouls { get; private set; }
-        public int TimeoutsRemaining { get; private set; } = StartingTimeouts;
+        public int TimeoutsRemaining { get; private set; }
 
         public TeamState(TeamSide side)
         {
             this.side = side;
+            // The Settings screen sets timeouts per team for the match.
+            TimeoutsRemaining = GameSettings.TimeoutsPerTeam;
         }
 
         public void AddFoul() => Fouls++;

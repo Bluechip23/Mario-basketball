@@ -57,6 +57,10 @@ namespace MarioBasketball.Core
         public float reboundRandom = 1.5f;
         [Tooltip("Wario's offensive-rebound trait rating.")]
         public int offensiveReboundRating = 9;
+        [Tooltip("Catch-score edge the intended pass receiver gets, so passes complete unless a defender is right on the ball.")]
+        public float receiverCatchBonus = 7f;
+        [Tooltip("Extra catch radius (m) for the intended pass receiver — a generous catching pocket.")]
+        public float receiverCatchRadiusBonus = 1.5f;
         [Tooltip("A defender must be within this (arms reach) to pick off a pass.")]
         public float passInterceptRadius = 1.1f;
         [Tooltip("A pass must travel at least this far from the passer before a defender can intercept — stops the passer's own man stealing it the instant it's released.")]
@@ -291,6 +295,7 @@ namespace MarioBasketball.Core
                             + (p.IsDiving ? reboundJumpScore * 0.5f : 0f)
                             - dist
                             + UnityEngine.Random.value * reboundRandom;
+                if (p == ball.IntendedReceiver) score += receiverCatchBonus; // the pass is meant for them
 
                 if (score > bestScore) { bestScore = score; best = p; }
             }
@@ -338,6 +343,17 @@ namespace MarioBasketball.Core
 
         float ReboundCatchRadius(PlayerController p)
         {
+            // The intended receiver has a big, forgiving catching pocket so a
+            // good pass actually lands in their hands.
+            if (ball.IntendedReceiver == p)
+            {
+                float rr = reboundBaseRadius + receiverCatchRadiusBonus
+                         + reboundHeightRadius * Mathf.Max(0f, p.BodyHeight - 1.6f);
+                if (p.IsAirborne) rr += reboundJumpReach;
+                if (p.IsDiving) rr += reboundDiveReach;
+                return rr;
+            }
+
             // Intercepting a live pass is an arms-reach play, not a wide
             // rebound box — a defender across the lane shouldn't pick it.
             if (ball.IsPass && p.team != ball.PassingTeam)
@@ -754,6 +770,14 @@ namespace MarioBasketball.Core
             State = GameState.Playing;
             StateChanged?.Invoke(State);
             SetClocksRunning(true);
+        }
+
+        /// <summary>The inbounder can put the ball straight into play — dribble it
+        /// in, shoot, or pass — instead of being forced to wait out the inbound
+        /// beat or only pass it in. No-op once the ball is already live.</summary>
+        public void TryStartFromInbound()
+        {
+            if (State == GameState.Inbounding || State == GameState.TipOff) ResumePlay();
         }
 
         // ---- Helpers -------------------------------------------------------

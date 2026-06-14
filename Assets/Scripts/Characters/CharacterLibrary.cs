@@ -198,7 +198,7 @@ namespace MarioBasketball.Characters
         public static CharacterStats Laurentius() => new CharacterStats
         {
             characterName = "Laurentius",
-            speed = 6, ballHandling = 4, threePoint = 1, midRange = 6, insideScoring = 4, postOffense = 3, dunk = 4, power = 8, rebounds = 10, blocks = 8, steals = 5, postDefense = 7, perimeterDefense = 8, stamina = 8,
+            speed = 6, ballHandling = 4, threePoint = 1, midRange = 6, insideScoring = 4, postOffense = 3, dunk = 4, power = 8, rebounds = 10, blocks = 7, steals = 5, postDefense = 7, perimeterDefense = 8, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 2.2f,
             archetype = PlayerArchetype.Big,
             description = "The glass belongs to him. A board-vacuuming enforcer who defends the paint and the perimeter alike — just never ask for a three."
@@ -209,7 +209,7 @@ namespace MarioBasketball.Characters
             characterName = "Cliffy Guy",
             speed = 10, ballHandling = 6, threePoint = 1, midRange = 1, insideScoring = 8, postOffense = 3, dunk = 8, power = 5, rebounds = 2, blocks = 2, steals = 9, postDefense = 3, perimeterDefense = 4, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.55f,
-            archetype = PlayerArchetype.Guard,
+            archetype = PlayerArchetype.Wing,
             description = "A blur in a mask. Scales any defense for steals and rim attacks — allergic to jump shots and rebounds."
         };
 

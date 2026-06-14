@@ -454,7 +454,7 @@ namespace MarioBasketball.Core
                     if (CountdownDone(dt))
                     {
                         Hoop scoredOn = GetAttackingHoop(Possession);
-                        BeginInbound(Opponent(Possession), InboundSpotNear(scoredOn));
+                        BeginMadeBasketInbound(scoredOn);
                     }
                     break;
 
@@ -546,6 +546,83 @@ namespace MarioBasketball.Core
             State = GameState.Inbounding;
             StateChanged?.Invoke(State);
             _stateTimer = inboundDuration;
+        }
+
+        /// <summary>After a made basket the scored-on team takes it out from
+        /// under that basket: the <b>big</b> inbounds from the baseline, the
+        /// <b>guard</b> sets at the free-throw elbow, and the <b>wing</b> spaces
+        /// to the opposite side just beyond the three-point line. The clock is
+        /// already stopped (it resumes when play does, after the inbound beat).</summary>
+        void BeginMadeBasketInbound(Hoop hoop)
+        {
+            TeamSide team = Opponent(Possession);
+            Possession = team;
+
+            PositionInboundFormation(team, hoop, out PlayerController inbounder);
+
+            if (inbounder != null && ball != null) ball.PickUp(inbounder);
+            else GiveBallToInbounder(team, InboundSpotNear(hoop));
+
+            Shot.Reset();
+            SetClocksRunning(false);
+            State = GameState.Inbounding;
+            StateChanged?.Invoke(State);
+            _stateTimer = inboundDuration;
+        }
+
+        /// <summary>Place the inbounding team's three on-court players into the
+        /// made-basket set, by archetype, relative to the hoop they're under.
+        /// Roles fall back gracefully so every spot is filled even with an
+        /// off-beat lineup. Reports the chosen inbounder (the big).</summary>
+        void PositionInboundFormation(TeamSide side, Hoop hoop, out PlayerController inbounder)
+        {
+            inbounder = null;
+            var pool = new List<PlayerController>();
+            foreach (var p in TeamFor(side).onCourt)
+                if (p != null && p.enabled) pool.Add(p);
+            if (pool.Count == 0) return;
+
+            // Geometry from the hoop being inbounded under (it sits 1.6 m in from
+            // the baseline; the free-throw line is 5.8 m in; lane half-width 2.45).
+            Vector3 hp = hoop != null ? hoop.transform.position : Vector3.zero;
+            float dir = hp.z >= 0f ? 1f : -1f;
+            float baselineZ = hp.z + dir * 1.6f;
+            float ftZ = baselineZ - dir * 5.8f;
+
+            Vector3 inboundSpot = new Vector3(0.6f, 1.1f, baselineZ - dir * 0.5f); // under the rim, inside the baseline wall
+            Vector3 elbowSpot   = new Vector3(2.45f, 1.1f, ftZ);                   // free-throw elbow
+            Vector3 wingSpot    = new Vector3(-4.7f, 1.1f, hp.z - dir * 5.1f);     // opposite wing, beyond the arc
+
+            PlayerController big   = Take(pool, PlayerArchetype.Big)   ?? TakeAny(pool);
+            PlayerController guard = Take(pool, PlayerArchetype.Guard) ?? TakeAny(pool);
+            PlayerController wing  = Take(pool, PlayerArchetype.Wing)  ?? TakeAny(pool);
+
+            if (big != null)   { big.Teleport(inboundSpot); inbounder = big; }
+            if (guard != null) guard.Teleport(elbowSpot);
+            if (wing != null)  wing.Teleport(wingSpot);
+        }
+
+        static PlayerController Take(List<PlayerController> pool, PlayerArchetype arch)
+        {
+            for (int i = 0; i < pool.Count; i++)
+            {
+                var c = pool[i].Character;
+                if (c != null && c.stats != null && c.stats.Archetype == arch)
+                {
+                    var p = pool[i];
+                    pool.RemoveAt(i);
+                    return p;
+                }
+            }
+            return null;
+        }
+
+        static PlayerController TakeAny(List<PlayerController> pool)
+        {
+            if (pool.Count == 0) return null;
+            var p = pool[0];
+            pool.RemoveAt(0);
+            return p;
         }
 
         void ResumePlay()

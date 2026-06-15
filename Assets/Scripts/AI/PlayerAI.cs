@@ -232,6 +232,16 @@ namespace MarioBasketball.AI
             if (nearestDef < dribbleGuardDistance && dist > _pc.paintRadius && Random.value < dribbleChance)
                 _pc.AttemptDribbleMove();
 
+            // At the rim with no good look and nowhere better to go — just finish it
+            // (a contested layup beats dribbling under the basket until the shot
+            // clock dies). Past the brief gather so it isn't an instant put-up.
+            if (dist <= _pc.finishRange && _pc.TimeWithBall >= putbackSettle)
+            {
+                _pc.SetMoveIntent(Vector2.zero, false);
+                _pc.TriggerShoot();
+                return;
+            }
+
             MoveTo(aim, sprint: dist > 5f);
         }
 

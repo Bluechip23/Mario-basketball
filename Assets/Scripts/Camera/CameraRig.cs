@@ -17,14 +17,14 @@ namespace MarioBasketball.CameraControl
 
         [Header("Sideline framing")]
         [Tooltip("Fixed x position off the sideline (negative = -x side).")]
-        public float sideX = -11f;
-        public float height = 4.5f;
+        public float sideX = -9.5f;
+        public float height = 4.2f;
         [Tooltip("The camera slides along the sideline within ±zRange.")]
         public float zRange = 8f;
         [Tooltip("Height of the look-at point, keeps the horizon stable.")]
         public float lookHeight = 1.4f;
         public float followSmoothing = 5f;
-        public float fieldOfView = 46f;
+        public float fieldOfView = 44f;
 
         Camera _cam;
 

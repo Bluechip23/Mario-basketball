@@ -89,6 +89,14 @@ namespace MarioBasketball.Presentation
         [Tooltip("How far the post defender leans their chest into the poster.")]
         public float postDefendLean = 16f;
 
+        [Header("Post shot form")]
+        [Tooltip("How far (deg) the body turns sideways to the rim on a hook shot.")]
+        public float hookBodyTurn = 62f;
+        [Tooltip("Off-arm shoulder raise while barring out space on a hook.")]
+        public float hookGuardArmDegrees = -72f;
+        [Tooltip("Off-arm elbow bend (≈90°) while barring out space on a hook.")]
+        public float hookGuardElbowDegrees = -100f;
+
         PlayerController _pc;
         BallController _ball;
         Transform _model, _armL, _armR, _elbowL, _elbowR, _wristL, _wristR, _legL, _legR, _kneeL, _kneeR;
@@ -160,6 +168,20 @@ namespace MarioBasketball.Presentation
                         }
                         else want = Quaternion.identity;
                     }
+                    else if (_pc.IsPostShooting)
+                    {
+                        // Each post shot turns the body its own way: a hook turns
+                        // sideways to the rim, the turnaround faces up and fades
+                        // back, the power drop step squares up to bury it.
+                        var move = _pc.CurrentPostMove;
+                        float turn =
+                            move == PostMove.Hook || move == PostMove.SkyHook ? hookBodyTurn :
+                            move == PostMove.TurnaroundJumper ? 165f :
+                            move == PostMove.DropStep || move == PostMove.PowerDropStep ? 130f :
+                            100f; // spin / up-and-under
+                        float lean = move == PostMove.TurnaroundJumper ? -fadeLeanAngle : 0f;
+                        want = Quaternion.Euler(lean, turn, 0f);
+                    }
                     else if (!_pc.IsAirborne && !_pc.IsPosting && !_pc.IsHanging && !_pc.IsSkyingForOop
                              && !_pc.IsFinishing && _pc.PlanarSpeed > 0.6f)
                     {
@@ -228,6 +250,33 @@ namespace MarioBasketball.Presentation
                 }
             }
 
+            // Post-shot footwork. The power drop step / drop step jump-stops: the
+            // lead leg swings hard toward the basket on the gather, the player sinks
+            // into a wide base, then explodes up. The hook rises off a balanced
+            // gather (a modest dip, no big leg drive).
+            if (_pc.IsPostShooting)
+            {
+                var pmove = _pc.CurrentPostMove;
+                float pk = Mathf.Clamp01(_pc.PostShotChargeFraction / Mathf.Max(0.01f, _pc.PostShotPerfectFraction));
+                if (pmove == PostMove.DropStep || pmove == PostMove.PowerDropStep)
+                {
+                    // Swing the lead leg through toward the rim, jump-stop low, rise.
+                    float swingLeg = Mathf.Sin(Mathf.PI * Mathf.Clamp01(pk)) * 40f;
+                    SetX(_legR, -swingLeg);                 // lead leg drives forward
+                    SetX(_legL, swingLeg * 0.4f);           // trail leg sets the base
+                    float crouch = Mathf.Lerp(50f, 10f, pk);
+                    SetX(_kneeL, crouch);
+                    SetX(_kneeR, crouch);
+                }
+                else
+                {
+                    // Balanced hook gather: a small dip into the rise-up.
+                    float crouch = Mathf.Lerp(30f, 8f, pk);
+                    SetX(_kneeL, crouch);
+                    SetX(_kneeR, crouch);
+                }
+            }
+
             // A released jump shot (or timed post shot) holds its follow-through.
             bool shooting = _pc.IsShooting || _pc.IsPostShooting;
             if (_wasShooting && !shooting) _followThrough = followThroughTime;
@@ -242,14 +291,21 @@ namespace MarioBasketball.Presentation
                 float charge = _pc.IsPostShooting ? _pc.PostShotChargeFraction : _pc.ShotChargeFraction;
                 float perfect = _pc.IsPostShooting ? _pc.PostShotPerfectFraction : _pc.ShotPerfectFraction;
                 float k = Mathf.Clamp01(charge / Mathf.Max(0.01f, perfect));
-                Pose(_armR, _elbowR, _wristR,
-                    Mathf.Lerp(gatherArmDegrees, releaseArmDegrees, k),
-                    Mathf.Lerp(gatherElbowDegrees, releaseElbowDegrees, k),
-                    gatherWristDegrees);
-                Pose(_armL, _elbowL, _wristL,
-                    Mathf.Lerp(gatherArmDegrees, guideArmDegrees, k),
-                    Mathf.Lerp(gatherElbowDegrees, guideElbowDegrees, k),
-                    gatherWristDegrees * 0.5f);
+                if (_pc.IsPostShooting)
+                {
+                    PostShotArms(_pc.CurrentPostMove, k);
+                }
+                else
+                {
+                    Pose(_armR, _elbowR, _wristR,
+                        Mathf.Lerp(gatherArmDegrees, releaseArmDegrees, k),
+                        Mathf.Lerp(gatherElbowDegrees, releaseElbowDegrees, k),
+                        gatherWristDegrees);
+                    Pose(_armL, _elbowL, _wristL,
+                        Mathf.Lerp(gatherArmDegrees, guideArmDegrees, k),
+                        Mathf.Lerp(gatherElbowDegrees, guideElbowDegrees, k),
+                        gatherWristDegrees * 0.5f);
+                }
             }
             else if (_followThrough > 0f)
             {
@@ -432,6 +488,60 @@ namespace MarioBasketball.Presentation
                     Pose(pumpArm, pumpElbow, pumpWrist,
                         dribbleArmBase + dribblePushDegrees, dribbleElbowPushed, dribbleWristPushed);
                     Pose(offArm, offElbow, offWrist, guardArmDegrees, dribbleElbowBent * 0.5f, 0f);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>Arm work for each post shot. The hook sweeps one hand up and
+        /// over the head with the off-arm barred out for space; the power drop
+        /// step and the other rim finishes drive both hands up to flush it; the
+        /// turnaround uses normal jumper form (faded back by the body lean).</summary>
+        void PostShotArms(PostMove move, float k)
+        {
+            switch (move)
+            {
+                case PostMove.Hook:
+                case PostMove.SkyHook:
+                {
+                    // Shooting arm (right) sweeps from the shoulder up and over the
+                    // head in the hook arc; the wrist snaps through near the top. The
+                    // sky hook releases that touch higher and straighter.
+                    float top = move == PostMove.SkyHook ? -192f : -176f;
+                    float sweep = Mathf.Lerp(-58f, top, k);
+                    float flick = Mathf.Clamp01((k - 0.65f) / 0.35f);
+                    Pose(_armR, _elbowR, _wristR, sweep, -12f,
+                        Mathf.Lerp(gatherWristDegrees, releaseWristDegrees, flick));
+                    // Off arm (left): raised, bent ~90°, barring out a sliver of space.
+                    Pose(_armL, _elbowL, _wristL, hookGuardArmDegrees, hookGuardElbowDegrees, 0f);
+                    break;
+                }
+
+                case PostMove.TurnaroundJumper:
+                {
+                    // Face-up fadeaway — standard jumper form, fading on the body lean.
+                    Pose(_armR, _elbowR, _wristR,
+                        Mathf.Lerp(gatherArmDegrees, releaseArmDegrees, k),
+                        Mathf.Lerp(gatherElbowDegrees, releaseElbowDegrees, k),
+                        gatherWristDegrees);
+                    Pose(_armL, _elbowL, _wristL,
+                        Mathf.Lerp(gatherArmDegrees, guideArmDegrees, k),
+                        Mathf.Lerp(gatherElbowDegrees, guideElbowDegrees, k),
+                        gatherWristDegrees * 0.5f);
+                    break;
+                }
+
+                default: // DropStep, PowerDropStep, Spin, UpAndUnder — power rim finish
+                {
+                    // Gather the ball low, then drive both hands up and flush it.
+                    Pose(_armR, _elbowR, _wristR,
+                        Mathf.Lerp(holdArmDegrees, dunkArmDegrees, k),
+                        Mathf.Lerp(holdElbowDegrees, dunkElbowDegrees, k),
+                        dunkWristDegrees * k);
+                    Pose(_armL, _elbowL, _wristL,
+                        Mathf.Lerp(holdArmDegrees, dunkArmDegrees, k),
+                        Mathf.Lerp(holdElbowDegrees, dunkElbowDegrees, k),
+                        dunkWristDegrees * k);
                     break;
                 }
             }

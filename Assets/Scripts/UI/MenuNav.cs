@@ -20,6 +20,9 @@ namespace MarioBasketball.UI
         public bool Submit { get; private set; }
         /// <summary>B / circle / Tab pressed this frame (back or flip, per menu).</summary>
         public bool East { get; private set; }
+        /// <summary>Right-stick value this frame (Y &gt; 0 = pushed up). Menus use
+        /// it for free scrolling of long lists.</summary>
+        public Vector2 RightStick { get; private set; }
 
         const float RepeatDelay = 0.35f;
         const float RepeatRate = 0.15f;
@@ -27,6 +30,7 @@ namespace MarioBasketball.UI
         readonly InputAction _nav;
         readonly InputAction _submit;
         readonly InputAction _east;
+        readonly InputAction _rightStick;
         Vector2Int _heldDir;
         float _repeatTimer;
 
@@ -46,10 +50,13 @@ namespace MarioBasketball.UI
 
             _east = new InputAction("MenuEast", InputActionType.Button, "<Gamepad>/buttonEast");
             _east.AddBinding("<Keyboard>/tab");
+
+            _rightStick = new InputAction("MenuScroll", InputActionType.Value, expectedControlType: "Vector2");
+            _rightStick.AddBinding("<Gamepad>/rightStick");
         }
 
-        public void Enable() { _nav.Enable(); _submit.Enable(); _east.Enable(); }
-        public void Disable() { _nav.Disable(); _submit.Disable(); _east.Disable(); }
+        public void Enable() { _nav.Enable(); _submit.Enable(); _east.Enable(); _rightStick.Enable(); }
+        public void Disable() { _nav.Disable(); _submit.Disable(); _east.Disable(); _rightStick.Disable(); }
 
         /// <summary>Sample input. Call exactly once per frame (from Update —
         /// menus run with the game paused, so timing uses unscaled time).</summary>
@@ -57,6 +64,7 @@ namespace MarioBasketball.UI
         {
             Submit = _submit.WasPressedThisFrame();
             East = _east.WasPressedThisFrame();
+            RightStick = _rightStick.ReadValue<Vector2>();
 
             Vector2 raw = _nav.ReadValue<Vector2>();
             var dir = new Vector2Int(

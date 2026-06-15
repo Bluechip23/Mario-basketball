@@ -27,9 +27,9 @@ namespace MarioBasketball.Gameplay
 
         [Header("Movement (mapped from the Speed stat)")]
         [Tooltip("Run speed (m/s) at Speed 1 — a slow player. The wide gap to maxMoveSpeed makes fast vs slow clearly matter.")]
-        public float minMoveSpeed = 2.8f;
+        public float minMoveSpeed = 3.3f;
         [Tooltip("Run speed (m/s) at Speed 10 — a burner.")]
-        public float maxMoveSpeed = 7f;
+        public float maxMoveSpeed = 7.8f;
         public float sprintMultiplier = 1.4f;
         public float turnSpeed = 720f;
         public float gravity = -25f;
@@ -232,11 +232,20 @@ namespace MarioBasketball.Gameplay
                     return transform.position + transform.forward * (0.18f * h) + Vector3.up * (0.55f * h);
                 if (IsPostShooting)
                 {
-                    // The shot rises overhead as the release meter fills (the
-                    // poster's back is to the rim, so keep it straight up).
                     float k = Mathf.Clamp01(PostShotChargeFraction / Mathf.Max(0.01f, PostShotPerfectFraction));
-                    Vector3 gather = transform.position + Vector3.up * (0.30f * h);
-                    Vector3 set = transform.position + Vector3.up * (0.66f * h);
+                    PostMove move = CurrentPostMove;
+                    if (move == PostMove.Hook || move == PostMove.SkyHook)
+                    {
+                        // Hook: the ball rides up in the shooting hand, out to the
+                        // side and arcing high over the head (not straight up).
+                        Vector3 low = transform.position + transform.right * (0.34f * h) + Vector3.up * (0.40f * h);
+                        Vector3 high = transform.position + transform.right * (0.16f * h) + Vector3.up * (0.98f * h);
+                        return Vector3.Lerp(low, high, k);
+                    }
+                    // Power drop step / spin / up-and-under: gather low off the
+                    // jump-stop, then drive the ball straight up to the rim.
+                    Vector3 gather = transform.position + transform.forward * (-0.12f * h) + Vector3.up * (0.26f * h);
+                    Vector3 set = transform.position + Vector3.up * (0.70f * h);
                     return Vector3.Lerp(gather, set, k);
                 }
                 // Snagged a board in the air — the ball is up in the raised hands.
@@ -318,6 +327,9 @@ namespace MarioBasketball.Gameplay
         public float PostShotChargeFraction => _post != null ? _post.PostShotChargeFraction : 0f;
         /// <summary>Where the perfect post-shot release sits on the meter (0-1).</summary>
         public float PostShotPerfectFraction => _post != null ? _post.PostShotPerfectFraction : 0f;
+        /// <summary>Which post move is currently being shot — drives the distinct
+        /// hook / power-drop-step / fadeaway body animation.</summary>
+        public PostMove CurrentPostMove => _post != null ? _post.CurrentMove : PostMove.Hook;
         /// <summary>World-space planar direction the current jump shot is fading
         /// toward (zero for a straight-up shot). Drives the body lean.</summary>
         public Vector3 FadeDirection => _fadeDir;

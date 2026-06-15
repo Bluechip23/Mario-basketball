@@ -6,17 +6,19 @@ using MarioBasketball.Bootstrap;
 namespace MarioBasketball.UI
 {
     /// <summary>
-    /// Pre-match team picker (IMGUI). The roster is laid out as <b>character
-    /// cards</b> grouped by position — GUARDS / WINGS / BIGS. A card's front is
-    /// the character's face (an empty portrait box for now) and a scouting
-    /// blurb; pressing B (circle) flips every card over to its stat sheet, with
-    /// values colour-coded (10 gold, 7-8 green, 4-6 plain, 1-3 red).
+    /// Pre-match team picker (IMGUI), styled bright and Mario-esque. The screen is
+    /// split into two panels: the <b>left</b> is the roster you pick from — a
+    /// scrolling wall of <b>character cards</b> grouped by position (GUARDS /
+    /// WINGS / BIGS); the <b>right</b> shows the two squads you're building (HOME
+    /// and AWAY) plus the controls. A card's front is the character's face (an
+    /// empty portrait box for now) and a scouting blurb; pressing B (circle) /
+    /// Tab flips every card to its colour-coded stat sheet.
     ///
-    /// The player drafts five characters per side; the first HOME pick is the
-    /// player they'll control. Controller-first: d-pad / stick moves a flashing
-    /// yellow outline between the team slots, the cards and the bottom buttons;
-    /// A adds (or removes, on a slot). The mouse still works. On Start it hands
-    /// the two rosters to <see cref="GameBootstrap.StartMatch"/>.
+    /// You draft five characters per side; the first HOME pick is the player
+    /// you'll control. Controller-first: d-pad / left stick moves a flashing
+    /// yellow outline, A adds (on a card) or removes (on a filled slot), and the
+    /// <b>right analog stick scrolls</b> the roster. The mouse still works. On
+    /// Start it hands the two rosters to <see cref="GameBootstrap.StartMatch"/>.
     /// </summary>
     public class TeamSelectMenu : MonoBehaviour
     {
@@ -24,13 +26,27 @@ namespace MarioBasketball.UI
         public MainMenu mainMenu;
 
         const int TeamSize = 5;
-        const float CardW = 180f;
-        const float CardH = 240f;
+        const int TeamItemCount = 2 * TeamSize + 4; // home + away slots + switch/random/back/start
+        const float CardW = 172f;
+        const float CardH = 236f;
         const float CardPad = 10f;
+        const float ScrollSpeed = 1100f; // right-stick scroll, px/sec
 
-        static readonly Color Gold = new Color(1f, 0.84f, 0.1f);
-        static readonly Color Green = new Color(0.35f, 0.85f, 0.35f);
-        static readonly Color Red = new Color(0.95f, 0.3f, 0.25f);
+        // ---- Mario palette --------------------------------------------------
+        static readonly Color Sky       = new Color(0.42f, 0.70f, 0.98f);
+        static readonly Color Cloud     = new Color(0.98f, 0.99f, 1f);
+        static readonly Color Cream     = new Color(1f, 0.97f, 0.86f);
+        static readonly Color MarioRed  = new Color(0.90f, 0.20f, 0.18f);
+        static readonly Color LuigiGreen= new Color(0.16f, 0.62f, 0.27f);
+        static readonly Color SkyDeep   = new Color(0.18f, 0.46f, 0.88f);
+        static readonly Color Coin      = new Color(1f, 0.80f, 0.10f);
+        static readonly Color HomeTint  = new Color(0.99f, 0.84f, 0.82f); // soft red wash
+        static readonly Color AwayTint  = new Color(0.82f, 0.89f, 1f);    // soft blue wash
+        static readonly Color Ink       = new Color(0.15f, 0.15f, 0.18f);
+
+        static readonly Color Gold  = new Color(0.86f, 0.65f, 0.05f);
+        static readonly Color Green = new Color(0.16f, 0.55f, 0.20f);
+        static readonly Color Red   = new Color(0.85f, 0.20f, 0.18f);
 
         List<CharacterStats> _roster = new List<CharacterStats>();
         readonly List<int> _home = new List<int>();
@@ -41,12 +57,10 @@ namespace MarioBasketball.UI
         MenuNav _nav;
 
         // ---- Focus (controller cursor) --------------------------------------
-        enum Zone { Slots, Cards, Bottom }
+        enum Zone { Cards, Team }
         Zone _zone = Zone.Cards;
-        int _slotRow;   // 0 = HOME slots, 1 = AWAY slots, 2 = control buttons
-        int _slotCol;
         int _cardIndex;
-        int _bottomCol; // 0 = Back, 1 = Start
+        int _teamIndex; // 0-4 HOME slots, 5-9 AWAY slots, 10 switch, 11 random, 12 back, 13 start
 
         struct CardEntry
         {
@@ -57,20 +71,25 @@ namespace MarioBasketball.UI
 
         struct Layout
         {
-            public Rect area;
-            public Rect[][] slotRects;   // [home, away, controls]
+            public Rect window, title;
+            public Rect leftPanel, rightPanel;
             public Rect scrollView;
             public float contentHeight;
+            public int cardRows, cols;
             public List<CardEntry> cards;
-            public List<(string label, Rect rect)> sections;
-            public Rect backRect, startRect;
-            public int cardRows;
+            public List<(string label, Rect rect, Color color)> sections;
+            public Rect homeBox, awayBox;
+            public Rect[] homeSlots, awaySlots;
+            public Rect switchRect, randomRect, backRect, startRect;
         }
 
         GUIStyle _title;
-        GUIStyle _header;
+        GUIStyle _panelHeader;
+        GUIStyle _teamHeader;
         GUIStyle _button;
+        GUIStyle _slotButton;
         GUIStyle _hint;
+        GUIStyle _sectionChip;
         GUIStyle _cardName;
         GUIStyle _cardText;
         GUIStyle _cardTag;
@@ -90,6 +109,8 @@ namespace MarioBasketball.UI
             _showStats = false;
             _zone = Zone.Cards;
             _cardIndex = 0;
+            _teamIndex = 0;
+            _scroll = Vector2.zero;
             Prefill(_home, "Mario", "Luigi", "Peach", "Toad", "Diddy Kong");
             Prefill(_away, "Bowser", "Donkey Kong", "Waluigi", "Yoshi", "Boo");
 
@@ -131,6 +152,12 @@ namespace MarioBasketball.UI
             if (_nav.Step != Vector2Int.zero) Navigate(layout, _nav.Step);
             if (_nav.Submit) ActivateFocused(layout);
 
+            // Right analog stick free-scrolls the roster (up = scroll up).
+            float maxScroll = Mathf.Max(0f, layout.contentHeight - layout.scrollView.height);
+            if (Mathf.Abs(_nav.RightStick.y) > 0.2f)
+                _scroll.y -= _nav.RightStick.y * ScrollSpeed * Time.unscaledDeltaTime;
+            _scroll.y = Mathf.Clamp(_scroll.y, 0f, maxScroll);
+
             if (_zone == Zone.Cards) ScrollToCard(layout);
         }
 
@@ -138,47 +165,38 @@ namespace MarioBasketball.UI
         {
             switch (_zone)
             {
-                case Zone.Slots:
-                    int cols = _slotRow == 2 ? layout.slotRects[2].Length : TeamSize;
-                    _slotCol = Mathf.Clamp(_slotCol + step.x, 0, cols - 1);
-                    if (step.y > 0) _slotRow = Mathf.Max(0, _slotRow - 1);
-                    else if (step.y < 0)
-                    {
-                        if (_slotRow < 2) _slotRow++;
-                        else { _zone = Zone.Cards; _cardIndex = NearestCardInRow(layout, 0, _slotCol * 0.5f); }
-                    }
-                    _slotCol = Mathf.Clamp(_slotCol, 0, (_slotRow == 2 ? layout.slotRects[2].Length : TeamSize) - 1);
-                    break;
-
                 case Zone.Cards:
-                    if (layout.cards.Count == 0) { if (step.y != 0) _zone = step.y < 0 ? Zone.Bottom : Zone.Slots; break; }
+                    if (layout.cards.Count == 0)
+                    {
+                        if (step.x > 0) { _zone = Zone.Team; _teamIndex = 0; }
+                        break;
+                    }
                     _cardIndex = Mathf.Clamp(_cardIndex, 0, layout.cards.Count - 1);
                     var cur = layout.cards[_cardIndex];
-                    if (step.x != 0)
+                    if (step.x > 0)
                     {
-                        int next = _cardIndex + step.x;
-                        if (next >= 0 && next < layout.cards.Count && layout.cards[next].row == cur.row)
-                            _cardIndex = next;
+                        int next = _cardIndex + 1;
+                        if (next < layout.cards.Count && layout.cards[next].row == cur.row) _cardIndex = next;
+                        else { _zone = Zone.Team; _teamIndex = 0; } // off the right edge → squads
+                    }
+                    else if (step.x < 0)
+                    {
+                        int prev = _cardIndex - 1;
+                        if (prev >= 0 && layout.cards[prev].row == cur.row) _cardIndex = prev;
                     }
                     if (step.y < 0) // down
                     {
-                        if (cur.row >= layout.cardRows - 1) { _zone = Zone.Bottom; _bottomCol = 1; }
-                        else _cardIndex = NearestCardInRow(layout, cur.row + 1, cur.col);
+                        if (cur.row < layout.cardRows - 1) _cardIndex = NearestCardInRow(layout, cur.row + 1, cur.col);
                     }
                     else if (step.y > 0) // up
                     {
-                        if (cur.row == 0) { _zone = Zone.Slots; _slotRow = 2; _slotCol = 0; }
-                        else _cardIndex = NearestCardInRow(layout, cur.row - 1, cur.col);
+                        if (cur.row > 0) _cardIndex = NearestCardInRow(layout, cur.row - 1, cur.col);
                     }
                     break;
 
-                case Zone.Bottom:
-                    _bottomCol = Mathf.Clamp(_bottomCol + step.x, 0, 1);
-                    if (step.y > 0)
-                    {
-                        _zone = Zone.Cards;
-                        _cardIndex = NearestCardInRow(layout, layout.cardRows - 1, 1);
-                    }
+                case Zone.Team:
+                    if (step.x < 0) { _zone = Zone.Cards; break; } // back to the roster
+                    _teamIndex = Mathf.Clamp(_teamIndex - step.y, 0, TeamItemCount - 1);
                     break;
             }
         }
@@ -200,19 +218,23 @@ namespace MarioBasketball.UI
         {
             switch (_zone)
             {
-                case Zone.Slots:
-                    if (_slotRow == 0 && _slotCol < _home.Count) _home.RemoveAt(_slotCol);
-                    else if (_slotRow == 1 && _slotCol < _away.Count) _away.RemoveAt(_slotCol);
-                    else if (_slotRow == 2 && _slotCol == 0) _editingAway = !_editingAway;
-                    else if (_slotRow == 2 && _slotCol == 1) Randomize(_editingAway ? _away : _home);
-                    break;
-
                 case Zone.Cards:
                     if (_cardIndex < layout.cards.Count) AddToTeam(layout.cards[_cardIndex].rosterIndex);
                     break;
 
-                case Zone.Bottom:
-                    if (_bottomCol == 0) BackToMain();
+                case Zone.Team:
+                    if (_teamIndex < TeamSize)
+                    {
+                        if (_teamIndex < _home.Count) _home.RemoveAt(_teamIndex);
+                    }
+                    else if (_teamIndex < 2 * TeamSize)
+                    {
+                        int j = _teamIndex - TeamSize;
+                        if (j < _away.Count) _away.RemoveAt(j);
+                    }
+                    else if (_teamIndex == 2 * TeamSize) _editingAway = !_editingAway;
+                    else if (_teamIndex == 2 * TeamSize + 1) Randomize(_editingAway ? _away : _home);
+                    else if (_teamIndex == 2 * TeamSize + 2) BackToMain();
                     else if (Ready) StartGame();
                     break;
             }
@@ -275,39 +297,27 @@ namespace MarioBasketball.UI
         Layout BuildLayout()
         {
             var l = new Layout();
-            float w = Mathf.Min(Screen.width - 40f, 1000f);
+            float w = Mathf.Min(Screen.width - 40f, 1180f);
             float h = Screen.height - 40f;
-            l.area = new Rect((Screen.width - w) / 2f, 20f, w, h);
+            l.window = new Rect((Screen.width - w) / 2f, 20f, w, h);
+            l.title = new Rect(l.window.x, l.window.y + 10f, l.window.width, 36f);
 
-            float x = l.area.x + 14f;
-            float innerW = w - 28f;
-            float y = l.area.y + 52f; // below the title
+            float top = l.window.y + 56f;
+            float bottom = l.window.yMax - 14f;
+            float leftW = Mathf.Round(w * 0.60f) - 18f;
+            l.leftPanel = new Rect(l.window.x + 14f, top, leftW, bottom - top);
+            float rx = l.leftPanel.xMax + 16f;
+            l.rightPanel = new Rect(rx, top, l.window.xMax - 14f - rx, bottom - top);
 
-            l.slotRects = new Rect[3][];
-            float slotW = (innerW - 110f - 4f * 6f) / TeamSize;
-            for (int row = 0; row < 2; row++)
-            {
-                l.slotRects[row] = new Rect[TeamSize];
-                for (int c = 0; c < TeamSize; c++)
-                    l.slotRects[row][c] = new Rect(x + 110f + c * (slotW + 6f), y, slotW, 30f);
-                y += 36f;
-            }
-            l.slotRects[2] = new Rect[2];
-            l.slotRects[2][0] = new Rect(x, y, innerW * 0.5f - 4f, 32f);
-            l.slotRects[2][1] = new Rect(x + innerW * 0.5f + 4f, y, innerW * 0.5f - 4f, 32f);
-            y += 38f;
+            // Left: hint line, then the scrolling card wall.
+            l.scrollView = new Rect(l.leftPanel.x + 10f, l.leftPanel.y + 56f,
+                l.leftPanel.width - 20f, l.leftPanel.yMax - (l.leftPanel.y + 56f) - 10f);
 
-            // Hint line, then the card scroller fills down to the bottom buttons.
-            y += 22f;
-            float bottomH = 46f;
-            l.scrollView = new Rect(x, y, innerW, l.area.yMax - y - bottomH - 16f);
-
-            // Cards grouped by archetype, in scroll-content space.
             l.cards = new List<CardEntry>();
-            l.sections = new List<(string, Rect)>();
-            int cols = Mathf.Max(1, Mathf.FloorToInt((innerW - 16f) / (CardW + CardPad)));
+            l.sections = new List<(string, Rect, Color)>();
+            l.cols = Mathf.Max(1, Mathf.FloorToInt((l.scrollView.width - 16f) / (CardW + CardPad)));
             float cy = 0f;
-            int row2 = 0;
+            int row = 0;
             foreach (var group in new[] { PlayerArchetype.Guard, PlayerArchetype.Wing, PlayerArchetype.Big })
             {
                 var members = new List<int>();
@@ -316,30 +326,59 @@ namespace MarioBasketball.UI
                 if (members.Count == 0) continue;
 
                 string label = group == PlayerArchetype.Guard ? "GUARDS" : group == PlayerArchetype.Wing ? "WINGS" : "BIGS";
-                l.sections.Add((label, new Rect(0f, cy, innerW - 16f, 24f)));
-                cy += 28f;
+                l.sections.Add((label, new Rect(0f, cy, l.scrollView.width - 16f, 24f), ArchColor(group)));
+                cy += 30f;
 
                 for (int i = 0; i < members.Count; i++)
                 {
-                    int col = i % cols;
-                    if (i > 0 && col == 0) { cy += CardH + CardPad; row2++; }
+                    int col = i % l.cols;
+                    if (i > 0 && col == 0) { cy += CardH + CardPad; row++; }
                     l.cards.Add(new CardEntry
                     {
                         rosterIndex = members[i],
-                        row = row2,
+                        row = row,
                         col = col,
                         rect = new Rect(col * (CardW + CardPad), cy, CardW, CardH)
                     });
                 }
-                cy += CardH + CardPad + 8f;
-                row2++;
+                cy += CardH + CardPad + 10f;
+                row++;
             }
             l.contentHeight = cy;
-            l.cardRows = row2;
+            l.cardRows = row;
 
-            l.backRect = new Rect(x, l.area.yMax - bottomH - 8f, 130f, bottomH);
-            l.startRect = new Rect(x + 140f, l.area.yMax - bottomH - 8f, innerW - 140f, bottomH);
+            // Right: the two squads stacked, then the controls.
+            float x = l.rightPanel.x + 12f;
+            float colW = l.rightPanel.width - 24f;
+            float y = l.rightPanel.y + 40f; // below the panel header
+
+            l.homeSlots = new Rect[TeamSize];
+            l.awaySlots = new Rect[TeamSize];
+            y = LayoutTeamBox(ref l.homeBox, l.homeSlots, x, y, colW);
+            y += 8f;
+            y = LayoutTeamBox(ref l.awayBox, l.awaySlots, x, y, colW);
+            y += 10f;
+
+            l.switchRect = new Rect(x, y, colW, 30f); y += 36f;
+            l.randomRect = new Rect(x, y, colW, 30f);
+
+            float by = l.rightPanel.yMax - 48f;
+            l.backRect = new Rect(x, by, colW * 0.38f - 4f, 40f);
+            l.startRect = new Rect(x + colW * 0.38f + 4f, by, colW * 0.62f - 4f, 40f);
             return l;
+        }
+
+        float LayoutTeamBox(ref Rect box, Rect[] slots, float x, float y, float w)
+        {
+            float boxTop = y;
+            float innerY = y + 28f; // below the team label
+            for (int i = 0; i < TeamSize; i++)
+            {
+                slots[i] = new Rect(x + 6f, innerY, w - 12f, 30f);
+                innerY += 34f;
+            }
+            box = new Rect(x, boxTop, w, innerY - boxTop + 4f);
+            return box.yMax;
         }
 
         // ---- Drawing ---------------------------------------------------------
@@ -349,27 +388,35 @@ namespace MarioBasketball.UI
             EnsureStyles();
             var layout = BuildLayout();
 
-            var prev = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.6f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = prev;
+            // Bright Mario sky behind the whole screen, then a cream window.
+            Fill(new Rect(0, 0, Screen.width, Screen.height), Sky);
+            DrawClouds();
+            Fill(layout.window, Cream);
+            Frame(layout.window, MarioRed, 4f);
+            GUI.Label(layout.title, "TEAM SELECT", _title);
 
-            GUI.Box(layout.area, GUIContent.none);
-            GUI.Label(new Rect(layout.area.x, layout.area.y + 10f, layout.area.width, 32f), "TEAM SELECT", _title);
+            DrawRosterPanel(layout);
+            DrawSquadsPanel(layout);
+        }
 
-            DrawSlotRow(layout, 0, "HOME", _home, editing: !_editingAway);
-            DrawSlotRow(layout, 1, "AWAY", _away, editing: _editingAway);
-            DrawControls(layout);
-
-            GUI.Label(new Rect(layout.scrollView.x, layout.scrollView.y - 22f, layout.scrollView.width, 20f),
-                $"A / click a card: add to {(_editingAway ? "AWAY" : "HOME")} · B (circle) / Tab: flip cards to stats · a filled slot above: remove",
+        void DrawRosterPanel(Layout layout)
+        {
+            Fill(layout.leftPanel, Cloud);
+            Frame(layout.leftPanel, SkyDeep, 3f);
+            GUI.Label(new Rect(layout.leftPanel.x + 12f, layout.leftPanel.y + 8f, layout.leftPanel.width - 24f, 24f),
+                "CHOOSE YOUR SQUAD", _panelHeader);
+            GUI.Label(new Rect(layout.leftPanel.x + 12f, layout.leftPanel.y + 32f, layout.leftPanel.width - 24f, 20f),
+                $"A / click: add to {(_editingAway ? "AWAY" : "HOME")}  ·  B / Tab: flip to stats  ·  right stick: scroll",
                 _hint);
 
             _scroll = GUI.BeginScrollView(layout.scrollView, _scroll,
                 new Rect(0f, 0f, layout.scrollView.width - 16f, layout.contentHeight));
 
-            foreach (var (label, rect) in layout.sections)
-                GUI.Label(rect, label, _header);
+            foreach (var (label, rect, color) in layout.sections)
+            {
+                Fill(rect, color);
+                GUI.Label(rect, "  " + label, _sectionChip);
+            }
 
             for (int i = 0; i < layout.cards.Count; i++)
             {
@@ -383,48 +430,63 @@ namespace MarioBasketball.UI
             }
 
             GUI.EndScrollView();
+        }
 
-            if (_zone == Zone.Bottom && _bottomCol == 0) MenuNav.DrawSelection(layout.backRect);
-            if (_zone == Zone.Bottom && _bottomCol == 1) MenuNav.DrawSelection(layout.startRect);
+        void DrawSquadsPanel(Layout layout)
+        {
+            Fill(layout.rightPanel, Cloud);
+            Frame(layout.rightPanel, Coin, 3f);
+            GUI.Label(new Rect(layout.rightPanel.x + 12f, layout.rightPanel.y + 8f, layout.rightPanel.width - 24f, 24f),
+                "YOUR SQUADS", _panelHeader);
+
+            DrawTeamBox(layout, layout.homeBox, layout.homeSlots, "HOME", _home, HomeTint, MarioRed, slotBase: 0, editing: !_editingAway);
+            DrawTeamBox(layout, layout.awayBox, layout.awaySlots, "AWAY", _away, AwayTint, SkyDeep, slotBase: TeamSize, editing: _editingAway);
+
+            // Controls.
+            if (_zone == Zone.Team && _teamIndex == 2 * TeamSize) MenuNav.DrawSelection(layout.switchRect);
+            if (GUI.Button(layout.switchRect, _editingAway ? "Editing AWAY  →  switch to HOME" : "Editing HOME  →  switch to AWAY", _button))
+                _editingAway = !_editingAway;
+
+            if (_zone == Zone.Team && _teamIndex == 2 * TeamSize + 1) MenuNav.DrawSelection(layout.randomRect);
+            if (GUI.Button(layout.randomRect, $"Randomize {(_editingAway ? "AWAY" : "HOME")}", _button))
+                Randomize(_editingAway ? _away : _home);
+
+            if (_zone == Zone.Team && _teamIndex == 2 * TeamSize + 2) MenuNav.DrawSelection(layout.backRect);
             if (GUI.Button(layout.backRect, "Back", _button)) BackToMain();
+
+            if (_zone == Zone.Team && _teamIndex == 2 * TeamSize + 3 && Ready) MenuNav.DrawSelection(layout.startRect);
             GUI.enabled = Ready;
-            if (GUI.Button(layout.startRect, Ready ? "START GAME" : "Pick 5 per team to start", _button)) StartGame();
+            if (GUI.Button(layout.startRect, Ready ? "START GAME" : "Pick 5 per team", _button)) StartGame();
             GUI.enabled = true;
         }
 
-        void DrawSlotRow(Layout layout, int row, string label, List<int> team, bool editing)
+        void DrawTeamBox(Layout layout, Rect box, Rect[] slots, string label, List<int> team,
+            Color tint, Color accent, int slotBase, bool editing)
         {
-            var first = layout.slotRects[row][0];
-            GUI.Label(new Rect(layout.area.x + 14f, first.y, 105f, first.height),
-                $"{(editing ? "▶ " : "   ")}{label} ({team.Count}/{TeamSize})", _header);
+            Fill(box, tint);
+            Frame(box, accent, editing ? 4f : 2f);
+            if (editing) MenuNav.DrawSelection(box, 2f); // glow the squad you're editing
+
+            GUI.Label(new Rect(box.x + 8f, box.y + 4f, box.width - 16f, 22f),
+                $"{(editing ? "▶ " : "")}{label}  ({team.Count}/{TeamSize})", _teamHeader);
 
             for (int slot = 0; slot < TeamSize; slot++)
             {
-                Rect r = layout.slotRects[row][slot];
-                if (_zone == Zone.Slots && _slotRow == row && _slotCol == slot) MenuNav.DrawSelection(r);
+                Rect r = slots[slot];
+                int navIdx = slotBase + slot;
+                if (_zone == Zone.Team && _teamIndex == navIdx) MenuNav.DrawSelection(r);
                 if (slot < team.Count)
                 {
-                    string tag = slot == 0 && row == 0 ? "★ " : "";
-                    if (GUI.Button(r, tag + _roster[team[slot]].characterName, _button))
+                    string tag = slot == 0 && slotBase == 0 ? "★ " : "";
+                    if (GUI.Button(r, tag + _roster[team[slot]].characterName, _slotButton))
                         team.RemoveAt(slot);
                 }
                 else
                 {
-                    GUI.Box(r, "—");
+                    Fill(r, new Color(1f, 1f, 1f, 0.45f));
+                    GUI.Label(r, "—", _cardTag);
                 }
             }
-        }
-
-        void DrawControls(Layout layout)
-        {
-            Rect switchR = layout.slotRects[2][0];
-            Rect randomR = layout.slotRects[2][1];
-            if (_zone == Zone.Slots && _slotRow == 2 && _slotCol == 0) MenuNav.DrawSelection(switchR);
-            if (_zone == Zone.Slots && _slotRow == 2 && _slotCol == 1) MenuNav.DrawSelection(randomR);
-            if (GUI.Button(switchR, _editingAway ? "Editing: AWAY  (switch to HOME)" : "Editing: HOME  (switch to AWAY)", _button))
-                _editingAway = !_editingAway;
-            if (GUI.Button(randomR, "Randomize this team", _button))
-                Randomize(_editingAway ? _away : _home);
         }
 
         /// <summary>One character card. Front: portrait placeholder + scouting
@@ -432,23 +494,31 @@ namespace MarioBasketball.UI
         /// Returns true when clicked.</summary>
         bool DrawCard(Rect r, CharacterStats s, int rosterIndex)
         {
-            bool clicked = GUI.Button(r, GUIContent.none);
-            GUI.Label(new Rect(r.x, r.y + 4f, r.width, 22f), s.characterName, _cardName);
+            Color arch = ArchColor(s.Archetype);
+            Fill(r, Cloud);
+            Frame(r, arch, 3f);
+            bool clicked = GUI.Button(r, GUIContent.none, GUIStyle.none);
+
+            // Name banner in the archetype colour.
+            var banner = new Rect(r.x + 3f, r.y + 3f, r.width - 6f, 24f);
+            Fill(banner, arch);
+            GUI.Label(banner, s.characterName, _cardName);
 
             if (_showStats) DrawCardStats(r, s);
             else DrawCardFront(r, s);
 
             // Already-drafted badge.
-            if (_home.Contains(rosterIndex)) DrawBadge(r, "HOME", new Color(0.85f, 0.15f, 0.15f));
-            else if (_away.Contains(rosterIndex)) DrawBadge(r, "AWAY", new Color(0.15f, 0.35f, 0.9f));
+            if (_home.Contains(rosterIndex)) DrawBadge(r, "HOME", MarioRed);
+            else if (_away.Contains(rosterIndex)) DrawBadge(r, "AWAY", SkyDeep);
             return clicked;
         }
 
         void DrawCardFront(Rect r, CharacterStats s)
         {
             // Portrait placeholder — an empty box until real character art lands.
-            var face = new Rect(r.x + 12f, r.y + 28f, r.width - 24f, 82f);
-            GUI.Box(face, GUIContent.none);
+            var face = new Rect(r.x + 12f, r.y + 32f, r.width - 24f, 80f);
+            Fill(face, new Color(0.90f, 0.92f, 0.96f));
+            Frame(face, new Color(0.7f, 0.74f, 0.8f), 1f);
             GUI.Label(face, "(face)", _cardTag);
 
             GUI.Label(new Rect(r.x + 12f, face.yMax + 2f, r.width - 24f, 16f),
@@ -473,7 +543,7 @@ namespace MarioBasketball.UI
             for (int i = 0; i < stats.Length; i++)
             {
                 float cx = r.x + 12f + (i / 7) * colW;
-                float cy = r.y + 30f + (i % 7) * rowH;
+                float cy = r.y + 34f + (i % 7) * rowH;
                 GUI.Label(new Rect(cx, cy, colW * 0.55f, rowH), stats[i].label, _statLabel);
                 var prev = GUI.color;
                 GUI.color = StatColor(stats[i].value);
@@ -482,35 +552,79 @@ namespace MarioBasketball.UI
             }
         }
 
-        /// <summary>10 is gold, 7-8 green, 4-6 plain, 1-3 red.</summary>
+        /// <summary>10 is gold, 7-8 green, 4-6 dark ink, 1-3 red.</summary>
         static Color StatColor(int value) =>
             value >= 10 ? Gold :
             value >= 7 ? Green :
-            value >= 4 ? Color.white :
+            value >= 4 ? Ink :
             Red;
+
+        static Color ArchColor(PlayerArchetype a) =>
+            a == PlayerArchetype.Guard ? SkyDeep :
+            a == PlayerArchetype.Wing ? LuigiGreen :
+            MarioRed;
 
         void DrawBadge(Rect card, string text, Color color)
         {
-            var r = new Rect(card.xMax - 52f, card.y + 4f, 48f, 18f);
+            var r = new Rect(card.xMax - 52f, card.yMax - 22f, 48f, 18f);
+            Fill(r, color);
+            GUI.Label(r, text, _cardTag);
+        }
+
+        // ---- Colour helpers --------------------------------------------------
+
+        static void Fill(Rect r, Color c)
+        {
             var prev = GUI.color;
-            GUI.color = color;
+            GUI.color = c;
             GUI.DrawTexture(r, Texture2D.whiteTexture);
             GUI.color = prev;
-            GUI.Label(r, text, _cardTag);
+        }
+
+        static void Frame(Rect r, Color c, float t)
+        {
+            Fill(new Rect(r.x, r.y, r.width, t), c);
+            Fill(new Rect(r.x, r.yMax - t, r.width, t), c);
+            Fill(new Rect(r.x, r.y, t, r.height), c);
+            Fill(new Rect(r.xMax - t, r.y, t, r.height), c);
+        }
+
+        /// <summary>A few lazy clouds drifting across the sky backdrop.</summary>
+        void DrawClouds()
+        {
+            float t = Time.unscaledTime * 18f;
+            var prev = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, 0.7f);
+            for (int i = 0; i < 5; i++)
+            {
+                float x = Mathf.Repeat(t + i * 360f, Screen.width + 200f) - 160f;
+                float y = 40f + i * (Screen.height / 6f);
+                GUI.DrawTexture(new Rect(x, y, 130f, 42f), Texture2D.whiteTexture);
+                GUI.DrawTexture(new Rect(x + 40f, y - 22f, 80f, 40f), Texture2D.whiteTexture);
+            }
+            GUI.color = prev;
         }
 
         void EnsureStyles()
         {
             _title ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _header ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold };
-            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 13 };
-            _hint ??= new GUIStyle(GUI.skin.label) { fontSize = 12 };
+            { fontSize = 28, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = MarioRed } };
+            _panelHeader ??= new GUIStyle(GUI.skin.label)
+            { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = SkyDeep } };
+            _teamHeader ??= new GUIStyle(GUI.skin.label)
+            { fontSize = 15, fontStyle = FontStyle.Bold, normal = { textColor = Ink } };
+            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 13, fontStyle = FontStyle.Bold };
+            _slotButton ??= new GUIStyle(GUI.skin.button) { fontSize = 13, alignment = TextAnchor.MiddleLeft };
+            _hint ??= new GUIStyle(GUI.skin.label) { fontSize = 11, normal = { textColor = new Color(0.35f, 0.4f, 0.45f) } };
+            _sectionChip ??= new GUIStyle(GUI.skin.label)
+            { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
             _cardName ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _cardText ??= new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true, alignment = TextAnchor.UpperLeft };
-            _cardTag ??= new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleCenter };
-            _statLabel ??= new GUIStyle(GUI.skin.label) { fontSize = 13 };
+            { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+            _cardText ??= new GUIStyle(GUI.skin.label)
+            { fontSize = 11, wordWrap = true, alignment = TextAnchor.UpperLeft, normal = { textColor = Ink } };
+            _cardTag ??= new GUIStyle(GUI.skin.label)
+            { fontSize = 11, alignment = TextAnchor.MiddleCenter, normal = { textColor = Ink } };
+            _statLabel ??= new GUIStyle(GUI.skin.label) { fontSize = 13, normal = { textColor = Ink } };
             _statValue ??= new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
         }
     }

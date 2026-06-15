@@ -100,6 +100,9 @@ namespace MarioBasketball.Gameplay
         /// charging — the next post-button press (human) releases it; the AI
         /// releases at the perfect point. The footwork already happened.</summary>
         public bool PostShotActive { get; private set; }
+        /// <summary>Which post move is currently going up (drives the body
+        /// animation — a hook reads very differently from a power drop step).</summary>
+        public PostMove CurrentMove { get; private set; }
         float PostShotMeterDuration => Mathf.Max(0.01f, postShotPerfectTime + postShotAutoReleaseAfter);
         /// <summary>How full the post-shot release meter is (0-1).</summary>
         public float PostShotChargeFraction => PostShotActive ? Mathf.Clamp01(_postShotTimer / PostShotMeterDuration) : 0f;
@@ -295,6 +298,8 @@ namespace MarioBasketball.Gameplay
             if (!IsPosting || PostShotActive) return;
             var gm = GameManager.Instance;
             if (gm == null || !_pc.HasBall) { End(); return; }
+
+            CurrentMove = move; // remembered for the shot animation
 
             float offense = _pc.EffectiveStat(StatType.PostOffense);
             float defense = _defender != null ? _defender.EffectiveStat(StatType.PostDefense) : 0f;

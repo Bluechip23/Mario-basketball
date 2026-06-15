@@ -29,8 +29,8 @@ namespace MarioBasketball.AI
         public float passUpgradeMargin = 1.5f;
 
         [Header("Catch-and-gather (no instant put-ups off a catch)")]
-        [Tooltip("Gather any fresh catch near the rim for this long before shooting, so players don't fling it straight back up off a pass/loose ball. A real tip-in happens only on an airborne rebound (handled in GameManager).")]
-        public float putbackSettle = 0.7f;
+        [Tooltip("Gather any fresh catch for this long before shooting, so players don't fling it straight back up off a pass/loose ball. A real tip-in happens only on an airborne rebound (handled in GameManager).")]
+        public float putbackSettle = 0.8f;
 
         [Header("Spacing / cuts")]
         public float wingSpacing = 3.5f;
@@ -204,10 +204,12 @@ namespace MarioBasketball.AI
             if (dist <= shootRange && (quality >= shootQualityThreshold || forced))
             {
                 // Never fling it straight back up off a fresh catch (pass OR loose
-                // ball) near the rim — gather a beat and play. A genuine tip-in only
-                // happens jumping for a rebound (GameManager handles that).
-                bool freshNearRim = dist <= _pc.finishRange && _pc.TimeWithBall < putbackSettle;
-                if (forced || !freshNearRim)
+                // ball) — anywhere on the floor, not just at the rim. Gather a beat
+                // and play so a kick-out or feed isn't auto-shot the instant it
+                // lands. A genuine tip-in only happens jumping for a rebound
+                // (GameManager handles that); the shot clock can still force it.
+                bool freshCatch = _pc.TimeWithBall < putbackSettle;
+                if (forced || !freshCatch)
                 {
                     _pc.SetMoveIntent(Vector2.zero, false);
                     _pc.TriggerShoot();

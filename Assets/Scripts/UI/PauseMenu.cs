@@ -132,9 +132,10 @@ namespace MarioBasketball.UI
             if (!MatchPause.IsPaused || _inSettings) return;
             EnsureStyles();
 
-            // Dim the field behind the menu.
+            // Dim the field behind the menu (translucent navy keeps the court
+            // visible while sitting on-palette).
             var prev = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.5f);
+            GUI.color = new Color(0.04f, 0.10f, 0.22f, 0.58f);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
             GUI.color = prev;
 
@@ -148,7 +149,9 @@ namespace MarioBasketball.UI
             float w = Mathf.Min(Screen.width - 40f, 760f);
             float h = Screen.height - 80f;
             var rect = new Rect((Screen.width - w) / 2f, 40f, w, h);
-            GUILayout.BeginArea(rect, GUI.skin.box);
+            MenuTheme.Fill(rect, MenuTheme.Cream);
+            MenuTheme.Frame(rect, MenuTheme.MarioRed, 4f);
+            GUILayout.BeginArea(new Rect(rect.x + 14f, rect.y + 12f, rect.width - 28f, rect.height - 24f));
 
             GUILayout.Label("BOX SCORE", _title);
             _scroll = GUILayout.BeginScrollView(_scroll);
@@ -161,9 +164,10 @@ namespace MarioBasketball.UI
 
         void DrawMenu()
         {
-            float w = 320f, h = 400f;
+            float w = 340f, h = 410f;
             var rect = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUI.Box(rect, GUIContent.none);
+            MenuTheme.Fill(rect, MenuTheme.Cream);
+            MenuTheme.Frame(rect, MenuTheme.MarioRed, 4f);
             GUI.Label(new Rect(rect.x, rect.y + 10, rect.width, 32), "PAUSED", _title);
 
             for (int i = 0; i < Items.Length; i++)
@@ -179,7 +183,9 @@ namespace MarioBasketball.UI
             float w = Mathf.Min(Screen.width - 40f, 1180f);
             float h = Screen.height - 80f;
             var rect = new Rect((Screen.width - w) / 2f, 40f, w, h);
-            GUILayout.BeginArea(rect, GUI.skin.box);
+            MenuTheme.Fill(rect, MenuTheme.Cream);
+            MenuTheme.Frame(rect, MenuTheme.MarioRed, 4f);
+            GUILayout.BeginArea(new Rect(rect.x + 14f, rect.y + 12f, rect.width - 28f, rect.height - 24f));
 
             GUILayout.Label("PLAYER STATS", _title);
             GUILayout.Label("Spd  BH  3PT  Mid  Ins  PsO  Dnk  Pow  Reb  Blk  Stl  PsD  PerD  Sta   (Energy)", _header);
@@ -236,10 +242,10 @@ namespace MarioBasketball.UI
         void EnsureStyles()
         {
             _title ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 18 };
-            _header ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold };
-            _row ??= new GUIStyle(GUI.skin.label) { fontSize = 14, richText = false };
+            { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = MenuTheme.MarioRed } };
+            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 18, fontStyle = FontStyle.Bold };
+            _header ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, normal = { textColor = MenuTheme.SkyDeep } };
+            _row ??= new GUIStyle(GUI.skin.label) { fontSize = 14, richText = false, normal = { textColor = MenuTheme.Ink } };
         }
     }
 }

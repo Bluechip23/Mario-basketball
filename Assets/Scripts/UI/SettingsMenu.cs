@@ -113,17 +113,14 @@ namespace MarioBasketball.UI
         void OnGUI()
         {
             EnsureStyles();
-
-            var prev = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.65f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = prev;
+            MenuTheme.DrawBackground();
 
             if (_showControls) { DrawControls(); return; }
 
             float w = 520f, h = 620f;
             var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUI.Box(area, GUIContent.none);
+            MenuTheme.Fill(area, MenuTheme.Cream);
+            MenuTheme.Frame(area, MenuTheme.MarioRed, 4f);
             GUI.Label(new Rect(area.x, area.y + 12, area.width, 36), "SETTINGS", _title);
 
             DrawRow(area, 0, "Master Volume", $"{GameSettings.MasterVolume}%");
@@ -149,7 +146,8 @@ namespace MarioBasketball.UI
         {
             var r = RowRect(area, row);
             if (_row == row) MenuNav.DrawSelection(r);
-            GUI.Box(r, GUIContent.none);
+            MenuTheme.Fill(r, MenuTheme.Cloud);
+            MenuTheme.Frame(r, MenuTheme.SkyDeep, 1f);
             GUI.Label(new Rect(r.x + 12, r.y, r.width * 0.5f, r.height), label, _label);
             GUI.Label(new Rect(r.x + r.width * 0.5f, r.y, r.width * 0.28f, r.height), value, _value);
 
@@ -214,7 +212,9 @@ namespace MarioBasketball.UI
             float w = Mathf.Min(Screen.width - 60f, 760f);
             float h = Mathf.Min(Screen.height - 80f, 640f);
             var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUILayout.BeginArea(area, GUI.skin.box);
+            MenuTheme.Fill(area, MenuTheme.Cream);
+            MenuTheme.Frame(area, MenuTheme.MarioRed, 4f);
+            GUILayout.BeginArea(new Rect(area.x + 14f, area.y + 12f, area.width - 28f, area.height - 24f));
 
             GUILayout.Label("CONTROLS", _title);
 
@@ -248,16 +248,16 @@ namespace MarioBasketball.UI
         void EnsureStyles()
         {
             _title ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _label ??= new GUIStyle(GUI.skin.label) { fontSize = 17, alignment = TextAnchor.MiddleLeft };
+            { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = MenuTheme.MarioRed } };
+            _label ??= new GUIStyle(GUI.skin.label) { fontSize = 17, alignment = TextAnchor.MiddleLeft, normal = { textColor = MenuTheme.Ink } };
             _value ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 17, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
-            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 16 };
-            _hint ??= new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true, alignment = TextAnchor.UpperCenter };
+            { fontSize = 17, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight, normal = { textColor = MenuTheme.SkyDeep } };
+            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 16, fontStyle = FontStyle.Bold };
+            _hint ??= new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true, alignment = TextAnchor.UpperCenter, normal = { textColor = new Color(0.35f, 0.4f, 0.45f) } };
             _group ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 15, fontStyle = FontStyle.Bold };
-            _action ??= new GUIStyle(GUI.skin.label) { fontSize = 14 };
-            _bind ??= new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
+            { fontSize = 15, fontStyle = FontStyle.Bold, normal = { textColor = MenuTheme.SkyDeep } };
+            _action ??= new GUIStyle(GUI.skin.label) { fontSize = 14, normal = { textColor = MenuTheme.Ink } };
+            _bind ??= new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, normal = { textColor = MenuTheme.Ink } };
         }
     }
 }

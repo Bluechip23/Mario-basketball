@@ -61,14 +61,13 @@ namespace MarioBasketball.UI
         void OnGUI()
         {
             EnsureStyles();
-
-            var prev = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.65f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = prev;
+            MenuTheme.DrawBackground();
 
             float w = 560f, h = Mathf.Min(Screen.height - 40f, 620f);
-            GUILayout.BeginArea(new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h), GUI.skin.box);
+            var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
+            MenuTheme.Fill(area, MenuTheme.Cream);
+            MenuTheme.Frame(area, MenuTheme.MarioRed, 4f);
+            GUILayout.BeginArea(new Rect(area.x + 14f, area.y + 12f, area.width - 28f, area.height - 24f));
 
             GUILayout.Label(_journey ? "CREATE JOURNEY CHARACTER" : "CREATE STANDARD PLAYER", _title);
 
@@ -161,10 +160,10 @@ namespace MarioBasketball.UI
         void EnsureStyles()
         {
             _title ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _header ??= new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
-            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 16 };
-            _row ??= new GUIStyle(GUI.skin.label) { fontSize = 15 };
+            { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = MenuTheme.MarioRed } };
+            _header ??= new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, normal = { textColor = MenuTheme.SkyDeep } };
+            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 16, fontStyle = FontStyle.Bold };
+            _row ??= new GUIStyle(GUI.skin.label) { fontSize = 15, normal = { textColor = MenuTheme.Ink } };
         }
     }
 }

@@ -94,11 +94,7 @@ namespace MarioBasketball.UI
         void OnGUI()
         {
             EnsureStyles();
-
-            var prev = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.65f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = prev;
+            MenuTheme.DrawBackground();
 
             if (_page == Page.Main) DrawMain();
             else DrawCreateSelect();
@@ -106,9 +102,10 @@ namespace MarioBasketball.UI
 
         void DrawMain()
         {
-            float w = 420f, h = 420f;
+            float w = 460f, h = 440f;
             var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUI.Box(area, GUIContent.none);
+            MenuTheme.Fill(area, MenuTheme.Cream);
+            MenuTheme.Frame(area, MenuTheme.MarioRed, 4f);
             GUI.Label(new Rect(area.x, area.y + 14, area.width, 36), "MARIO STREET BASKETBALL", _title);
 
             // Selectable entries, with the disabled Journey teaser between
@@ -140,7 +137,8 @@ namespace MarioBasketball.UI
         {
             float w = 560f, h = 440f;
             var area = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
-            GUI.Box(area, GUIContent.none);
+            MenuTheme.Fill(area, MenuTheme.Cream);
+            MenuTheme.Frame(area, MenuTheme.MarioRed, 4f);
 
             GUI.Label(new Rect(area.x, area.y + 12, area.width, 36), "CREATE A PLAYER", _title);
 
@@ -164,7 +162,8 @@ namespace MarioBasketball.UI
             string info = _sel == 0 ? JourneyInfo
                         : _sel == 1 ? StandardInfo
                         : "Highlight an option to see what it does.";
-            GUI.Box(infoRect, GUIContent.none);
+            MenuTheme.Fill(infoRect, MenuTheme.Cloud);
+            MenuTheme.Frame(infoRect, MenuTheme.SkyDeep, 2f);
             GUI.Label(new Rect(infoRect.x + 10, infoRect.y + 8, infoRect.width - 20, infoRect.height - 16), info, _info);
 
             if (GUI.Button(backRect, "Back", _button)) { _page = Page.Main; _sel = 1; }
@@ -196,9 +195,9 @@ namespace MarioBasketball.UI
         void EnsureStyles()
         {
             _title ??= new GUIStyle(GUI.skin.label)
-            { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 18 };
-            _info ??= new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true };
+            { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = MenuTheme.MarioRed } };
+            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 18, fontStyle = FontStyle.Bold };
+            _info ??= new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true, normal = { textColor = MenuTheme.Ink } };
         }
     }
 }

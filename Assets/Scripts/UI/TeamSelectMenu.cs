@@ -32,17 +32,16 @@ namespace MarioBasketball.UI
         const float CardPad = 10f;
         const float ScrollSpeed = 1100f; // right-stick scroll, px/sec
 
-        // ---- Mario palette --------------------------------------------------
-        static readonly Color Sky       = new Color(0.42f, 0.70f, 0.98f);
-        static readonly Color Cloud     = new Color(0.98f, 0.99f, 1f);
-        static readonly Color Cream     = new Color(1f, 0.97f, 0.86f);
-        static readonly Color MarioRed  = new Color(0.90f, 0.20f, 0.18f);
-        static readonly Color LuigiGreen= new Color(0.16f, 0.62f, 0.27f);
-        static readonly Color SkyDeep   = new Color(0.18f, 0.46f, 0.88f);
-        static readonly Color Coin      = new Color(1f, 0.80f, 0.10f);
-        static readonly Color HomeTint  = new Color(0.99f, 0.84f, 0.82f); // soft red wash
-        static readonly Color AwayTint  = new Color(0.82f, 0.89f, 1f);    // soft blue wash
-        static readonly Color Ink       = new Color(0.15f, 0.15f, 0.18f);
+        // ---- Mario palette (shared look lives in MenuTheme) -----------------
+        static readonly Color Cloud      = MenuTheme.Cloud;
+        static readonly Color Cream      = MenuTheme.Cream;
+        static readonly Color MarioRed   = MenuTheme.MarioRed;
+        static readonly Color LuigiGreen = MenuTheme.LuigiGreen;
+        static readonly Color SkyDeep    = MenuTheme.SkyDeep;
+        static readonly Color Coin       = MenuTheme.Coin;
+        static readonly Color Ink        = MenuTheme.Ink;
+        static readonly Color HomeTint   = new Color(0.99f, 0.84f, 0.82f); // soft red wash
+        static readonly Color AwayTint   = new Color(0.82f, 0.89f, 1f);    // soft blue wash
 
         static readonly Color Gold  = new Color(0.86f, 0.65f, 0.05f);
         static readonly Color Green = new Color(0.16f, 0.55f, 0.20f);
@@ -389,8 +388,7 @@ namespace MarioBasketball.UI
             var layout = BuildLayout();
 
             // Bright Mario sky behind the whole screen, then a cream window.
-            Fill(new Rect(0, 0, Screen.width, Screen.height), Sky);
-            DrawClouds();
+            MenuTheme.DrawBackground();
             Fill(layout.window, Cream);
             Frame(layout.window, MarioRed, 4f);
             GUI.Label(layout.title, "TEAM SELECT", _title);
@@ -571,39 +569,10 @@ namespace MarioBasketball.UI
             GUI.Label(r, text, _cardTag);
         }
 
-        // ---- Colour helpers --------------------------------------------------
+        // ---- Colour helpers (shared look lives in MenuTheme) ----------------
 
-        static void Fill(Rect r, Color c)
-        {
-            var prev = GUI.color;
-            GUI.color = c;
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-            GUI.color = prev;
-        }
-
-        static void Frame(Rect r, Color c, float t)
-        {
-            Fill(new Rect(r.x, r.y, r.width, t), c);
-            Fill(new Rect(r.x, r.yMax - t, r.width, t), c);
-            Fill(new Rect(r.x, r.y, t, r.height), c);
-            Fill(new Rect(r.xMax - t, r.y, t, r.height), c);
-        }
-
-        /// <summary>A few lazy clouds drifting across the sky backdrop.</summary>
-        void DrawClouds()
-        {
-            float t = Time.unscaledTime * 18f;
-            var prev = GUI.color;
-            GUI.color = new Color(1f, 1f, 1f, 0.7f);
-            for (int i = 0; i < 5; i++)
-            {
-                float x = Mathf.Repeat(t + i * 360f, Screen.width + 200f) - 160f;
-                float y = 40f + i * (Screen.height / 6f);
-                GUI.DrawTexture(new Rect(x, y, 130f, 42f), Texture2D.whiteTexture);
-                GUI.DrawTexture(new Rect(x + 40f, y - 22f, 80f, 40f), Texture2D.whiteTexture);
-            }
-            GUI.color = prev;
-        }
+        static void Fill(Rect r, Color c) => MenuTheme.Fill(r, c);
+        static void Frame(Rect r, Color c, float t) => MenuTheme.Frame(r, c, t);
 
         void EnsureStyles()
         {

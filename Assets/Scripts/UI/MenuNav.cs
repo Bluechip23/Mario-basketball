@@ -91,17 +91,27 @@ namespace MarioBasketball.UI
         }
 
         /// <summary>The flashing yellow outline marking the selected menu item —
-        /// the controller cursor. Call from OnGUI.</summary>
+        /// the controller cursor. A solid black border sits behind the yellow so
+        /// it reads clearly against the bright menu backgrounds. Call from OnGUI.</summary>
         public static void DrawSelection(Rect r, float thickness = 3f)
         {
             float pulse = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 7f);
             var prev = GUI.color;
+            // Black backing outline (a touch thicker so it frames the yellow).
+            GUI.color = new Color(0f, 0f, 0f, Mathf.Lerp(0.65f, 0.95f, pulse));
+            DrawBox(r, thickness * 2f);
+            // Yellow cursor on top.
             GUI.color = new Color(1f, 0.88f, 0.1f, pulse);
+            DrawBox(r, thickness);
+            GUI.color = prev;
+        }
+
+        static void DrawBox(Rect r, float thickness)
+        {
             GUI.DrawTexture(new Rect(r.x - thickness, r.y - thickness, r.width + thickness * 2f, thickness), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(r.x - thickness, r.yMax, r.width + thickness * 2f, thickness), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(r.x - thickness, r.y, thickness, r.height), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(r.xMax, r.y, thickness, r.height), Texture2D.whiteTexture);
-            GUI.color = prev;
         }
     }
 }

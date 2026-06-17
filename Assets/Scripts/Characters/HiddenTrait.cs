@@ -93,6 +93,15 @@ namespace MarioBasketball.Characters
         /// stats can climb to 11. See <c>PlayerCharacter</c> /
         /// <c>GameManager</c> (Birdo).
         /// </summary>
-        HotHand
+        HotHand,
+
+        /// <summary>
+        /// Wide-Open Sniper: a spot-up specialist who only burns you on a lapse.
+        /// Left <b>wide open</b> from three (no defender within the contest range)
+        /// his 3-Point make% gets a flat bonus; the instant a defender closes
+        /// within range the bonus vanishes and the three is contested at normal
+        /// odds. See <c>ShotMath</c> (Boo).
+        /// </summary>
+        WideOpenSniper
     }
 }

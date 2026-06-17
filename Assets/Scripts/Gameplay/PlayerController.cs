@@ -67,6 +67,10 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float minTimingMultiplier = 0.35f;
         [Tooltip("Auto-release this long after the apex if the button is still held.")]
         public float shotAutoReleaseAfterApex = 0.45f;
+        [Tooltip("Jump shots float: gravity is softened to this fraction while a jump shot is in the air, so the shooter hangs — the shot plays out more smoothly and there's more time to time the release (it stops feeling fast-forwarded).")]
+        [Range(0.3f, 1f)] public float shotGravityScale = 0.6f;
+        [Tooltip("Jump-shot leap height (m) — a touch higher than a normal jump so the shooter elevates and hangs into the release.")]
+        public float shotJumpHeight = 1.6f;
         [Tooltip("Catch-and-shoot window for the quick-catch shooter trait.")]
         public float quickCatchWindow = 0.3f;
         [Tooltip("Window to shoot off a Playmaker's pass for the +2 assist bonus.")]
@@ -410,8 +414,11 @@ namespace MarioBasketball.Gameplay
             _cc = GetComponent<CharacterController>();
             _character = GetComponent<PlayerCharacter>();
             _post = GetComponent<PostUpController>();
-            // Time from launch to the top of the jump = the ideal release point.
-            _apexTime = Mathf.Sqrt(-2f * gravity * jumpHeight) / -gravity;
+            // Time from launch to the top of the (floaty) jump-shot leap = the
+            // ideal release point. Computed from the shot's own height/gravity so
+            // the timing meter lines up with how long the player actually hangs.
+            float shotG = gravity * shotGravityScale;
+            _apexTime = Mathf.Sqrt(-2f * shotG * shotJumpHeight) / -shotG;
         }
 
         void OnEnable()
@@ -731,10 +738,12 @@ namespace MarioBasketball.Gameplay
             PlanarSpeed = horizontal.magnitude;
 
             if (_cc.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
-            // Skying for an oop: rise normally to the peak, then soften gravity on
-            // the way down so the player hangs above the rim while the lob arrives.
+            // A jump shot floats (softened gravity) so it hangs and is easier to
+            // time. Skying for an oop: rise normally, then soften on the way down
+            // so the player hangs above the rim while the lob arrives.
             float g = gravity;
-            if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
+            if (_shooting) g = gravity * shotGravityScale;
+            else if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
             _verticalVelocity += g * dt;
 
             Vector3 velocity = horizontal + Vector3.up * _verticalVelocity;
@@ -843,7 +852,7 @@ namespace MarioBasketball.Gameplay
             _fadeDir = Vector3.zero;
             _fadeAmount = 0f;
             _launchVel = _lastRunVelocity; // the momentum you take into the jump
-            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight); // jump
+            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * (gravity * shotGravityScale) * shotJumpHeight); // floaty jump-shot leap
         }
 
         void OnShootReleased()

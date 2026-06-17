@@ -29,6 +29,17 @@ namespace MarioBasketball.Gameplay
         public static float MaxChance = 0.97f;
         public static float OnFireBonus = 0.30f;
 
+        /// <summary>Flat make% knocked off every three-point attempt (on top of
+        /// the per-foot distance falloff). Pulls threes a notch below mid-range
+        /// for the same stat, while a wide-open, well-timed three from a real
+        /// shooter still drops at a healthy clip.</summary>
+        public static float ThreeBasePenalty = 0.08f;
+
+        /// <summary>Flat make% a <see cref="HiddenTrait.WideOpenSniper"/> (Boo)
+        /// adds to a three with no defender inside <see cref="ContestRange"/> —
+        /// gone the instant anyone closes within range.</summary>
+        public static float WideOpenThreeBonus = 0.10f;
+
         public static float ContestRange = 3f;
         public static float ContestMaxPenalty = 0.35f;
 
@@ -61,6 +72,13 @@ namespace MarioBasketball.Gameplay
             float statEff = statOverride >= 0f ? statOverride : shooter.EffectiveStat(zone);
             float p = BaseFromStat(statEff);
             p += DistanceModifier(shooter, zone, distMeters);
+            if (zone == StatType.ThreePoint)
+            {
+                p -= ThreeBasePenalty;
+                // Wide-Open Sniper (Boo): a bonus only while uncontested.
+                if (IsWideOpenSniper(shooter) && Uncontested(shooter, defender))
+                    p += WideOpenThreeBonus;
+            }
             p -= ContestPenalty(shooter, defender, zone) * contestScale;
             if (onFire) p += OnFireBonus;
             return Mathf.Clamp(p, MinChance, MaxChance);
@@ -111,6 +129,20 @@ namespace MarioBasketball.Gameplay
         static bool IsDeepSpecialist(PlayerController shooter)
             => shooter.Character != null && shooter.Character.stats != null
                && shooter.Character.stats.hiddenTrait == HiddenTrait.DeepThreeSpecialist;
+
+        static bool IsWideOpenSniper(PlayerController shooter)
+            => shooter != null && shooter.Character != null && shooter.Character.stats != null
+               && shooter.Character.stats.hiddenTrait == HiddenTrait.WideOpenSniper;
+
+        /// <summary>No defender inside <see cref="ContestRange"/> — a genuinely
+        /// wide-open look (matches when <see cref="ContestPenalty"/> is zero).</summary>
+        static bool Uncontested(PlayerController shooter, PlayerController defender)
+        {
+            if (defender == null) return true;
+            Vector3 a = shooter.transform.position; a.y = 0f;
+            Vector3 b = defender.transform.position; b.y = 0f;
+            return Vector3.Distance(a, b) >= ContestRange;
+        }
 
         /// <summary>Peach's curve: y = e^(-0.1543 (x-4.5)^2) * 10 percent, for x
         /// (feet behind the line) in 1-8; 9-10 ft hold the 8 ft value; past 10 ft

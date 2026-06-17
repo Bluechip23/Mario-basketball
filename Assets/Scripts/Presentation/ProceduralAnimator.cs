@@ -314,9 +314,14 @@ namespace MarioBasketball.Presentation
             }
             else if (_pc.IsHanging)
             {
-                // Grab the rim with both hands and hang straight down.
+                // Grab the rim and hang. A one-hand flush hangs off the dunking
+                // (right) hand with the off-arm tucked; everything else grabs iron
+                // two-handed.
                 Pose(_armR, _elbowR, _wristR, -178f, -2f, 0f);
-                Pose(_armL, _elbowL, _wristL, -178f, -2f, 0f);
+                if (_pc.CurrentFinishStyle == FinishStyle.OneFootOneHandDunk)
+                    Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
+                else
+                    Pose(_armL, _elbowL, _wristL, -178f, -2f, 0f);
             }
             else if (_pc.IsFinishing && _pc.IsAdjustingFinish)
             {

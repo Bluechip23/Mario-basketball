@@ -97,8 +97,8 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float fadeAgainstMomentumMin = 0.25f;
 
         [Header("Inside finishing (dunk / layup)")]
-        [Tooltip("Max time in the air before a finish auto-resolves (the late cap).")]
-        public float finishAirTime = 0.6f;
+        [Tooltip("Max time in the air before a finish auto-resolves (the late cap). Longer = more arcade hang time at the rim and more room to air-adjust.")]
+        public float finishAirTime = 0.95f;
         [Tooltip("Minimum air time before a finish can release — you always leave the floor and rise toward the rim first.")]
         public float finishMinAirTime = 0.22f;
         [Tooltip("Once you've driven this close to the rim (and cleared the min air time) the finish releases at the basket, not from distance.")]
@@ -107,10 +107,10 @@ namespace MarioBasketball.Gameplay
         public float finishApproachSpeed = 7f;
         [Tooltip("Flight time of the finish itself — short, so it drops in at the rim instead of lazily arcing in from distance.")]
         public float finishFlightTime = 0.32f;
-        [Tooltip("How long a two-hand slam grabs the rim and hangs.")]
-        public float dunkHangTime = 0.25f;
-        [Tooltip("Layup hop height (m) — a small one-legged jump.")]
-        public float layupJumpHeight = 1.0f;
+        [Tooltip("How long a dunk grabs the rim and hangs (the two-hand slam hangs longer).")]
+        public float dunkHangTime = 0.3f;
+        [Tooltip("Layup hop height (m) — gets up off the floor enough to finish at/above the rim, arcade style.")]
+        public float layupJumpHeight = 1.4f;
         [Tooltip("Dunk leap height (m) at Dunk 10 — arcade air, soaring over the rim. Scales up from the normal jump by the Dunk stat.")]
         public float dunkJumpHeightMax = 2.4f;
         [Tooltip("Contest leap height (m) at Blocks 10 — a great shot-blocker matches a big dunker in the air.")]
@@ -229,7 +229,14 @@ namespace MarioBasketball.Gameplay
                     return Vector3.Lerp(gather, set, k);
                 }
                 if (IsFinishing)
-                    return transform.position + transform.forward * (0.18f * h) + Vector3.up * (0.55f * h);
+                {
+                    // Carry the ball up overhead as you rise to the rim: a dunk
+                    // brings it up high to throw down (so it travels down through
+                    // the rim), a layup extends it up off the glass.
+                    float up = _finishIsDunk ? 0.98f : 0.86f;
+                    float fwd = _finishIsDunk ? 0.10f : 0.16f;
+                    return transform.position + transform.forward * (fwd * h) + Vector3.up * (up * h);
+                }
                 if (IsPostShooting)
                 {
                     float k = Mathf.Clamp01(PostShotChargeFraction / Mathf.Max(0.01f, PostShotPerfectFraction));
@@ -595,12 +602,14 @@ namespace MarioBasketball.Gameplay
             if (!_finishing) return;
             if (IsStunned || !HasBall) { _finishing = false; return; }
             _finishTimer += dt;
-            // Release at the rim: once you've leapt (min air time) and driven to the
-            // basket, finish there — otherwise the late cap resolves it in the air.
+            // Ride the leap up to its peak before finishing, so dunks and layups
+            // happen up at (or above) the rim — arcade air, with room to air-adjust
+            // around a shot-blocker. The late cap resolves it if you never get there.
             var gm = GameManager.Instance;
             Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
             bool atRim = hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= finishReleaseDistance;
-            if ((atRim && _finishTimer >= finishMinAirTime) || _finishTimer >= finishAirTime)
+            bool atPeak = _verticalVelocity <= 0f && _finishTimer >= finishMinAirTime;
+            if ((atRim && atPeak) || _finishTimer >= finishAirTime)
                 ResolveFinish();
         }
 
@@ -663,9 +672,14 @@ namespace MarioBasketball.Gameplay
             }
             else if (_finishing)
             {
-                // Glide toward the rim while up for the dunk/layup.
+                // Drive toward the rim while up for the dunk/layup, then stop once
+                // you reach it and rise straight up — so you slam at the rim instead
+                // of sailing past it. Stay squared to the hoop.
                 Vector3 toRim = RimDirection();
-                horizontal = toRim.sqrMagnitude > 0.01f ? toRim.normalized * finishApproachSpeed : Vector3.zero;
+                float d = toRim.magnitude;
+                float approach = d > finishReleaseDistance ? finishApproachSpeed : 0f;
+                horizontal = d > 0.01f ? toRim.normalized * approach : Vector3.zero;
+                if (d > 0.01f) { rotateToMove = true; faceDir = toRim.normalized; }
                 _character?.ReportActivity(true, false);
             }
             else if (_shooting)
@@ -907,9 +921,14 @@ namespace MarioBasketball.Gameplay
         {
             if (!_finishing) return;
             _finishing = false;
-            FinishShot(_finishIsDunk, _finishAdjusted);
-            // The big slam grabs the rim and hangs for a beat before dropping off.
-            if (_finishStyle == FinishStyle.TwoHandSlam) { _hangTimer = dunkHangTime; PositionForHang(); }
+            bool reachedRim = FinishShot(_finishIsDunk, _finishAdjusted);
+            // Every dunk grabs the rim and hangs for a beat (the two-hand slam hangs
+            // longest); skip it if the shot got swatted away.
+            if (_finishIsDunk && reachedRim)
+            {
+                _hangTimer = _finishStyle == FinishStyle.TwoHandSlam ? dunkHangTime * 1.5f : dunkHangTime;
+                PositionForHang();
+            }
         }
 
         /// <summary>Work out where to hang: the near edge of the rim, at a height
@@ -932,12 +951,12 @@ namespace MarioBasketball.Gameplay
         /// <summary>Resolve a dunk or layup: a block roll first (reduced by an
         /// air-adjust, and resisted by Power on dunks), then a make roll. A dunk
         /// scores off the Dunk stat, a layup off Inside Scoring.</summary>
-        void FinishShot(bool isDunk, bool adjusted, float makeBonus = 0f)
+        bool FinishShot(bool isDunk, bool adjusted, float makeBonus = 0f)
         {
-            if (!HasBall) return;
+            if (!HasBall) return false;
             var gm = GameManager.Instance;
             Hoop hoop = gm.GetAttackingHoop(team);
-            if (hoop == null) return;
+            if (hoop == null) return false;
 
             Vector3 aim = hoop.AimPoint;
             _lastShotDistance = HorizontalDistance(transform.position, aim); // for Delfan's called shot
@@ -964,7 +983,7 @@ namespace MarioBasketball.Gameplay
                         Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
                         GameManager.Instance.RecordBlock(defender);
                         GameManager.Instance.OnShotMissed(this);
-                        return;
+                        return false; // swatted — no rim grab
                     }
                 }
             }
@@ -977,6 +996,7 @@ namespace MarioBasketball.Gameplay
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
             Ball.Shoot(aim, team, 2, finishFlightTime, ShotMath.AimOffset(make), this);
+            return true; // got the shot off at the rim
         }
 
         /// <summary>True if this player has the given hidden trait.</summary>
@@ -1232,7 +1252,9 @@ namespace MarioBasketball.Gameplay
             if (!HasBall) return;
             _skyTimer = 0f;
             bool dunk = (_character != null ? _character.stats.Get(StatType.Dunk) : 5) >= dunkThreshold;
-            FinishShot(dunk, adjusted: false, makeBonus: alleyOopBonus);
+            _finishStyle = PickFinishStyle(dunk);
+            bool reachedRim = FinishShot(dunk, adjusted: false, makeBonus: alleyOopBonus);
+            if (dunk && reachedRim) { _hangTimer = dunkHangTime; PositionForHang(); } // throw it down and grab iron
         }
 
         /// <summary>Tip your own close miss straight back up while still in the air

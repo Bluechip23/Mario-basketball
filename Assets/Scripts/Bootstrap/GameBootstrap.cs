@@ -33,6 +33,15 @@ namespace MarioBasketball.Bootstrap
         static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
         static readonly Color AwayColor = new Color(0.15f, 0.35f, 0.9f);
 
+        // Mario scenery palette.
+        static readonly Color PipeGreen     = new Color(0.13f, 0.62f, 0.20f);
+        static readonly Color PipeGreenDark = new Color(0.08f, 0.42f, 0.13f);
+        static readonly Color QBlockYellow  = new Color(1f, 0.78f, 0.12f);
+        static readonly Color QBlockBrown   = new Color(0.50f, 0.28f, 0.10f);
+        static readonly Color Grass         = new Color(0.36f, 0.70f, 0.28f);
+        static readonly Color HillGreen     = new Color(0.28f, 0.60f, 0.22f);
+        static readonly Color CloudWhite    = new Color(0.98f, 0.99f, 1f);
+
         Material _lineMat;
         Hoop _hoopNeg;
         Hoop _hoopPos;
@@ -44,6 +53,7 @@ namespace MarioBasketball.Bootstrap
             BuildCourt();
             BuildWalls();
             BuildMarkings();
+            BuildSurroundings();
 
             // Teams start on their own half and attack the far basket: home
             // begins on the -z half and attacks the +z hoop, and vice versa.
@@ -96,6 +106,9 @@ namespace MarioBasketball.Bootstrap
             // Players don't physically collide with each other — no climbing or
             // standing on heads; the soft Separation push keeps them spaced out.
             IgnorePlayerVsPlayers(gm);
+
+            // Mario benches: Home perches on warp pipes, Away on floating ? blocks.
+            BuildBenches(gm);
 
             // Substitution anchors: benches sit outside each sideline.
             gm.homeBenchAnchor = new Vector3(-(courtWidth / 2f + 1.5f), 1.1f, -2f);
@@ -308,6 +321,136 @@ namespace MarioBasketball.Bootstrap
             });
         }
 
+        // ---- Mario scenery & benches ---------------------------------------
+
+        /// <summary>Dress the empty space around the court: a grass field, rolling
+        /// hills behind the baselines, roadside bushes, lazy clouds and a few
+        /// decorative warp pipes / floating ? blocks. All cosmetic — colliders are
+        /// stripped so nothing interferes with play (it all sits outside the walls).</summary>
+        void BuildSurroundings()
+        {
+            var root = new GameObject("Scenery").transform;
+            float hw = courtWidth / 2f, hl = courtLength / 2f;
+
+            // Grass field stretching well past the court on every side.
+            var grass = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            grass.name = "GrassField";
+            grass.transform.SetParent(root);
+            grass.transform.position = new Vector3(0f, -0.06f, 0f);
+            grass.transform.localScale = new Vector3(9f, 1f, 9f); // ~90 m square
+            var grassCol = grass.GetComponent<Collider>();
+            if (grassCol != null) Destroy(grassCol);
+            Tint(grass, Grass);
+
+            var rng = new System.Random(12345); // stable layout each run
+            float Rand(float a, float b) => (float)(a + rng.NextDouble() * (b - a));
+
+            // Rolling hills behind both baselines (flattened spheres).
+            for (int i = 0; i < 6; i++)
+            {
+                float side = (i % 2 == 0) ? 1f : -1f;
+                float z = side * (hl + Rand(8f, 18f));
+                float s = Rand(7f, 13f);
+                Prop(PrimitiveType.Sphere, "Hill", new Vector3(Rand(-20f, 20f), -s * 0.55f, z),
+                    new Vector3(s, s * 0.6f, s), HillGreen, root);
+            }
+
+            // Bushes hugging the sidelines.
+            for (int i = 0; i < 10; i++)
+            {
+                float side = (i % 2 == 0) ? 1f : -1f;
+                float s = Rand(1.2f, 2.4f);
+                Prop(PrimitiveType.Sphere, "Bush", new Vector3(side * (hw + Rand(2f, 6f)), s * 0.25f, Rand(-hl, hl)),
+                    new Vector3(s, s * 0.7f, s), HillGreen, root);
+            }
+
+            // Puffy clouds overhead.
+            for (int i = 0; i < 7; i++)
+            {
+                float s = Rand(2.5f, 4.5f);
+                Prop(PrimitiveType.Sphere, "Cloud", new Vector3(Rand(-25f, 25f), Rand(10f, 16f), Rand(-25f, 25f)),
+                    new Vector3(s * 1.6f, s * 0.7f, s), CloudWhite, root);
+            }
+
+            // A couple of standalone warp pipes and some floating ? blocks in the surrounds.
+            BuildPipe(new Vector3(-(hw + 4f), 0f, hl + 6f), Rand(1.6f, 2.6f), root);
+            BuildPipe(new Vector3(hw + 4f, 0f, -(hl + 6f)), Rand(1.6f, 2.6f), root);
+            for (int i = 0; i < 4; i++)
+                BuildQuestionBlock(new Vector3(Rand(-12f, 12f), Rand(4f, 7f), (i % 2 == 0 ? 1f : -1f) * (hl + Rand(3f, 7f))), 1.0f, root);
+        }
+
+        /// <summary>Seat each team's bench on Mario furniture: Home on warp pipes,
+        /// Away on floating ? blocks (players perched on top, facing the court).</summary>
+        void BuildBenches(GameManager gm)
+        {
+            var root = new GameObject("Benches").transform;
+            SeatBench(gm.Home.bench, onPipes: true, root);
+            SeatBench(gm.Away.bench, onPipes: false, root);
+        }
+
+        void SeatBench(List<PlayerController> bench, bool onPipes, Transform root)
+        {
+            foreach (var p in bench)
+            {
+                if (p == null) continue;
+                Vector3 at = p.transform.position;       // already at the sideline bench spot
+                float h = p.BodyHeight;
+                Vector3 face = new Vector3(-Mathf.Sign(at.x), 0f, 0f); // look in toward the court
+                if (onPipes)
+                {
+                    const float pipeH = 1.0f;
+                    BuildPipe(new Vector3(at.x, 0f, at.z), pipeH, root);
+                    SeatPlayer(p, new Vector3(at.x, pipeH + h * 0.5f, at.z), face);
+                }
+                else
+                {
+                    const float floatY = 1.15f, size = 0.95f;
+                    BuildQuestionBlock(new Vector3(at.x, floatY, at.z), size, root);
+                    SeatPlayer(p, new Vector3(at.x, floatY + size * 0.5f + h * 0.5f, at.z), face);
+                }
+            }
+        }
+
+        static void SeatPlayer(PlayerController p, Vector3 pos, Vector3 face)
+        {
+            p.Teleport(pos); // benched players are inert (their controller is disabled), so they stay put
+            if (face.sqrMagnitude > 0.01f) p.transform.rotation = Quaternion.LookRotation(face.normalized, Vector3.up);
+        }
+
+        /// <summary>A green warp pipe of the given height, with a wider rim lip.</summary>
+        void BuildPipe(Vector3 basePos, float height, Transform root)
+        {
+            Prop(PrimitiveType.Cylinder, "Pipe", basePos + Vector3.up * (height * 0.5f),
+                new Vector3(1.1f, height * 0.5f, 1.1f), PipeGreen, root);   // cylinder is 2 units tall → y-scale is half-height
+            Prop(PrimitiveType.Cylinder, "PipeLip", basePos + Vector3.up * height,
+                new Vector3(1.35f, 0.14f, 1.35f), PipeGreenDark, root);
+        }
+
+        /// <summary>A floating ? block — yellow cube, corner rivets and a hint of a "?".</summary>
+        void BuildQuestionBlock(Vector3 centre, float size, Transform root)
+        {
+            Prop(PrimitiveType.Cube, "QuestionBlock", centre, Vector3.one * size, QBlockYellow, root);
+            float r = size * 0.42f;
+            foreach (var c in new[] { new Vector3(r, -r, r), new Vector3(-r, -r, r), new Vector3(r, -r, -r), new Vector3(-r, -r, -r) })
+                Prop(PrimitiveType.Cube, "Rivet", centre + c, Vector3.one * (size * 0.12f), QBlockBrown, root);
+            Prop(PrimitiveType.Cube, "Q", centre + new Vector3(0f, 0f, size * 0.5f + 0.01f),
+                new Vector3(size * 0.20f, size * 0.42f, 0.02f), QBlockBrown, root);
+        }
+
+        /// <summary>Build a tinted primitive used purely as scenery (collider stripped).</summary>
+        GameObject Prop(PrimitiveType type, string label, Vector3 pos, Vector3 scale, Color color, Transform parent)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            go.name = label;
+            if (parent != null) go.transform.SetParent(parent, true);
+            go.transform.position = pos;
+            go.transform.localScale = scale;
+            var col = go.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+            Tint(go, color);
+            return go;
+        }
+
         Hoop BuildHoop(string label, Vector3 basePos, TeamSide team, float faceZ)
         {
             var root = new GameObject(label);
@@ -413,16 +556,17 @@ namespace MarioBasketball.Bootstrap
                 camGo.AddComponent<AudioListener>();
             }
             // Sideline overview before a target exists (team select / pre-match).
-            cam.transform.position = new Vector3(-(courtWidth / 2f + 6f), 7f, 0f);
-            cam.transform.LookAt(new Vector3(0f, 1f, 0f));
+            cam.transform.position = new Vector3(-(courtWidth / 2f + 6f), 5f, 0f);
+            cam.transform.LookAt(new Vector3(0f, 1.6f, 0f));
 
             var rig = cam.GetComponent<CameraRig>();
             if (rig == null) rig = cam.gameObject.AddComponent<CameraRig>();
-            // Pulled back and up a touch so the bigger court and the action read
-            // clearly without bodies crowding the frame.
+            // Sit lower and look higher up so the camera rides closer to court
+            // level — a flatter, more in-the-action angle (NBA Street eye line)
+            // rather than looking down on the floor.
             rig.sideX = -(courtWidth / 2f + 5f);
-            rig.height = 6f;
-            rig.lookHeight = 1.5f;
+            rig.height = 4.6f;
+            rig.lookHeight = 1.85f;
             rig.fieldOfView = 50f;
             rig.zRange = courtLength / 2f - 6f;
             rig.target = target;

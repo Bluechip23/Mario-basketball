@@ -29,6 +29,12 @@ namespace MarioBasketball.Gameplay
         public static float MaxChance = 0.97f;
         public static float OnFireBonus = 0.30f;
 
+        /// <summary>Flat make% knocked off every three-point attempt (on top of
+        /// the per-foot distance falloff). Pulls threes a notch below mid-range
+        /// for the same stat, while a wide-open, well-timed three from a real
+        /// shooter still drops at a healthy clip.</summary>
+        public static float ThreeBasePenalty = 0.08f;
+
         public static float ContestRange = 3f;
         public static float ContestMaxPenalty = 0.35f;
 
@@ -61,6 +67,7 @@ namespace MarioBasketball.Gameplay
             float statEff = statOverride >= 0f ? statOverride : shooter.EffectiveStat(zone);
             float p = BaseFromStat(statEff);
             p += DistanceModifier(shooter, zone, distMeters);
+            if (zone == StatType.ThreePoint) p -= ThreeBasePenalty;
             p -= ContestPenalty(shooter, defender, zone) * contestScale;
             if (onFire) p += OnFireBonus;
             return Mathf.Clamp(p, MinChance, MaxChance);

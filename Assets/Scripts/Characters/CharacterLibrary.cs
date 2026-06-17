@@ -204,9 +204,9 @@ namespace MarioBasketball.Characters
             description = "The glass belongs to him. A board-vacuuming enforcer who defends the paint and the perimeter alike — just never ask for a three."
         };
 
-        public static CharacterStats CliffyGuy() => new CharacterStats
+        public static CharacterStats QuiGon() => new CharacterStats
         {
-            characterName = "Cliffy Guy",
+            characterName = "Qui-gon",
             speed = 10, ballHandling = 6, threePoint = 1, midRange = 1, insideScoring = 8, postOffense = 3, dunk = 8, power = 5, rebounds = 2, blocks = 2, steals = 9, postDefense = 3, perimeterDefense = 4, stamina = 8,
             hiddenTrait = HiddenTrait.None, heightMeters = 1.55f,
             archetype = PlayerArchetype.Wing,
@@ -228,7 +228,7 @@ namespace MarioBasketball.Characters
             Bowser(), DonkeyKong(), Mario(), Luigi(), Peach(), Toad(), Waluigi(), DiddyKong(),
             Yoshi(), Birdo(), Boo(), BabyMario(), Wario(), PiranhaPlant(), Daisy(),
             MontyMole(), Koopa(), Kritter(), Shyguy(),
-            Delfan(), Laurentius(), CliffyGuy(), JonahGuy()
+            Delfan(), Laurentius(), QuiGon(), JonahGuy()
         };
     }
 }

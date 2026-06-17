@@ -103,11 +103,12 @@ namespace MarioBasketball.Characters
             description = "A sprinting flame-thrower — pull-up threes and mid-range daggers in transition, all game long."
         };
 
+        /// <summary>Boo — Wide-Open Sniper (+make% on uncontested threes).</summary>
         public static CharacterStats Boo() => new CharacterStats
         {
             characterName = "Boo",
             speed = 3, ballHandling = 1, threePoint = 10, midRange = 6, insideScoring = 2, postOffense = 1, dunk = 1, power = 1, rebounds = 4, blocks = 2, steals = 9, postDefense = 4, perimeterDefense = 4, stamina = 6,
-            hiddenTrait = HiddenTrait.None, heightMeters = 1.4f,
+            hiddenTrait = HiddenTrait.WideOpenSniper, heightMeters = 1.4f,
             archetype = PlayerArchetype.Guard,
             description = "Barely moves, barely defends... but leave it open in the corner and the spooky catch-and-shoot three never misses."
         };

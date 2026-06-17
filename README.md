@@ -101,7 +101,7 @@ to see the full stat sheet.
 **Guards**
 - **Toad** — Tiny, tireless and nearly impossible to strip; the best pure handle in the kingdom.
 - **Diddy Kong** — Pure jet fuel; the fastest end-to-end menace on the floor.
-- **Boo** — Barely moves or defends, but the spooky catch-and-shoot corner three never misses.
+- **Boo** — Barely moves or defends, but the spooky wide-open corner three never misses. *(Wide-Open Sniper)*
 - **Baby Mario** — All the captain's craft (and a grown-up post game) in a knee-high package. *(Acrobat)*
 - **Monty Mole** — A burrowing perimeter pest; there's no driving around, under or through him.
 - **Koopa** — The shell-backed floor general; elite handle and vision. *(Playmaker)*
@@ -144,6 +144,7 @@ A handful of characters carry a signature trait:
 
 - **Deep-Three Specialist** (Peach) — *gains* range the further behind the arc she steps.
 - **Hot Hand** (Birdo) — builds a rolling heat bonus as she keeps hitting.
+- **Wide-Open Sniper** (Boo) — a bonus on uncontested threes that vanishes the instant a defender closes out.
 - **Offensive Rebounder** (Waluigi) — crashes the offensive glass far above his size.
 - **Acrobat** (Baby Mario) — shrugs off shot-mistiming and fadeaway penalties in the air.
 - **Smooth Passer** (Wario) — passes like an elite handler, especially out of the post.

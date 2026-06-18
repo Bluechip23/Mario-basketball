@@ -1,4 +1,5 @@
 using UnityEngine;
+using MarioBasketball.Core;
 using MarioBasketball.Gameplay;
 
 namespace MarioBasketball.Presentation
@@ -89,6 +90,10 @@ namespace MarioBasketball.Presentation
         [Tooltip("How far the post defender leans their chest into the poster.")]
         public float postDefendLean = 16f;
 
+        [Header("Bench")]
+        [Tooltip("How long a benched player claps after their team scores.")]
+        public float benchClapTime = 2.2f;
+
         [Header("Post shot form")]
         [Tooltip("How far (deg) the body turns sideways to the rim on a hook shot.")]
         public float hookBodyTurn = 62f;
@@ -104,6 +109,8 @@ namespace MarioBasketball.Presentation
         float _fallTilt;
         bool _wasShooting;
         float _followThrough;
+        int _lastTeamScore = -1;
+        float _benchClapTimer;
 
         void Start()
         {
@@ -193,6 +200,11 @@ namespace MarioBasketball.Presentation
                 }
             }
             if (_pc.IsFallen) return;
+
+            // Benched players just sit on the sideline (arms at their sides) and
+            // clap when their team scores — they aren't running the live gameplay
+            // poses (which would leave them floating with their arms up).
+            if (_pc.Character != null && _pc.Character.IsBenched) { BenchIdle(); return; }
 
             float speed = _pc.PlanarSpeed;
             bool moving = speed > 0.6f;
@@ -549,6 +561,41 @@ namespace MarioBasketball.Presentation
                         dunkWristDegrees * k);
                     break;
                 }
+            }
+        }
+
+        /// <summary>Seated-on-the-bench pose: thighs forward, knees bent, body
+        /// upright, hands resting at the sides — and a quick clap whenever their
+        /// team's score ticks up.</summary>
+        void BenchIdle()
+        {
+            // Watch our team's score; a bump kicks off a celebratory clap.
+            var gm = GameManager.Instance;
+            if (gm != null)
+            {
+                int score = _pc.team == TeamSide.Home ? gm.HomeScore : gm.AwayScore;
+                if (_lastTeamScore < 0) _lastTeamScore = score;
+                else if (score > _lastTeamScore) { _benchClapTimer = benchClapTime; _lastTeamScore = score; }
+            }
+            if (_benchClapTimer > 0f) _benchClapTimer -= Time.deltaTime;
+
+            // Sit: thighs forward off the bench, knees bent so the shins drop.
+            SetX(_legL, -52f); SetX(_legR, -52f);
+            SetX(_kneeL, 66f); SetX(_kneeR, 66f);
+
+            if (_benchClapTimer > 0f)
+            {
+                // Hands meet in front of the chest and clap, opening and closing fast.
+                float t = Mathf.Sin(Time.unscaledTime * 18f) * 0.5f + 0.5f;
+                float elbow = Mathf.Lerp(-72f, -118f, t);
+                Pose(_armL, _elbowL, _wristL, -48f, elbow, 0f);
+                Pose(_armR, _elbowR, _wristR, -48f, elbow, 0f);
+            }
+            else
+            {
+                // Arms hanging at the sides.
+                Pose(_armL, _elbowL, _wristL, 0f, idleElbowDegrees, 0f);
+                Pose(_armR, _elbowR, _wristR, 0f, idleElbowDegrees, 0f);
             }
         }
 

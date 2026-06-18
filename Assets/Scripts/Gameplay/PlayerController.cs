@@ -117,8 +117,8 @@ namespace MarioBasketball.Gameplay
         public float finishSlamTime = 0.16f;
         [Tooltip("How long a dunk grabs the rim and hangs (the two-hand slam hangs longer).")]
         public float dunkHangTime = 0.3f;
-        [Tooltip("Finishes float: gravity is softened to this fraction while up for a dunk/layup, so the player rises slowly and clearly elevates with the ball to the rim (instead of a fast pop) — and has time to air-adjust.")]
-        [Range(0.3f, 1f)] public float finishGravityScale = 0.55f;
+        [Tooltip("Finishes float: gravity is softened to this fraction while up for a dunk/layup. Set lower than shotGravityScale so the player rises a touch SLOWER (floatier) than on a jump shot, clearly soaring to the rim with the ball — and has time to air-adjust.")]
+        [Range(0.3f, 1f)] public float finishGravityScale = 0.4f;
         [Tooltip("Layup hop height (m) — gets up off the floor enough to finish at/above the rim, arcade style.")]
         public float layupJumpHeight = 1.4f;
         [Tooltip("Dunk leap height (m) at Dunk 10 — arcade air, soaring over the rim. Scales up from the normal jump by the Dunk stat.")]
@@ -655,15 +655,23 @@ namespace MarioBasketball.Gameplay
 
             // Ride the leap up to its peak before finishing, so dunks and layups
             // happen up at (or above) the rim — arcade air, with room to air-adjust
-            // around a shot-blocker. The late cap resolves it if you never get there.
+            // around a shot-blocker.
             var gm = GameManager.Instance;
             Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
             bool atRim = hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= finishReleaseDistance;
             bool atPeak = _verticalVelocity <= 0f && _finishTimer >= finishMinAirTime;
-            if ((atRim && atPeak) || _finishTimer >= finishAirTime)
+            if (atRim && atPeak)
             {
+                // At the rim and at the top — start the slam: the ball is driven
+                // down into the rim (still in hand) and released only there.
                 _finishSlamming = true;
                 _finishSlamTimer = finishSlamTime;
+            }
+            else if (_finishTimer >= finishAirTime)
+            {
+                // Late cap: never made it to the rim (contested / cut off) — just
+                // release from here rather than dragging the ball to the rim.
+                ResolveFinish();
             }
         }
 

@@ -105,12 +105,14 @@ namespace MarioBasketball.Gameplay
         public float finishAirTime = 0.95f;
         [Tooltip("Minimum air time before a finish can release — you always leave the floor and rise toward the rim first.")]
         public float finishMinAirTime = 0.22f;
-        [Tooltip("Once you've driven this close to the rim (and cleared the min air time) the finish releases at the basket, not from distance.")]
-        public float finishReleaseDistance = 1.0f;
+        [Tooltip("Once you've driven this close to the rim (and reached the top of the leap) the finish releases right at the basket — small, so you sky all the way up to the rim before the ball leaves your hands.")]
+        public float finishReleaseDistance = 0.6f;
         [Tooltip("How hard you attack the rim on a finish (m/s toward the hoop).")]
         public float finishApproachSpeed = 7f;
-        [Tooltip("Flight time of the finish itself — short, so it drops in at the rim instead of lazily arcing in from distance.")]
+        [Tooltip("Flight time of a layup once it leaves the hand at the rim — a soft drop off the glass.")]
         public float finishFlightTime = 0.32f;
+        [Tooltip("Flight time of a dunk — very short, so it's slammed straight down through the rim from above instead of lofted in.")]
+        public float dunkFlightTime = 0.18f;
         [Tooltip("How long a dunk grabs the rim and hangs (the two-hand slam hangs longer).")]
         public float dunkHangTime = 0.3f;
         [Tooltip("Finishes float: gravity is softened to this fraction while up for a dunk/layup, so the player rises slowly and clearly elevates with the ball to the rim (instead of a fast pop) — and has time to air-adjust.")]
@@ -864,10 +866,9 @@ namespace MarioBasketball.Gameplay
         void OnShootReleased()
         {
             if (_shooting) ReleaseJumpShot();
-            // A finish commits to the rim: a quick tap still leaps and lays it in
-            // (AdvanceFinish resolves it at the basket). Releasing only finishes
-            // early once you've actually left the floor and risen toward the rim.
-            else if (_finishing && _finishTimer >= finishMinAirTime) ResolveFinish();
+            // A finish is NOT cut short by releasing the button — once you commit
+            // you sky all the way up with the ball and slam/lay it in at the rim
+            // (AdvanceFinish resolves it there). Alter it in the air with L1.
         }
 
         bool InsideRange()
@@ -1011,7 +1012,9 @@ namespace MarioBasketball.Gameplay
             makeChance += makeBonus;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
-            Ball.Shoot(aim, team, 2, finishFlightTime, ShotMath.AimOffset(make), this);
+            // A dunk slams straight down from above; a layup is a softer drop.
+            float flight = isDunk ? dunkFlightTime : finishFlightTime;
+            Ball.Shoot(aim, team, 2, flight, ShotMath.AimOffset(make), this);
             return true; // got the shot off at the rim
         }
 

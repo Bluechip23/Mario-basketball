@@ -30,8 +30,10 @@ namespace MarioBasketball.Presentation
     public class ProceduralAnimator : MonoBehaviour
     {
         [Header("Run cycle")]
-        public float strideFrequency = 1.6f;
-        public float strideFrequencyPerSpeed = 0.22f;
+        [Tooltip("Stride cadence (leg/arm swings per second) at a walk. This is purely the look of the gait — it does NOT change how fast the player actually moves (that's PlayerController). Kept fairly low so the legs don't churn in fast-forward.")]
+        public float strideFrequency = 1.1f;
+        [Tooltip("Extra stride cadence per m/s of speed. Low so a sprint reads as long strides, not a frantic shuffle.")]
+        public float strideFrequencyPerSpeed = 0.15f;
         public float legSwingDegrees = 60f;
         public float armSwingDegrees = 55f;
         [Tooltip("Elbow bend while running (arms pump at ~90°, not straight nutcrackers).")]
@@ -87,8 +89,10 @@ namespace MarioBasketball.Presentation
         public float fadeLeanAngle = 24f;
         [Tooltip("A loose/shot ball within this of an airborne player makes them reach for the board (vs hands straight up to contest).")]
         public float reboundReachDistance = 2.6f;
-        [Tooltip("How far the post defender leans their chest into the poster.")]
+        [Tooltip("How far the post defender leans their chest/forearm into the poster.")]
         public float postDefendLean = 16f;
+        [Tooltip("Forward torso lean (deg) the poster sinks into while backing their man down — an athletic stance, chest over the thighs, instead of standing bolt upright.")]
+        public float postPosterLean = 15f;
 
         [Header("Bench")]
         [Tooltip("How long a benched player claps after their team scores.")]
@@ -137,6 +141,10 @@ namespace MarioBasketball.Presentation
 
             // The poster (if any) currently backing this player down on D.
             PlayerController postingMe = _pc.PostingMeOnD;
+            // A poster shorter than the defender is guarded differently: you can't
+            // legally lean a forearm into a smaller man, so the D stays vertical
+            // with hands straight up (still in a stance).
+            bool posterShorter = postingMe != null && postingMe.BodyHeight < _pc.BodyHeight - 0.05f;
 
             // Body tilt: whip around on a spin move, sprawl to the floor when
             // knocked down, or lean into a fadeaway jump shot.
@@ -164,9 +172,11 @@ namespace MarioBasketball.Presentation
                         float amt = _pc.FadeAmount * fadeLeanAngle;
                         want = Quaternion.Euler(local.z * amt, 0f, -local.x * amt);
                     }
-                    else if (postingMe != null)
+                    else if (postingMe != null && !posterShorter)
                     {
-                        // Engaged on the back-down: lean the chest into the poster.
+                        // Engaged on the back-down against a taller-or-equal poster:
+                        // lean the chest/forearm into them. (A shorter poster: stay
+                        // vertical — falls through to identity, hands go up below.)
                         Vector3 toP = postingMe.transform.position - transform.position; toP.y = 0f;
                         if (toP.sqrMagnitude > 0.01f)
                         {
@@ -174,6 +184,12 @@ namespace MarioBasketball.Presentation
                             want = Quaternion.Euler(local.z * postDefendLean, 0f, -local.x * postDefendLean * 0.5f);
                         }
                         else want = Quaternion.identity;
+                    }
+                    else if (_pc.IsPosting)
+                    {
+                        // Backing your man down: sit into an athletic stance with the
+                        // chest forward over the thighs, not standing bolt upright.
+                        want = Quaternion.Euler(postPosterLean, 0f, 0f);
                     }
                     else if (_pc.IsPostShooting)
                     {
@@ -233,12 +249,13 @@ namespace MarioBasketball.Presentation
                 SetX(_kneeL, 52f);
                 SetX(_kneeR, 52f);
             }
-            // Sit into a stance: the poster crouches as they back down; the engaged
-            // defender bends their knees and braces.
+            // Sit into an athletic stance: the poster sinks as they back down, and
+            // the engaged defender bends their knees and braces (even against a
+            // shorter poster they stay down in a stance — just with hands up).
             if (!_pc.IsAirborne && (_pc.IsPosting || postingMe != null))
             {
-                SetX(_kneeL, 34f);
-                SetX(_kneeR, 34f);
+                SetX(_kneeL, 40f);
+                SetX(_kneeR, 40f);
             }
 
             // Leg work for a finish: one-foot takeoff drives the opposite knee up
@@ -437,9 +454,20 @@ namespace MarioBasketball.Presentation
             }
             else if (postingMe != null)
             {
-                // Bracing against the back-down: forearms bar into the poster.
-                Pose(_armR, _elbowR, _wristR, -44f, -95f, 0f);
-                Pose(_armL, _elbowL, _wristL, -44f, -95f, 0f);
+                if (posterShorter)
+                {
+                    // Defending a smaller man backing in: stay tall, both hands
+                    // straight up — verticality instead of a forearm in the back.
+                    Pose(_armR, _elbowR, _wristR, -178f, -6f, 0f);
+                    Pose(_armL, _elbowL, _wristL, -178f, -6f, 0f);
+                }
+                else
+                {
+                    // Bracing a taller-or-equal poster: the right forearm bars into
+                    // their back (~90° bend) while the off-hand rides up for balance.
+                    Pose(_armR, _elbowR, _wristR, -44f, -95f, 0f);
+                    Pose(_armL, _elbowL, _wristL, -150f, -22f, 0f);
+                }
             }
             else if (_pc.IsAirborne && !_pc.HasBall)
             {

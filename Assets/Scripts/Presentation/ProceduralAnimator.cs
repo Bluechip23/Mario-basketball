@@ -335,6 +335,22 @@ namespace MarioBasketball.Presentation
                 else
                     Pose(_armL, _elbowL, _wristL, -178f, -2f, 0f);
             }
+            else if (_pc.IsFinishing && _pc.IsSlammingFinish)
+            {
+                // Drive the ball down into the rim: the arms sweep from overhead
+                // down to the basket, following the ball (which rides the hand to
+                // the rim). A two-hand slam uses both; a one-hand flush / layup
+                // throws it down with the shooting hand and guards with the other.
+                float p = _pc.FinishSlamProgress01;
+                float sh = Mathf.Lerp(_pc.FinishIsDunk ? dunkArmDegrees : layupArmDegrees, -38f, p);
+                float el = Mathf.Lerp(_pc.FinishIsDunk ? dunkElbowDegrees : layupElbowDegrees, -8f, p);
+                float wr = Mathf.Lerp(0f, dunkWristDegrees, p);
+                Pose(_armR, _elbowR, _wristR, sh, el, wr);
+                if (_pc.FinishIsDunk && _pc.CurrentFinishStyle != FinishStyle.OneFootOneHandDunk)
+                    Pose(_armL, _elbowL, _wristL, sh, el, wr);
+                else
+                    Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
+            }
             else if (_pc.IsFinishing && _pc.IsAdjustingFinish)
             {
                 // Air-adjust (L1): a double-clutch — cradle the ball back in and

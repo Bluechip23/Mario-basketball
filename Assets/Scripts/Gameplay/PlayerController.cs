@@ -113,6 +113,8 @@ namespace MarioBasketball.Gameplay
         public float finishFlightTime = 0.32f;
         [Tooltip("Flight time of a dunk — very short, so it's slammed straight down through the rim from above instead of lofted in.")]
         public float dunkFlightTime = 0.18f;
+        [Tooltip("Duration of the slam / lay-in: after skying up, the hand drives the ball the last stretch down into the rim (ball still in hand) and only lets go once it's there.")]
+        public float finishSlamTime = 0.16f;
         [Tooltip("How long a dunk grabs the rim and hangs (the two-hand slam hangs longer).")]
         public float dunkHangTime = 0.3f;
         [Tooltip("Finishes float: gravity is softened to this fraction while up for a dunk/layup, so the player rises slowly and clearly elevates with the ball to the rim (instead of a fast pop) — and has time to air-adjust.")]
@@ -245,7 +247,22 @@ namespace MarioBasketball.Gameplay
                     float k = Mathf.Clamp01(_finishTimer / 0.3f);
                     float up = Mathf.Lerp(0.5f, _finishIsDunk ? 0.98f : 0.86f, k);
                     float fwd = Mathf.Lerp(0.18f, _finishIsDunk ? 0.10f : 0.16f, k);
-                    return transform.position + transform.forward * (fwd * h) + Vector3.up * (up * h);
+                    Vector3 hand = transform.position + transform.forward * (fwd * h) + Vector3.up * (up * h);
+
+                    // Slam phase: the hand drives the ball the last stretch down
+                    // into the rim — it stays in the hand and only lets go once
+                    // it's there (no early arc out of the hand).
+                    if (_finishSlamming)
+                    {
+                        var hoop = GameManager.Instance != null ? GameManager.Instance.GetAttackingHoop(team) : null;
+                        if (hoop != null)
+                        {
+                            float s = 1f - Mathf.Clamp01(_finishSlamTimer / Mathf.Max(0.01f, finishSlamTime));
+                            Vector3 atRim = hoop.AimPoint + Vector3.up * (_finishIsDunk ? 0.04f : 0.12f);
+                            return Vector3.Lerp(hand, atRim, s);
+                        }
+                    }
+                    return hand;
                 }
                 if (IsPostShooting)
                 {
@@ -309,6 +326,13 @@ namespace MarioBasketball.Gameplay
         /// <summary>Airborne for a dunk/layup (can air-adjust or pass).</summary>
         public bool IsFinishing => _finishing;
         public bool FinishIsDunk => _finishIsDunk;
+        /// <summary>True during the slam/lay-in: the player hangs at the rim and
+        /// drives the ball down into it (the ball stays in the hand until then).</summary>
+        public bool IsSlammingFinish => _finishSlamming;
+        /// <summary>How far through the slam/lay-in (0-1) — drives the arms down
+        /// with the ball.</summary>
+        public float FinishSlamProgress01 =>
+            _finishSlamming ? 1f - Mathf.Clamp01(_finishSlamTimer / Mathf.Max(0.01f, finishSlamTime)) : 0f;
         /// <summary>How the current finish looks (layup / one-foot dunk / slam).</summary>
         public FinishStyle CurrentFinishStyle => _finishStyle;
         /// <summary>This finish leaves off one foot (layups and the one-foot dunks).</summary>
@@ -388,6 +412,8 @@ namespace MarioBasketball.Gameplay
         float _finishTimer;
         bool _finishIsDunk;
         bool _finishAdjusted;
+        bool _finishSlamming;
+        float _finishSlamTimer;
         FinishStyle _finishStyle;
         bool _finishTakeoffLeft;
         float _hangTimer;
@@ -613,8 +639,20 @@ namespace MarioBasketball.Gameplay
         void AdvanceFinish(float dt)
         {
             if (!_finishing) return;
-            if (IsStunned || !HasBall) { _finishing = false; return; }
+            if (IsStunned || !HasBall) { _finishing = false; _finishSlamming = false; return; }
             _finishTimer += dt;
+
+            // Slam / lay-in: hang at the rim while the hand drives the ball down
+            // into it (CarriedBallPoint walks the ball to the rim), and only let
+            // go once it's there — the ball never arcs out of the hand early.
+            if (_finishSlamming)
+            {
+                _verticalVelocity = 0f;
+                _finishSlamTimer -= dt;
+                if (_finishSlamTimer <= 0f) ResolveFinish();
+                return;
+            }
+
             // Ride the leap up to its peak before finishing, so dunks and layups
             // happen up at (or above) the rim — arcade air, with room to air-adjust
             // around a shot-blocker. The late cap resolves it if you never get there.
@@ -623,7 +661,10 @@ namespace MarioBasketball.Gameplay
             bool atRim = hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= finishReleaseDistance;
             bool atPeak = _verticalVelocity <= 0f && _finishTimer >= finishMinAirTime;
             if ((atRim && atPeak) || _finishTimer >= finishAirTime)
-                ResolveFinish();
+            {
+                _finishSlamming = true;
+                _finishSlamTimer = finishSlamTime;
+            }
         }
 
         void HandlePostHold()
@@ -665,6 +706,16 @@ namespace MarioBasketball.Gameplay
                 _character?.ReportActivity(false, false);
                 Vector3 to = _hangTarget - transform.position;
                 _cc.Move(to * Mathf.Clamp01(hangSettleLerp * dt));
+                return;
+            }
+
+            // Slamming/laying it in: hang in place at the rim while the ball is
+            // driven down into it (see CarriedBallPoint). Don't drift or fall.
+            if (_finishSlamming)
+            {
+                _verticalVelocity = 0f;
+                PlanarSpeed = 0f;
+                _character?.ReportActivity(true, false);
                 return;
             }
 
@@ -865,10 +916,17 @@ namespace MarioBasketball.Gameplay
 
         void OnShootReleased()
         {
-            if (_shooting) ReleaseJumpShot();
-            // A finish is NOT cut short by releasing the button — once you commit
-            // you sky all the way up with the ball and slam/lay it in at the rim
-            // (AdvanceFinish resolves it there). Alter it in the air with L1.
+            if (_shooting) { ReleaseJumpShot(); return; }
+            // Releasing the button during a finish (before the ball reaches the
+            // rim) turns a dunk into a layup: hold it down to throw it home, let
+            // go to lay it in. The finish still skies all the way up — releasing
+            // only changes WHAT you do at the rim, not when. L1 alters it either
+            // way (a contorted dunk, or a double-clutch layup).
+            if (_finishing && !_finishSlamming && _finishIsDunk)
+            {
+                _finishIsDunk = false;
+                _finishStyle = FinishStyle.Layup;
+            }
         }
 
         bool InsideRange()
@@ -892,10 +950,14 @@ namespace MarioBasketball.Gameplay
         void StartFinish()
         {
             _finishing = true;
+            _finishSlamming = false;
             _finishTimer = 0f;
             _finishAdjusted = false;
-            // Decide dunk vs layup off the base Dunk rating so fatigue doesn't quietly
-            // demote a real dunker to layups — a decent dunker skies for the dunk.
+            // Commit to a dunk if this player can throw it down (off the base Dunk
+            // rating, so fatigue doesn't quietly demote a real dunker). The human
+            // holds the button to keep the dunk; releasing before the rim drops it
+            // to a layup (see OnShootReleased). The AI never releases, so a dunker
+            // dunks. A non-dunker always lays it in.
             _finishIsDunk = (_character != null ? _character.stats.Get(StatType.Dunk) : 5) >= dunkThreshold;
             _finishStyle = PickFinishStyle(_finishIsDunk);
             _finishTakeoffLeft = Random.value < 0.5f;
@@ -938,6 +1000,7 @@ namespace MarioBasketball.Gameplay
         {
             if (!_finishing) return;
             _finishing = false;
+            _finishSlamming = false;
             bool reachedRim = FinishShot(_finishIsDunk, _finishAdjusted);
             // Every dunk grabs the rim and hangs for a beat (the two-hand slam hangs
             // longest); skip it if the shot got swatted away.

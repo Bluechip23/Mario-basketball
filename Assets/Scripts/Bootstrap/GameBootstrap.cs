@@ -561,14 +561,17 @@ namespace MarioBasketball.Bootstrap
 
             var rig = cam.GetComponent<CameraRig>();
             if (rig == null) rig = cam.gameObject.AddComponent<CameraRig>();
-            // Sit lower and look higher up so the camera rides closer to court
-            // level — a flatter, more in-the-action angle (NBA Street eye line)
-            // rather than looking down on the floor.
-            rig.sideX = -(courtWidth / 2f + 5f);
-            rig.height = 5.2f;
-            rig.lookHeight = 1.7f;
-            rig.fieldOfView = 50f;
-            rig.zRange = courtLength / 2f - 6f;
+            // NBA-Street chase cam: trail behind the ball down-court, low and
+            // close (players read big), looking toward the attacking hoop. A touch
+            // zoomed out from the reference shot — tune distanceBehind / fieldOfView.
+            rig.distanceBehind = 8.5f;
+            rig.height = 3.4f;
+            rig.lateralOffset = 1.5f;
+            rig.lookAhead = 3f;
+            rig.lookHeight = 1.2f;
+            rig.fieldOfView = 46f;
+            rig.followSmoothing = 5f;
+            rig.turnSmoothing = 3f;
             rig.target = target;
         }
 

@@ -117,8 +117,10 @@ namespace MarioBasketball.Gameplay
         public float finishSlamTime = 0.16f;
         [Tooltip("How long a dunk grabs the rim and hangs (the two-hand slam hangs longer).")]
         public float dunkHangTime = 0.3f;
-        [Tooltip("Finishes float: gravity is softened to this fraction while up for a dunk/layup, so the player rises slowly and clearly elevates with the ball to the rim (instead of a fast pop) — and has time to air-adjust.")]
-        [Range(0.3f, 1f)] public float finishGravityScale = 0.55f;
+        // A dunk/layup now leaves the floor at the SAME rise speed as a jump shot
+        // (ShotTakeoffVelocity); finish gravity is derived per-jump from that speed
+        // and the target apex (FinishJumpHeight) in StartFinish, so taller leaps
+        // simply float longer rather than taking off faster.
         [Tooltip("Layup hop height (m) — gets up off the floor enough to finish at/above the rim, arcade style.")]
         public float layupJumpHeight = 1.4f;
         [Tooltip("Dunk leap height (m) at Dunk 10 — arcade air, soaring over the rim. Scales up from the normal jump by the Dunk stat.")]
@@ -333,6 +335,11 @@ namespace MarioBasketball.Gameplay
         /// with the ball.</summary>
         public float FinishSlamProgress01 =>
             _finishSlamming ? 1f - Mathf.Clamp01(_finishSlamTimer / Mathf.Max(0.01f, finishSlamTime)) : 0f;
+        /// <summary>How far through the up-leap a finisher is: 0 at takeoff, 1 at the
+        /// top (and through the slam). Drives the gather→extend of a two-hand dunk —
+        /// the ball is cradled low off the floor and reached overhead at the rim.</summary>
+        public float FinishRiseProgress01 =>
+            Mathf.Clamp01(1f - _verticalVelocity / Mathf.Max(0.01f, ShotTakeoffVelocity()));
         /// <summary>How the current finish looks (layup / one-foot dunk / slam).</summary>
         public FinishStyle CurrentFinishStyle => _finishStyle;
         /// <summary>This finish leaves off one foot (layups and the one-foot dunks).</summary>
@@ -416,6 +423,7 @@ namespace MarioBasketball.Gameplay
         float _finishSlamTimer;
         FinishStyle _finishStyle;
         bool _finishTakeoffLeft;
+        float _finishGravityScale = 0.4f; // per-finish, so the takeoff matches a jump shot's rise (see StartFinish)
         float _hangTimer;
         Vector3 _hangTarget;
         float _skyTimer;
@@ -655,15 +663,23 @@ namespace MarioBasketball.Gameplay
 
             // Ride the leap up to its peak before finishing, so dunks and layups
             // happen up at (or above) the rim — arcade air, with room to air-adjust
-            // around a shot-blocker. The late cap resolves it if you never get there.
+            // around a shot-blocker.
             var gm = GameManager.Instance;
             Hoop hoop = gm != null ? gm.GetAttackingHoop(team) : null;
             bool atRim = hoop != null && HorizontalDistance(transform.position, hoop.AimPoint) <= finishReleaseDistance;
             bool atPeak = _verticalVelocity <= 0f && _finishTimer >= finishMinAirTime;
-            if ((atRim && atPeak) || _finishTimer >= finishAirTime)
+            if (atRim && atPeak)
             {
+                // At the rim and at the top — start the slam: the ball is driven
+                // down into the rim (still in hand) and released only there.
                 _finishSlamming = true;
                 _finishSlamTimer = finishSlamTime;
+            }
+            else if (_finishTimer >= finishAirTime)
+            {
+                // Late cap: never made it to the rim (contested / cut off) — just
+                // release from here rather than dragging the ball to the rim.
+                ResolveFinish();
             }
         }
 
@@ -801,7 +817,7 @@ namespace MarioBasketball.Gameplay
             // then soften on the way down so the player hangs while the lob arrives.
             float g = gravity;
             if (_shooting) g = gravity * shotGravityScale;
-            else if (_finishing) g = gravity * finishGravityScale;
+            else if (_finishing) g = gravity * _finishGravityScale;
             else if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
             _verticalVelocity += g * dt;
 
@@ -911,7 +927,7 @@ namespace MarioBasketball.Gameplay
             _fadeDir = Vector3.zero;
             _fadeAmount = 0f;
             _launchVel = _lastRunVelocity; // the momentum you take into the jump
-            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * (gravity * shotGravityScale) * shotJumpHeight); // floaty jump-shot leap
+            if (_cc.isGrounded) _verticalVelocity = ShotTakeoffVelocity(); // floaty jump-shot leap
         }
 
         void OnShootReleased()
@@ -962,10 +978,23 @@ namespace MarioBasketball.Gameplay
             _finishStyle = PickFinishStyle(_finishIsDunk);
             _finishTakeoffLeft = Random.value < 0.5f;
             // Arcade air: layups are a small hop, dunks soar (over the rim for big
-            // dunkers) — the leap scales with the Dunk stat. Launched against the
-            // softened finish gravity so it floats up slowly to the rim.
-            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * (gravity * finishGravityScale) * FinishJumpHeight());
+            // dunkers) — the apex still scales with the Dunk stat. But the player
+            // leaves the floor at the SAME rise speed as a jump shot, then gravity
+            // is softened per-finish (the taller the leap, the floatier) so they
+            // still reach exactly that apex. Matching the takeoff velocity keeps the
+            // rise off the floor consistent with a jump shot instead of a separate,
+            // floatier finish takeoff.
+            float riseSpeed = ShotTakeoffVelocity();
+            float apex = FinishJumpHeight();
+            // g needed to top out at `apex` from `riseSpeed`: apex = v^2 / (2g).
+            float gNeeded = (riseSpeed * riseSpeed) / (2f * Mathf.Max(0.01f, apex));
+            _finishGravityScale = Mathf.Clamp(gNeeded / -gravity, 0.1f, 1f);
+            if (_cc.isGrounded) _verticalVelocity = riseSpeed;
         }
+
+        /// <summary>The vertical velocity a jump shot leaves the floor with — the
+        /// reference "rise speed" that dunks and layups also take off at.</summary>
+        float ShotTakeoffVelocity() => Mathf.Sqrt(-2f * (gravity * shotGravityScale) * shotJumpHeight);
 
         float FinishJumpHeight()
         {

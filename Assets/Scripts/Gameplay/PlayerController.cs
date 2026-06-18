@@ -335,6 +335,11 @@ namespace MarioBasketball.Gameplay
         /// with the ball.</summary>
         public float FinishSlamProgress01 =>
             _finishSlamming ? 1f - Mathf.Clamp01(_finishSlamTimer / Mathf.Max(0.01f, finishSlamTime)) : 0f;
+        /// <summary>How far through the up-leap a finisher is: 0 at takeoff, 1 at the
+        /// top (and through the slam). Drives the gather→extend of a two-hand dunk —
+        /// the ball is cradled low off the floor and reached overhead at the rim.</summary>
+        public float FinishRiseProgress01 =>
+            Mathf.Clamp01(1f - _verticalVelocity / Mathf.Max(0.01f, ShotTakeoffVelocity()));
         /// <summary>How the current finish looks (layup / one-foot dunk / slam).</summary>
         public FinishStyle CurrentFinishStyle => _finishStyle;
         /// <summary>This finish leaves off one foot (layups and the one-foot dunks).</summary>

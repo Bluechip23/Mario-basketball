@@ -278,6 +278,16 @@ namespace MarioBasketball.Presentation
                     SetX(_legL, -45f); SetX(_kneeL, 80f);
                 }
             }
+            else if (_pc.IsFinishing && _pc.IsAirborne)
+            {
+                // Two-foot takeoff: both legs rise together (no running counter-
+                // swing), trailing slightly and tucking up as the player gathers to
+                // the rim. They stay matched the whole way up.
+                float rp = _pc.FinishRiseProgress01;
+                float tuck = Mathf.Lerp(8f, 52f, rp);
+                SetX(_legL, -10f); SetX(_legR, -10f);
+                SetX(_kneeL, tuck); SetX(_kneeR, tuck);
+            }
 
             // Post-shot footwork. The power drop step / drop step jump-stops: the
             // lead leg swings hard toward the basket on the gather, the player sinks
@@ -389,10 +399,16 @@ namespace MarioBasketball.Presentation
             }
             else if (_pc.IsFinishing)
             {
-                // Two-hand flush (one-foot two-hand, or the gather slam): both arms
-                // drive the ball up and over the rim.
-                Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
-                Pose(_armL, _elbowL, _wristL, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
+                // Two-hand dunk (the two-foot gather slam, or two-hand off one foot):
+                // gather the ball in both hands off the floor and EXTEND it overhead
+                // as you rise to the rim — not held up the whole way. The wrists stay
+                // neutral until the slam drives the ball down through the rim.
+                float rp = _pc.FinishRiseProgress01;
+                float arm = Mathf.Lerp(holdArmDegrees, dunkArmDegrees, rp);
+                float elb = Mathf.Lerp(holdElbowDegrees, dunkElbowDegrees, rp);
+                float wr = Mathf.Lerp(holdWristDegrees, 0f, rp);
+                Pose(_armR, _elbowR, _wristR, arm, elb, wr);
+                Pose(_armL, _elbowL, _wristL, arm, elb, wr);
             }
             else if (_pc.IsDribblingBall || _pc.IsDribbleMoveGesture)
             {

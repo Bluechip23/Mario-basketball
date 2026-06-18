@@ -565,8 +565,8 @@ namespace MarioBasketball.Bootstrap
             // level — a flatter, more in-the-action angle (NBA Street eye line)
             // rather than looking down on the floor.
             rig.sideX = -(courtWidth / 2f + 5f);
-            rig.height = 4.6f;
-            rig.lookHeight = 1.85f;
+            rig.height = 5.2f;
+            rig.lookHeight = 1.7f;
             rig.fieldOfView = 50f;
             rig.zRange = courtLength / 2f - 6f;
             rig.target = target;

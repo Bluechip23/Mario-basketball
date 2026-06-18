@@ -68,9 +68,9 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Auto-release this long after the apex if the button is still held.")]
         public float shotAutoReleaseAfterApex = 0.45f;
         [Tooltip("Jump shots float: gravity is softened to this fraction while a jump shot is in the air, so the shooter hangs — the shot plays out more smoothly and there's more time to time the release (it stops feeling fast-forwarded).")]
-        [Range(0.3f, 1f)] public float shotGravityScale = 0.6f;
+        [Range(0.3f, 1f)] public float shotGravityScale = 0.45f;
         [Tooltip("Jump-shot leap height (m) — a touch higher than a normal jump so the shooter elevates and hangs into the release.")]
-        public float shotJumpHeight = 1.6f;
+        public float shotJumpHeight = 1.7f;
         [Tooltip("Catch-and-shoot window for the quick-catch shooter trait.")]
         public float quickCatchWindow = 0.3f;
         [Tooltip("Window to shoot off a Playmaker's pass for the +2 assist bonus.")]
@@ -113,6 +113,8 @@ namespace MarioBasketball.Gameplay
         public float finishFlightTime = 0.32f;
         [Tooltip("How long a dunk grabs the rim and hangs (the two-hand slam hangs longer).")]
         public float dunkHangTime = 0.3f;
+        [Tooltip("Finishes float: gravity is softened to this fraction while up for a dunk/layup, so the player rises slowly and clearly elevates with the ball to the rim (instead of a fast pop) — and has time to air-adjust.")]
+        [Range(0.3f, 1f)] public float finishGravityScale = 0.55f;
         [Tooltip("Layup hop height (m) — gets up off the floor enough to finish at/above the rim, arcade style.")]
         public float layupJumpHeight = 1.4f;
         [Tooltip("Dunk leap height (m) at Dunk 10 — arcade air, soaring over the rim. Scales up from the normal jump by the Dunk stat.")]
@@ -234,11 +236,13 @@ namespace MarioBasketball.Gameplay
                 }
                 if (IsFinishing)
                 {
-                    // Carry the ball up overhead as you rise to the rim: a dunk
-                    // brings it up high to throw down (so it travels down through
-                    // the rim), a layup extends it up off the glass.
-                    float up = _finishIsDunk ? 0.98f : 0.86f;
-                    float fwd = _finishIsDunk ? 0.10f : 0.16f;
+                    // Bring the ball up from the gather to overhead *as the player
+                    // rises*, so it elevates with them to the rim instead of
+                    // snapping up: a dunk goes high to throw down, a layup extends
+                    // up off the glass.
+                    float k = Mathf.Clamp01(_finishTimer / 0.3f);
+                    float up = Mathf.Lerp(0.5f, _finishIsDunk ? 0.98f : 0.86f, k);
+                    float fwd = Mathf.Lerp(0.18f, _finishIsDunk ? 0.10f : 0.16f, k);
                     return transform.position + transform.forward * (fwd * h) + Vector3.up * (up * h);
                 }
                 if (IsPostShooting)
@@ -738,11 +742,13 @@ namespace MarioBasketball.Gameplay
             PlanarSpeed = horizontal.magnitude;
 
             if (_cc.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
-            // A jump shot floats (softened gravity) so it hangs and is easier to
-            // time. Skying for an oop: rise normally, then soften on the way down
-            // so the player hangs above the rim while the lob arrives.
+            // A jump shot and a dunk/layup both float (softened gravity) so the
+            // player hangs — the shot is easier to time and the finish clearly
+            // elevates to the rim with the ball. Skying for an oop: rise normally,
+            // then soften on the way down so the player hangs while the lob arrives.
             float g = gravity;
             if (_shooting) g = gravity * shotGravityScale;
+            else if (_finishing) g = gravity * finishGravityScale;
             else if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
             _verticalVelocity += g * dt;
 
@@ -893,8 +899,9 @@ namespace MarioBasketball.Gameplay
             _finishStyle = PickFinishStyle(_finishIsDunk);
             _finishTakeoffLeft = Random.value < 0.5f;
             // Arcade air: layups are a small hop, dunks soar (over the rim for big
-            // dunkers) — the leap scales with the Dunk stat.
-            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * FinishJumpHeight());
+            // dunkers) — the leap scales with the Dunk stat. Launched against the
+            // softened finish gravity so it floats up slowly to the rim.
+            if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * (gravity * finishGravityScale) * FinishJumpHeight());
         }
 
         float FinishJumpHeight()

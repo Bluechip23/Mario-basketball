@@ -227,6 +227,13 @@ namespace MarioBasketball.Gameplay
             }
         }
 
+        Transform _modelTf;
+        // Carried-ball offsets are built from the MODEL's facing (the body the
+        // animator turns), not the controller transform — so the ball stays in the
+        // hand when the body whips sideways for a hook / turnaround / spin.
+        Vector3 MFwd => _modelTf != null ? _modelTf.forward : transform.forward;
+        Vector3 MRight => _modelTf != null ? _modelTf.right : transform.right;
+
         /// <summary>Where a gathered (non-dribbled) ball is carried. During a
         /// jump shot it rises with the meter from the chest gather to an
         /// overhead set point (so the shot releases above the head, matching the
@@ -240,8 +247,8 @@ namespace MarioBasketball.Gameplay
                 if (IsShooting)
                 {
                     float k = Mathf.Clamp01(ShotChargeFraction / Mathf.Max(0.01f, ShotPerfectFraction));
-                    Vector3 gather = transform.position + transform.forward * (0.24f * h) + Vector3.up * (0.10f * h);
-                    Vector3 set = transform.position + transform.forward * (0.10f * h) + Vector3.up * (0.62f * h);
+                    Vector3 gather = transform.position + MFwd * (0.24f * h) + Vector3.up * (0.10f * h);
+                    Vector3 set = transform.position + MFwd * (0.10f * h) + Vector3.up * (0.62f * h);
                     return Vector3.Lerp(gather, set, k);
                 }
                 if (IsFinishing)
@@ -253,7 +260,7 @@ namespace MarioBasketball.Gameplay
                     float k = FinishRiseProgress01;
                     float up = Mathf.Lerp(0.5f, _finishIsDunk ? 0.98f : 0.86f, k);
                     float fwd = Mathf.Lerp(0.18f, _finishIsDunk ? 0.10f : 0.16f, k);
-                    Vector3 hand = transform.position + transform.forward * (fwd * h) + Vector3.up * (up * h);
+                    Vector3 hand = transform.position + MFwd * (fwd * h) + Vector3.up * (up * h);
 
                     // Slam phase: the hand drives the ball the last stretch down
                     // into the rim — it stays in the hand and only lets go once
@@ -278,19 +285,19 @@ namespace MarioBasketball.Gameplay
                     {
                         // Hook: the ball rides up in the shooting hand, out to the
                         // side and arcing high over the head (not straight up).
-                        Vector3 low = transform.position + transform.right * (0.34f * h) + Vector3.up * (0.40f * h);
-                        Vector3 high = transform.position + transform.right * (0.16f * h) + Vector3.up * (0.98f * h);
+                        Vector3 low = transform.position + MRight * (0.34f * h) + Vector3.up * (0.40f * h);
+                        Vector3 high = transform.position + MRight * (0.16f * h) + Vector3.up * (0.98f * h);
                         return Vector3.Lerp(low, high, k);
                     }
                     // Power drop step / spin / up-and-under: gather low off the
                     // jump-stop, then drive the ball straight up to the rim.
-                    Vector3 gather = transform.position + transform.forward * (-0.12f * h) + Vector3.up * (0.26f * h);
+                    Vector3 gather = transform.position + MFwd * (-0.12f * h) + Vector3.up * (0.26f * h);
                     Vector3 set = transform.position + Vector3.up * (0.70f * h);
                     return Vector3.Lerp(gather, set, k);
                 }
                 // Snagged a board in the air — the ball is up in the raised hands.
                 if (IsAirborne)
-                    return transform.position + transform.forward * (0.12f * h) + Vector3.up * (0.72f * h);
+                    return transform.position + MFwd * (0.12f * h) + Vector3.up * (0.72f * h);
                 return BallHoldPoint;
             }
         }
@@ -463,6 +470,7 @@ namespace MarioBasketball.Gameplay
             _cc = GetComponent<CharacterController>();
             _character = GetComponent<PlayerCharacter>();
             _post = GetComponent<PostUpController>();
+            _modelTf = transform.Find("Model"); // the visual body the animator rotates
             // Time from launch to the top of the (floaty) jump-shot leap = the
             // ideal release point. Computed from the shot's own height/gravity so
             // the timing meter lines up with how long the player actually hangs.
@@ -580,6 +588,10 @@ namespace MarioBasketball.Gameplay
                 _passAim = _input.PassAim;
                 _sprintIntent = _input.SprintHeld;
                 _iconHeld = _input.IconHeld;
+                // Air-adjust: holding LB while up for a dunk/layup contorts the
+                // finish (not just a single press at the right instant) — so you can
+                // hold it through the leap and have it actually take.
+                if (_finishing && _iconHeld) _finishAdjusted = true;
                 HandlePostHold();
             }
 

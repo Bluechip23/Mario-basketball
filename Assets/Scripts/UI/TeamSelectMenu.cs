@@ -358,12 +358,15 @@ namespace MarioBasketball.UI
             y = LayoutTeamBox(ref l.awayBox, l.awaySlots, x, y, colW);
             y += 10f;
 
-            l.switchRect = new Rect(x, y, colW, 30f); y += 36f;
-            l.randomRect = new Rect(x, y, colW, 30f);
-
-            float by = l.rightPanel.yMax - 48f;
+            // Controls, anchored as a clean stack to the bottom of the panel so they
+            // always line up regardless of how tall the squad boxes end up: the
+            // back/start row sits on the floor, with switch + randomize stacked
+            // directly above it.
+            float by = l.rightPanel.yMax - 48f;                 // back / start row
             l.backRect = new Rect(x, by, colW * 0.38f - 4f, 40f);
             l.startRect = new Rect(x + colW * 0.38f + 4f, by, colW * 0.62f - 4f, 40f);
+            l.randomRect = new Rect(x, by - 38f, colW, 30f);
+            l.switchRect = new Rect(x, by - 74f, colW, 30f);
             return l;
         }
 

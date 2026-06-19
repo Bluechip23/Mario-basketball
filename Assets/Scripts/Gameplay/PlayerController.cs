@@ -31,6 +31,10 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Run speed (m/s) at Speed 10 — a burner.")]
         public float maxMoveSpeed = 7.8f;
         public float sprintMultiplier = 1.4f;
+        [Tooltip("Turbo bar drain per second while sprinting. Flat — not affected by any stat yet.")]
+        public float turboDrainPerSec = 0.5f;
+        [Tooltip("Turbo bar recovery per second while not sprinting. Flat — not affected by any stat yet.")]
+        public float turboRegenPerSec = 0.35f;
         public float turnSpeed = 720f;
         public float gravity = -25f;
         public float jumpHeight = 1.4f;
@@ -364,6 +368,9 @@ namespace MarioBasketball.Gameplay
         public bool IconPassActive => _iconHeld && HasBall && !IsPosting && !IsFinishing;
         /// <summary>Physical body height (m), drives rebound reach.</summary>
         public float BodyHeight => _cc != null ? _cc.height : 1.8f;
+        /// <summary>Turbo/boost reserve (0-1). Drains while sprinting, recovers
+        /// otherwise — flat rates, not affected by any stat yet. Drives the HUD bar.</summary>
+        public float Turbo01 => _turbo;
         public bool IsAirborne => _cc != null && !_cc.isGrounded;
         public bool IsDiving => _diveTimer > 0f;
         /// <summary>Current horizontal speed (m/s) — drives the run animation.</summary>
@@ -398,6 +405,8 @@ namespace MarioBasketball.Gameplay
         float _verticalVelocity;
         Vector2 _moveIntent;
         bool _sprintIntent;
+        bool _sprintingNow;
+        float _turbo = 1f;
         float _stealCooldown;
         float _stunTimer;
         float _diveTimer;
@@ -578,6 +587,8 @@ namespace MarioBasketball.Gameplay
             AdvanceShotMeter(dt);
             AdvanceFinish(dt);
             Move();
+            // Turbo bar: burn while sprinting, recover otherwise (flat rates).
+            _turbo = Mathf.Clamp01(_turbo + (_sprintingNow ? -turboDrainPerSec : turboRegenPerSec) * dt);
             UpdateDribbleState();
 
             // Dribbling/driving with the ball puts it into play straight off an
@@ -715,6 +726,7 @@ namespace MarioBasketball.Gameplay
             Vector3 horizontal;
             bool rotateToMove = false;
             Vector3 faceDir = Vector3.zero;
+            _sprintingNow = false; // set true only when actually burning turbo (below)
 
             // Hanging on the rim after a slam: settle onto the rim grip and hold a
             // beat (arms up, hands on the rim), then drop off and fall.
@@ -798,7 +810,8 @@ namespace MarioBasketball.Gameplay
 
                 float speedStat = Effective(StatType.Speed, 5f);
                 float baseSpeed = Mathf.Lerp(minMoveSpeed, maxMoveSpeed, Mathf.Clamp01((speedStat - 1f) / 9f));
-                bool sprinting = _sprintIntent && dir.sqrMagnitude > 0.01f;
+                bool sprinting = _sprintIntent && dir.sqrMagnitude > 0.01f && _turbo > 0.01f;
+                _sprintingNow = sprinting; // burns turbo this frame
                 float speed = baseSpeed * (sprinting ? sprintMultiplier : 1f);
                 if (_dribbleBoostTimer > 0f) speed *= dribbleBoostMult; // separation after a move
                 _character?.ReportActivity(dir.sqrMagnitude > 0.01f, sprinting);

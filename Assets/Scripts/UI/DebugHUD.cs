@@ -15,23 +15,42 @@ namespace MarioBasketball.UI
         GUIStyle _big;
         GUIStyle _mid;
         GUIStyle _small;
+        GUIStyle _score;
+        GUIStyle _centerTop;
+        GUIStyle _centerShot;
+        GUIStyle _head;
+
+        // Team jersey colours (match GameBootstrap HomeColor / AwayColor).
+        static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
+        static readonly Color AwayColor = new Color(0.15f, 0.35f, 0.90f);
+
+        Texture2D _white;
+        Texture2D White
+        {
+            get
+            {
+                if (_white == null) { _white = new Texture2D(1, 1); _white.SetPixel(0, 0, Color.white); _white.Apply(); }
+                return _white;
+            }
+        }
 
         void OnGUI()
         {
             _big ??= new GUIStyle(GUI.skin.label) { fontSize = 32, fontStyle = FontStyle.Bold };
             _mid ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold };
             _small ??= new GUIStyle(GUI.skin.label) { fontSize = 15 };
+            _score ??= new GUIStyle(GUI.skin.label) { fontSize = 36, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _centerTop ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _centerShot ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _centerShot.normal.textColor = new Color(1f, 0.82f, 0.2f);
+            _head ??= new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _head.normal.textColor = Color.white;
 
             var gm = GameManager.Instance;
             if (gm != null)
             {
-                GUI.Label(new Rect(20, 12, 700, 44), $"HOME {gm.HomeScore}   —   AWAY {gm.AwayScore}", _big);
-
-                string clock = gm.Clock != null ? gm.Clock.Display : "0:00";
-                int quarter = gm.Clock != null ? gm.Clock.Quarter : 1;
-                string shot = gm.Shot != null ? gm.Shot.Display : "20";
-                GUI.Label(new Rect(20, 56, 700, 28),
-                    $"Q{quarter}   {clock}   |   Shot {shot}   |   Ball: {gm.Possession}   |   {gm.State}", _mid);
+                DrawScoreboard(gm);
+                GUI.Label(new Rect(20, 56, 480, 24), $"Ball: {gm.Possession}   |   {gm.State}", _small);
 
                 string homePen = gm.Home.InPenalty ? "(PEN)" : "";
                 string awayPen = gm.Away.InPenalty ? "(PEN)" : "";
@@ -94,6 +113,103 @@ namespace MarioBasketball.UI
                     }
                 }
             }
+        }
+
+        // Centred scoreboard: [head][turbo] HOME · Q/time + shot clock · AWAY [turbo][head].
+        void DrawScoreboard(GameManager gm)
+        {
+            const float headSize = 50f, turboW = 120f, turboH = 14f, scoreW = 64f, centerW = 150f, gap = 8f;
+            float panelW = headSize * 2f + turboW * 2f + scoreW * 2f + centerW + gap * 6f;
+            float x = (Screen.width - panelW) / 2f;
+            float y = 10f;
+            const float rowH = 64f;
+
+            Fill(new Rect(x - 14f, y - 6f, panelW + 28f, rowH + 12f), new Color(0f, 0f, 0f, 0.55f));
+
+            PlayerController home = Featured(gm, TeamSide.Home);
+            PlayerController away = Featured(gm, TeamSide.Away);
+
+            string clock = gm.Clock != null ? gm.Clock.Display : "0:00";
+            int quarter = gm.Clock != null ? gm.Clock.Quarter : 1;
+            string shot = gm.Shot != null ? gm.Shot.Display : "20";
+
+            float cx = x;
+            DrawHead(new Rect(cx, y + (rowH - headSize) / 2f, headSize, headSize), home, HomeColor); cx += headSize + gap;
+            DrawTurbo(new Rect(cx, y + (rowH - turboH) / 2f, turboW, turboH), home, fillTowardLeft: true); cx += turboW + gap;
+            GUI.Label(new Rect(cx, y, scoreW, rowH), gm.HomeScore.ToString(), _score); cx += scoreW + gap;
+
+            GUI.Label(new Rect(cx, y + 4f, centerW, 30f), $"Q{quarter}    {clock}", _centerTop);
+            GUI.Label(new Rect(cx, y + 33f, centerW, 28f), shot, _centerShot); cx += centerW + gap;
+
+            GUI.Label(new Rect(cx, y, scoreW, rowH), gm.AwayScore.ToString(), _score); cx += scoreW + gap;
+            DrawTurbo(new Rect(cx, y + (rowH - turboH) / 2f, turboW, turboH), away, fillTowardLeft: false); cx += turboW + gap;
+            DrawHead(new Rect(cx, y + (rowH - headSize) / 2f, headSize, headSize), away, AwayColor);
+        }
+
+        /// <summary>Whose turbo to show for a team: the ball handler if they have it,
+        /// else the controlled human, else the teammate nearest the ball.</summary>
+        static PlayerController Featured(GameManager gm, TeamSide side)
+        {
+            var holder = gm.ball != null ? gm.ball.Holder : null;
+            if (holder != null && holder.team == side) return holder;
+            if (gm.humanPlayer != null && gm.humanPlayer.team == side && gm.humanPlayer.enabled) return gm.humanPlayer;
+
+            Vector3 ballPos = gm.ball != null ? gm.ball.transform.position : Vector3.zero;
+            PlayerController best = null; float bestD = Mathf.Infinity;
+            foreach (var p in gm.TeamFor(side).onCourt)
+            {
+                if (p == null || !p.enabled) continue;
+                float d = Vector3.Distance(p.transform.position, ballPos);
+                if (d < bestD) { bestD = d; best = p; }
+            }
+            return best;
+        }
+
+        void DrawHead(Rect r, PlayerController p, Color teamColor)
+        {
+            Fill(r, teamColor);
+            DrawBorder(r, Color.white, 2f);
+            if (p != null && p.Character != null)
+                GUI.Label(r, Initials(p.Character.stats.characterName), _head);
+        }
+
+        void DrawTurbo(Rect r, PlayerController p, bool fillTowardLeft)
+        {
+            Fill(r, new Color(0.08f, 0.08f, 0.10f, 0.9f)); // track
+            float t = p != null ? Mathf.Clamp01(p.Turbo01) : 0f;
+            // Amber when full, fading to red as it empties.
+            Color c = Color.Lerp(new Color(0.9f, 0.25f, 0.1f), new Color(1f, 0.85f, 0.15f), t);
+            float w = r.width * t;
+            // Bars grow toward each team's head (on the outside): home fills leftward,
+            // away rightward.
+            Rect fill = fillTowardLeft ? new Rect(r.xMax - w, r.y, w, r.height) : new Rect(r.x, r.y, w, r.height);
+            Fill(fill, c);
+            DrawBorder(r, new Color(1f, 1f, 1f, 0.6f), 1f);
+        }
+
+        void Fill(Rect r, Color c)
+        {
+            Color old = GUI.color;
+            GUI.color = c;
+            GUI.DrawTexture(r, White);
+            GUI.color = old;
+        }
+
+        void DrawBorder(Rect r, Color c, float t)
+        {
+            Fill(new Rect(r.x, r.y, r.width, t), c);
+            Fill(new Rect(r.x, r.yMax - t, r.width, t), c);
+            Fill(new Rect(r.x, r.y, t, r.height), c);
+            Fill(new Rect(r.xMax - t, r.y, t, r.height), c);
+        }
+
+        static string Initials(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "?";
+            var parts = name.Split(' ');
+            if (parts.Length >= 2 && parts[0].Length > 0 && parts[1].Length > 0)
+                return ("" + parts[0][0] + parts[1][0]).ToUpper();
+            return name.Substring(0, Mathf.Min(2, name.Length)).ToUpper();
         }
 
         // LB held: label the on-court teammates with the face button that passes to them.

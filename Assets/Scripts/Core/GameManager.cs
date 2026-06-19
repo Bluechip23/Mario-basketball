@@ -203,8 +203,10 @@ namespace MarioBasketball.Core
         /// blocked attempt still counts as a miss.</summary>
         public void RecordShotAttempt(PlayerController shooter, int points) => Box.AddFieldGoalAttempt(shooter, points);
 
-        /// <summary>Record a blocked shot for <paramref name="blocker"/> and buzz
-        /// their controller if a human is driving them.</summary>
+        /// <summary>Record a <b>blocked shot</b> for <paramref name="blocker"/> and
+        /// buzz their controller if a human is driving them. Blocks are credited
+        /// for shots ONLY — call this exclusively from shot resolution (jump shot,
+        /// inside finish, post shot). Never for a strip/poke (that's a steal).</summary>
         public void RecordBlock(PlayerController blocker)
         {
             if (blocker == null) return;
@@ -212,11 +214,14 @@ namespace MarioBasketball.Core
             if (blocker.isHuman) Haptics.Play(Haptics.Cue.Block);
         }
 
-        /// <summary>Record a steal/strip for <paramref name="thief"/> and buzz a
-        /// human controller.</summary>
+        /// <summary>Record a <b>steal</b> for <paramref name="thief"/> and buzz a
+        /// human controller. A steal is only credited when the thief actually came
+        /// away with the ball off an opponent (a strip/poke, a forced post turnover,
+        /// or a picked-off pass) — guarded here so a block or a loose ball can never
+        /// leak in as a steal.</summary>
         public void RecordSteal(PlayerController thief)
         {
-            if (thief == null) return;
+            if (thief == null || ball == null || ball.Holder != thief) return;
             Box.AddSteal(thief);
             BeginFastBreak(thief.team); // take off the other way
             if (thief.isHuman) Haptics.Play(Haptics.Cue.Steal);

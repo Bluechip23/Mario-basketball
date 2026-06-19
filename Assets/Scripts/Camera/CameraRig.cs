@@ -32,7 +32,7 @@ namespace MarioBasketball.CameraControl
         [Tooltip("Sideways shift (m) off the straight-behind line, for a slight over-the-shoulder 3/4 look. 0 = dead centre.")]
         public float lateralOffset = 0f;
         [Tooltip("Orbit the camera around the ball, away from straight-behind toward the sideline. 0 = directly behind (down-court); 90 = side-on (the old sideline view). ~45 sits halfway, a 3/4 angle.")]
-        public float orbitDegrees = 45f;
+        public float orbitDegrees = 65f;
         [Tooltip("How far ahead of the ball (m, down-court) the camera aims, so the offense and hoop sit in frame.")]
         public float lookAhead = 3f;
         [Tooltip("Height of the look-at point (m) — keeps the horizon stable.")]

@@ -106,7 +106,7 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Minimum air time before a finish can release — you always leave the floor and rise toward the rim first.")]
         public float finishMinAirTime = 0.22f;
         [Tooltip("Once you've driven this close to the rim (and reached the top of the leap) the finish slams right at the basket. Roomy enough that a body driving in reliably registers 'at the rim' and dunks, instead of stalling just outside it.")]
-        public float finishReleaseDistance = 0.8f;
+        public float finishReleaseDistance = 0.7f;
         [Tooltip("How hard you attack the rim on a finish (m/s toward the hoop).")]
         public float finishApproachSpeed = 7f;
         [Tooltip("Flight time of a layup once it leaves the hand at the rim — a soft drop off the glass.")]
@@ -243,10 +243,10 @@ namespace MarioBasketball.Gameplay
                 if (IsFinishing)
                 {
                     // Bring the ball up from the gather to overhead *as the player
-                    // rises*, so it elevates with them to the rim instead of
-                    // snapping up: a dunk goes high to throw down, a layup extends
-                    // up off the glass.
-                    float k = Mathf.Clamp01(_finishTimer / 0.3f);
+                    // rises*, tracking the SAME rise progress the arms use
+                    // (FinishRiseProgress01) so the ball stays glued to the hands
+                    // instead of racing ahead of them on the way up.
+                    float k = FinishRiseProgress01;
                     float up = Mathf.Lerp(0.5f, _finishIsDunk ? 0.98f : 0.86f, k);
                     float fwd = Mathf.Lerp(0.18f, _finishIsDunk ? 0.10f : 0.16f, k);
                     Vector3 hand = transform.position + transform.forward * (fwd * h) + Vector3.up * (up * h);

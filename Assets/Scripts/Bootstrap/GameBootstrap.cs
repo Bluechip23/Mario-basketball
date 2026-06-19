@@ -629,7 +629,8 @@ namespace MarioBasketball.Bootstrap
             // zoomed out from the reference shot — tune distanceBehind / fieldOfView.
             rig.distanceBehind = 8.5f;
             rig.height = 3.4f;
-            rig.lateralOffset = 1.5f;
+            rig.lateralOffset = 0f;
+            rig.orbitDegrees = 45f;   // 3/4 angle: halfway between dead-behind and the old sideline view
             rig.lookAhead = 3f;
             rig.lookHeight = 1.2f;
             rig.fieldOfView = 46f;

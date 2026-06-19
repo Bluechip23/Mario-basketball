@@ -105,8 +105,8 @@ namespace MarioBasketball.Gameplay
         public float finishAirTime = 0.95f;
         [Tooltip("Minimum air time before a finish can release — you always leave the floor and rise toward the rim first.")]
         public float finishMinAirTime = 0.22f;
-        [Tooltip("Once you've driven this close to the rim (and reached the top of the leap) the finish releases right at the basket — small, so you sky all the way up to the rim before the ball leaves your hands.")]
-        public float finishReleaseDistance = 0.6f;
+        [Tooltip("Once you've driven this close to the rim (and reached the top of the leap) the finish slams right at the basket. Roomy enough that a body driving in reliably registers 'at the rim' and dunks, instead of stalling just outside it.")]
+        public float finishReleaseDistance = 0.8f;
         [Tooltip("How hard you attack the rim on a finish (m/s toward the hoop).")]
         public float finishApproachSpeed = 7f;
         [Tooltip("Flight time of a layup once it leaves the hand at the rim — a soft drop off the glass.")]
@@ -677,9 +677,12 @@ namespace MarioBasketball.Gameplay
             }
             else if (_finishTimer >= finishAirTime)
             {
-                // Late cap: never made it to the rim (contested / cut off) — just
-                // release from here rather than dragging the ball to the rim.
-                ResolveFinish();
+                // Time's up before we cleanly reached the rim+apex (e.g. cut off):
+                // finish AT the rim anyway — drive the still-held ball down into the
+                // hoop. We never throw it loose in mid-air; the ball only leaves the
+                // hand at the basket (the make/block roll still happens there).
+                _finishSlamming = true;
+                _finishSlamTimer = finishSlamTime;
             }
         }
 

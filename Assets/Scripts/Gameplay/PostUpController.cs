@@ -79,10 +79,10 @@ namespace MarioBasketball.Gameplay
         public float shimmyFreeze = 0.45f;
 
         [Header("Post shot timing (only the shot is timed; the footwork is not)")]
-        [Tooltip("Seconds from starting the shot to its ideal release point.")]
-        public float postShotPerfectTime = 0.5f;
+        [Tooltip("Seconds from starting the shot to its ideal release point. Kept short so post moves snap off quickly instead of dragging.")]
+        public float postShotPerfectTime = 0.32f;
         [Tooltip("Auto-release this long after the perfect point if the player never releases (a late, mistimed shot).")]
-        public float postShotAutoReleaseAfter = 0.35f;
+        public float postShotAutoReleaseAfter = 0.28f;
         [Tooltip("Release within this many seconds of the perfect point for a perfect shot.")]
         public float postPerfectWindow = 0.08f;
         [Tooltip("Make% multiplier lost per second of mistiming beyond the window.")]

@@ -84,6 +84,8 @@ namespace MarioBasketball.Presentation
 
         [Header("Misc")]
         public float poseLerp = 13f;
+        [Tooltip("How fast the body whips into a post-shot turn (hook / turnaround / drop step). Higher than poseLerp so the turn lands before the quick release, instead of lagging behind it.")]
+        public float postTurnLerp = 30f;
         public float fallAngle = 80f;
         [Tooltip("Body lean (degrees) at a full fadeaway jump shot.")]
         public float fadeLeanAngle = 24f;
@@ -100,7 +102,7 @@ namespace MarioBasketball.Presentation
 
         [Header("Post shot form")]
         [Tooltip("How far (deg) the body turns sideways to the rim on a hook shot.")]
-        public float hookBodyTurn = 62f;
+        public float hookBodyTurn = 95f;
         [Tooltip("Off-arm shoulder raise while barring out space on a hook.")]
         public float hookGuardArmDegrees = -72f;
         [Tooltip("Off-arm elbow bend (≈90°) while barring out space on a hook.")]
@@ -214,7 +216,10 @@ namespace MarioBasketball.Presentation
                         want = Quaternion.Euler(runLeanAngle * Mathf.Clamp01(_pc.PlanarSpeed / 7f), 0f, 0f);
                     }
                     else want = Quaternion.identity;
-                    _model.localRotation = Quaternion.Slerp(_model.localRotation, want, poseLerp * Time.deltaTime);
+                    // Post shots whip into their turn fast so the body is squared up
+                    // for the release instead of still rotating behind it.
+                    float turnRate = _pc.IsPostShooting ? postTurnLerp : poseLerp;
+                    _model.localRotation = Quaternion.Slerp(_model.localRotation, want, turnRate * Time.deltaTime);
                 }
             }
             if (_pc.IsFallen) return;

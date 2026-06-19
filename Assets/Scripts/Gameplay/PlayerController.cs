@@ -588,6 +588,10 @@ namespace MarioBasketball.Gameplay
                 _passAim = _input.PassAim;
                 _sprintIntent = _input.SprintHeld;
                 _iconHeld = _input.IconHeld;
+                // Air-adjust: holding LB while up for a dunk/layup contorts the
+                // finish (not just a single press at the right instant) — so you can
+                // hold it through the leap and have it actually take.
+                if (_finishing && _iconHeld) _finishAdjusted = true;
                 HandlePostHold();
             }
 

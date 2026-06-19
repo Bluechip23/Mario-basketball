@@ -456,6 +456,20 @@ namespace MarioBasketball.Bootstrap
             var root = new GameObject(label);
             root.transform.position = basePos;
 
+            // Cosmetic-only piece (collider stripped) parented under the hoop, so the
+            // structural dressing never interferes with shot/rim physics.
+            GameObject Deco(PrimitiveType type, Vector3 lp, Vector3 ls, Color col, string nm)
+            {
+                var g = GameObject.CreatePrimitive(type);
+                g.name = nm;
+                g.transform.SetParent(root.transform);
+                g.transform.localPosition = lp;
+                g.transform.localScale = ls;
+                var c = g.GetComponent<Collider>(); if (c != null) Destroy(c);
+                Tint(g, col);
+                return g;
+            }
+
             var board = GameObject.CreatePrimitive(PrimitiveType.Cube);
             board.name = "Backboard";
             board.transform.SetParent(root.transform);
@@ -473,8 +487,25 @@ namespace MarioBasketball.Bootstrap
             rim.transform.SetParent(root.transform);
             rim.transform.localPosition = rimCentre;
             rim.transform.localScale = new Vector3(rimRadius * 2f, 0.03f, rimRadius * 2f);
-            Tint(rim, new Color(0.95f, 0.45f, 0.1f));
             Destroy(rim.GetComponent<Collider>());
+            // Render the rim as an open ring (a tube of short segments) instead of a
+            // solid orange disc — you can see the ball drop through, like a real hoop.
+            // The cylinder itself stays (invisible) only as the AimPoint anchor.
+            Color rimColor = new Color(0.95f, 0.32f, 0.12f);
+            rim.GetComponent<MeshRenderer>().enabled = false;
+            const int ringSegments = 24;
+            for (int i = 0; i < ringSegments; i++)
+            {
+                float a = (i + 0.5f) / ringSegments * Mathf.PI * 2f;
+                var seg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                seg.name = "RimRing";
+                seg.transform.SetParent(root.transform);
+                seg.transform.localPosition = rimCentre + new Vector3(Mathf.Cos(a) * rimRadius, 0f, Mathf.Sin(a) * rimRadius);
+                seg.transform.localRotation = Quaternion.FromToRotation(Vector3.up, new Vector3(-Mathf.Sin(a), 0f, Mathf.Cos(a)));
+                seg.transform.localScale = new Vector3(0.045f, 0.05f, 0.045f);
+                var sc = seg.GetComponent<Collider>(); if (sc != null) Destroy(sc);
+                Tint(seg, rimColor);
+            }
 
             const int rimSegments = 10;
             for (int i = 0; i < rimSegments; i++)
@@ -515,6 +546,38 @@ namespace MarioBasketball.Bootstrap
             zoneCol.radius = 0.17f;
             zoneCol.isTrigger = true;
             zoneGo.AddComponent<ScoreZone>();
+
+            // ---- Mounting structure (cosmetic) so the hoop reads as a real,
+            // pole-mounted backboard instead of a floating board. ----
+            Color steel = new Color(0.30f, 0.32f, 0.36f);
+            Color frame = new Color(0.16f, 0.16f, 0.18f);
+            Color square = new Color(0.85f, 0.20f, 0.12f);
+            float boardY = rimHeight + 0.55f;     // backboard centre height
+            float faceFront = -0.50f * faceZ;     // court-facing surface of the board
+
+            // Support pole behind the baseline, with two arms reaching out to the board.
+            float poleTop = boardY + 0.70f;       // up to the top edge of the board
+            Deco(PrimitiveType.Cylinder, new Vector3(0f, poleTop / 2f, -1.05f * faceZ),
+                 new Vector3(0.14f, poleTop / 2f, 0.14f), steel, "Pole");
+            Deco(PrimitiveType.Cube, new Vector3(0f, boardY + 0.40f, -0.80f * faceZ), new Vector3(0.09f, 0.09f, 0.55f), steel, "MountArm");
+            Deco(PrimitiveType.Cube, new Vector3(0f, boardY - 0.40f, -0.80f * faceZ), new Vector3(0.09f, 0.09f, 0.55f), steel, "MountArm");
+
+            // Backboard trim around the edge.
+            Deco(PrimitiveType.Cube, new Vector3(0f, boardY + 0.70f, faceFront), new Vector3(2.42f, 0.08f, 0.06f), frame, "BoardFrame");
+            Deco(PrimitiveType.Cube, new Vector3(0f, boardY - 0.70f, faceFront), new Vector3(2.42f, 0.08f, 0.06f), frame, "BoardFrame");
+            Deco(PrimitiveType.Cube, new Vector3(-1.20f, boardY, faceFront), new Vector3(0.08f, 1.40f, 0.06f), frame, "BoardFrame");
+            Deco(PrimitiveType.Cube, new Vector3(1.20f, boardY, faceFront), new Vector3(0.08f, 1.40f, 0.06f), frame, "BoardFrame");
+
+            // Shooter's square above the rim (sits a hair proud of the board face).
+            float sqTop = rimHeight + 0.58f, sqBot = rimHeight + 0.13f, sqW = 0.59f, sqMid = (sqTop + sqBot) / 2f;
+            float sqFront = -0.49f * faceZ;
+            Deco(PrimitiveType.Cube, new Vector3(0f, sqTop, sqFront), new Vector3(sqW + 0.06f, 0.05f, 0.03f), square, "Square");
+            Deco(PrimitiveType.Cube, new Vector3(0f, sqBot, sqFront), new Vector3(sqW + 0.06f, 0.05f, 0.03f), square, "Square");
+            Deco(PrimitiveType.Cube, new Vector3(-sqW / 2f, sqMid, sqFront), new Vector3(0.05f, sqTop - sqBot, 0.03f), square, "Square");
+            Deco(PrimitiveType.Cube, new Vector3(sqW / 2f, sqMid, sqFront), new Vector3(0.05f, sqTop - sqBot, 0.03f), square, "Square");
+
+            // Bracket joining the rim to the board.
+            Deco(PrimitiveType.Cube, new Vector3(0f, rimHeight, -0.34f * faceZ), new Vector3(0.14f, 0.06f, 0.36f), rimColor, "RimBracket");
 
             var hoop = root.AddComponent<Hoop>();
             hoop.attackedBy = team;

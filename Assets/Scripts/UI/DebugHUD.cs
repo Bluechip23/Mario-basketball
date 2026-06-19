@@ -89,7 +89,7 @@ namespace MarioBasketball.UI
 
                     if (humanPc.IsFinishing)
                         GUI.Label(new Rect((Screen.width - 320) / 2f, Screen.height - 232f, 320f, 22f),
-                            "In the air — hold LB to adjust  ·  X pass", _mid);
+                            "In the air — hold LB + stick to steer around the block  ·  X pass", _mid);
 
                     if (humanPc.IsShooting)
                     {

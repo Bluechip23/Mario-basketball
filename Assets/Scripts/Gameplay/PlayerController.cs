@@ -133,6 +133,15 @@ namespace MarioBasketball.Gameplay
         public float contestJumpHeightMax = 2.4f;
         [Tooltip("How fast the slammer settles onto the rim for the hang.")]
         public float hangSettleLerp = 12f;
+        [Header("Air-adjust (hold LB on a finish)")]
+        [Tooltip("Lateral air-control speed (m/s) while adjusting a finish — steer left/right to swing around a shot-blocker and finish from the other side.")]
+        public float finishAirControlSpeed = 4.5f;
+        [Tooltip("While adjusting, the rim is approached this much slower so the steer has room to reposition you (the auto-pull to the rim eases off).")]
+        [Range(0f, 1f)] public float finishAdjustApproachScale = 0.4f;
+        [Tooltip("Extra hang time (s) added to the finish air-time cap while adjusting, so there's room to maneuver before it resolves.")]
+        public float finishAdjustExtraAir = 0.5f;
+        [Tooltip("Gravity multiplier applied on top of the finish float while adjusting (lower = hangs longer to avoid the block).")]
+        [Range(0.3f, 1f)] public float finishAdjustFloat = 0.7f;
         [Tooltip("Effective Dunk at/above this goes up for a dunk; below, a layup.")]
         public float dunkThreshold = 5f;
         [Tooltip("Dunk block resistance per point of Power.")]
@@ -698,7 +707,7 @@ namespace MarioBasketball.Gameplay
                 _finishSlamming = true;
                 _finishSlamTimer = finishSlamTime;
             }
-            else if (_finishTimer >= finishAirTime)
+            else if (_finishTimer >= finishAirTime + (_iconHeld ? finishAdjustExtraAir : 0f))
             {
                 // Time's up before we cleanly reached the rim+apex (e.g. cut off):
                 // finish AT the rim anyway — drive the still-held ball down into the
@@ -784,9 +793,23 @@ namespace MarioBasketball.Gameplay
                 // of sailing past it. Stay squared to the hoop.
                 Vector3 toRim = RimDirection();
                 float d = toRim.magnitude;
-                float approach = d > finishReleaseDistance ? finishApproachSpeed : 0f;
+                bool adjusting = _iconHeld; // LB currently held → live air control
+                // While adjusting, ease off the auto-pull to the rim so the player's
+                // own steer can reposition them around it.
+                float approach = d > finishReleaseDistance
+                    ? finishApproachSpeed * (adjusting ? finishAdjustApproachScale : 1f) : 0f;
                 horizontal = d > 0.01f ? toRim.normalized * approach : Vector3.zero;
                 if (d > 0.01f) { rotateToMove = true; faceDir = toRim.normalized; }
+
+                // Air-adjust steering: hold LB and push the stick to drift laterally
+                // through the air — swing around a shot-blocker and finish from the
+                // other side of the rim.
+                if (adjusting)
+                {
+                    Vector3 steer = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
+                    if (steer.sqrMagnitude > 0.01f)
+                        horizontal += Vector3.ClampMagnitude(steer, 1f) * finishAirControlSpeed;
+                }
                 _character?.ReportActivity(true, false);
             }
             else if (_shooting)
@@ -845,7 +868,7 @@ namespace MarioBasketball.Gameplay
             // then soften on the way down so the player hangs while the lob arrives.
             float g = gravity;
             if (_shooting) g = gravity * shotGravityScale;
-            else if (_finishing) g = gravity * _finishGravityScale;
+            else if (_finishing) g = gravity * _finishGravityScale * (_iconHeld ? finishAdjustFloat : 1f);
             else if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
             _verticalVelocity += g * dt;
 

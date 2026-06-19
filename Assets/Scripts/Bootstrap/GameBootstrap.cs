@@ -630,7 +630,7 @@ namespace MarioBasketball.Bootstrap
             rig.distanceBehind = 8.5f;
             rig.height = 3.4f;
             rig.lateralOffset = 0f;
-            rig.orbitDegrees = 45f;   // 3/4 angle: halfway between dead-behind and the old sideline view
+            rig.orbitDegrees = 65f;   // closer to the old sideline view, still trailing the action
             rig.lookAhead = 3f;
             rig.lookHeight = 1.2f;
             rig.fieldOfView = 46f;

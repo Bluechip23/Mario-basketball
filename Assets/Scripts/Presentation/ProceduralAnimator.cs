@@ -185,17 +185,13 @@ namespace MarioBasketball.Presentation
                         }
                         else want = Quaternion.identity;
                     }
-                    else if (_pc.IsPosting)
-                    {
-                        // Backing your man down: sit into an athletic stance with the
-                        // chest forward over the thighs, not standing bolt upright.
-                        want = Quaternion.Euler(postPosterLean, 0f, 0f);
-                    }
                     else if (_pc.IsPostShooting)
                     {
                         // Each post shot turns the body its own way: a hook turns
                         // sideways to the rim, the turnaround faces up and fades
-                        // back, the power drop step squares up to bury it.
+                        // back, the power drop step squares up to bury it. (Checked
+                        // before the plain posting lean, since IsPosting is still
+                        // true through the shot — otherwise the move never reads.)
                         var move = _pc.CurrentPostMove;
                         float turn =
                             move == PostMove.Hook || move == PostMove.SkyHook ? hookBodyTurn :
@@ -204,6 +200,12 @@ namespace MarioBasketball.Presentation
                             100f; // spin / up-and-under
                         float lean = move == PostMove.TurnaroundJumper ? -fadeLeanAngle : 0f;
                         want = Quaternion.Euler(lean, turn, 0f);
+                    }
+                    else if (_pc.IsPosting)
+                    {
+                        // Backing your man down: sit into an athletic stance with the
+                        // chest forward over the thighs, not standing bolt upright.
+                        want = Quaternion.Euler(postPosterLean, 0f, 0f);
                     }
                     else if (!_pc.IsAirborne && !_pc.IsPosting && !_pc.IsHanging && !_pc.IsSkyingForOop
                              && !_pc.IsFinishing && _pc.PlanarSpeed > 0.6f)

@@ -30,7 +30,9 @@ namespace MarioBasketball.CameraControl
         [Tooltip("Camera height above the floor (m). Low = flatter, in-the-action angle.")]
         public float height = 3.4f;
         [Tooltip("Sideways shift (m) off the straight-behind line, for a slight over-the-shoulder 3/4 look. 0 = dead centre.")]
-        public float lateralOffset = 1.5f;
+        public float lateralOffset = 0f;
+        [Tooltip("Orbit the camera around the ball, away from straight-behind toward the sideline. 0 = directly behind (down-court); 90 = side-on (the old sideline view). ~45 sits halfway, a 3/4 angle.")]
+        public float orbitDegrees = 45f;
         [Tooltip("How far ahead of the ball (m, down-court) the camera aims, so the offense and hoop sit in frame.")]
         public float lookAhead = 3f;
         [Tooltip("Height of the look-at point (m) — keeps the horizon stable.")]
@@ -78,9 +80,12 @@ namespace MarioBasketball.CameraControl
             else return;
 
             Vector3 ground = new Vector3(target.position.x, 0f, target.position.z);
-            Vector3 right = Vector3.Cross(Vector3.up, _forward); // unit, perpendicular to forward
+            // Trail from a direction orbited off straight-behind toward the sideline,
+            // so the view is a 3/4 angle rather than dead behind the action.
+            Vector3 camDir = Quaternion.AngleAxis(orbitDegrees, Vector3.up) * _forward;
+            Vector3 right = Vector3.Cross(Vector3.up, camDir); // unit, perpendicular to the trail dir
 
-            Vector3 desired = ground - _forward * distanceBehind + right * lateralOffset + Vector3.up * height;
+            Vector3 desired = ground - camDir * distanceBehind + right * lateralOffset + Vector3.up * height;
             transform.position = Vector3.Lerp(transform.position, desired, followSmoothing * Time.deltaTime);
 
             Vector3 look = ground + _forward * lookAhead + Vector3.up * lookHeight;

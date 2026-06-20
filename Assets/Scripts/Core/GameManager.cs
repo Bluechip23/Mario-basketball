@@ -602,6 +602,10 @@ namespace MarioBasketball.Core
         /// you can't change personnel while the ball is live.</summary>
         public bool CanSubstitute => State == GameState.Timeout || State == GameState.QuarterBreak;
 
+        /// <summary>True while the substitution menu is open. The timeout / quarter-
+        /// break countdown freezes so picking your subs is never on a clock.</summary>
+        public bool SubMenuOpen { get; set; }
+
         /// <summary>Swap an on-court player for a bench player. Only legal during a
         /// timeout or between quarters (<see cref="CanSubstitute"/>); returns false
         /// if it wasn't allowed or the indices didn't resolve.</summary>
@@ -649,7 +653,8 @@ namespace MarioBasketball.Core
                     break;
 
                 case GameState.Timeout:
-                    if (CountdownDone(dt))
+                    // Hold the clock while the player is choosing subs — no timer.
+                    if (!SubMenuOpen && CountdownDone(dt))
                         BeginInbound(Possession, MidCourtInbound());
                     break;
 
@@ -673,7 +678,7 @@ namespace MarioBasketball.Core
                     break;
 
                 case GameState.QuarterBreak:
-                    if (CountdownDone(dt))
+                    if (!SubMenuOpen && CountdownDone(dt))
                     {
                         Clock.AdvanceQuarter();
                         if (Clock.Quarter == 3) // halftime: team fouls reset

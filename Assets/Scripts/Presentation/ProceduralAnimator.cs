@@ -417,6 +417,17 @@ namespace MarioBasketball.Presentation
                 Pose(_armR, _elbowR, _wristR, arm, elb, wr);
                 Pose(_armL, _elbowL, _wristL, arm, elb, wr);
             }
+            else if (_pc.IsPostFaking)
+            {
+                // Pump fake: snap the ball up toward a shooting set and back down,
+                // both hands going up with it (0 → 1 → 0).
+                float pf = Mathf.Sin(Mathf.PI * _pc.PostFake01);
+                float arm = Mathf.Lerp(holdArmDegrees, -150f, pf);
+                float elb = Mathf.Lerp(holdElbowDegrees, -18f, pf);
+                float wr = Mathf.Lerp(holdWristDegrees, -28f, pf);
+                Pose(_armR, _elbowR, _wristR, arm, elb, wr);
+                Pose(_armL, _elbowL, _wristL, arm, elb, wr);
+            }
             else if (_pc.IsDribblingBall || _pc.IsDribbleMoveGesture)
             {
                 // In phase with the actual ball: 0 = hip contact, 0.5 = floor

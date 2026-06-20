@@ -180,7 +180,7 @@ namespace MarioBasketball.UI
             {
                 ("Shoot jumper (release at the marker)", "X", "Space"),
                 ("Dunk / layup inside (hold)", "X", "Space"),
-                ("Air-adjust a finish", "LB", "C"),
+                ("Air-adjust a finish (hold)", "LT", "Left Shift"),
                 ("Pass — tap = loft, hold = bullet", "A", "E"),
                 ("Aim the pass", "Right stick", "IJKL"),
                 ("Pass to a teammate icon", "Hold LB + A/B", "Hold C + A/B"),
@@ -189,7 +189,8 @@ namespace MarioBasketball.UI
                 ("Dribble flick — step-back / cross", "Right-stick flick", "—"),
                 ("Post up (hold)", "RB", "R"),
                 ("Back down in the post", "RT", "B"),
-                ("Post: hook / drop step / spin / fake", "Y / A / B / LB", "H / G / V / C"),
+                ("Post: hook / drop step / spin / fake", "Y / A / LT-tap / B", "H / G / V / T"),
+                ("Post advanced (hold LT + Y/A)", "sky hook / power step", "Shift + H/G"),
             }),
             ("OFFENSE — OFF BALL", new[]
             {

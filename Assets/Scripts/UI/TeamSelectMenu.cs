@@ -151,6 +151,10 @@ namespace MarioBasketball.UI
             if (_nav.Step != Vector2Int.zero) Navigate(layout, _nav.Step);
             if (_nav.Submit) ActivateFocused(layout);
 
+            // Submitting START / Back disables this menu mid-Update, which runs
+            // OnDisable and nulls _nav. Bail before touching it again this frame.
+            if (!enabled || _nav == null) return;
+
             // Right analog stick free-scrolls the roster (up = scroll up).
             float maxScroll = Mathf.Max(0f, layout.contentHeight - layout.scrollView.height);
             if (Mathf.Abs(_nav.RightStick.y) > 0.2f)

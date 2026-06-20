@@ -20,7 +20,7 @@ namespace MarioBasketball.UI
     {
         string _message;
         float _messageTimer;
-        GUIStyle _style, _title, _col, _btn, _btnSel, _hint;
+        GUIStyle _style, _title, _colStyle, _btn, _btnSel, _hint;
 
         bool _subOpen;
         bool _justOpened;
@@ -196,8 +196,8 @@ namespace MarioBasketball.UI
             float outX = area.x + 20f;
             float inX = area.x + 28f + colW;
 
-            GUI.Label(new Rect(outX, listTop, colW, 22f), "OUT — On court", _col);
-            GUI.Label(new Rect(inX, listTop, colW, 22f), "IN — Bench", _col);
+            GUI.Label(new Rect(outX, listTop, colW, 22f), "OUT — On court", _colStyle);
+            GUI.Label(new Rect(inX, listTop, colW, 22f), "IN — Bench", _colStyle);
             float rowTop = listTop + 26f;
 
             for (int i = 0; i < team.onCourt.Count; i++)
@@ -248,7 +248,7 @@ namespace MarioBasketball.UI
             { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             _title ??= new GUIStyle(GUI.skin.label)
             { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-            _col ??= new GUIStyle(GUI.skin.label)
+            _colStyle ??= new GUIStyle(GUI.skin.label)
             { fontSize = 16, fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.85f, 0.85f, 0.9f) } };
             _btn ??= new GUIStyle(GUI.skin.button) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
             _btnSel ??= new GUIStyle(GUI.skin.button)

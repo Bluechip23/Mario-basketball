@@ -60,6 +60,8 @@ namespace MarioBasketball.Gameplay
         public float spinStripBaseChance = 0.12f;
         public float fakeBiteBaseChance = 0.5f;
         public float fakeWindow = 1.2f;
+        [Tooltip("How long the pump-fake gesture animates (cosmetic — the ball jerks up and back down whether or not the defender bites).")]
+        public float fakeGestureTime = 0.45f;
         public float fakeLeverageBonus = 1.5f;
         public float fakeQualityBonus = 3f;
 
@@ -92,6 +94,11 @@ namespace MarioBasketball.Gameplay
         public bool IsPosting { get; private set; }
         /// <summary>True while a successful fake still has the defender in the air.</summary>
         public bool FakeActive => _fakeActive;
+        /// <summary>True while the pump-fake gesture is animating (cosmetic).</summary>
+        public bool IsFaking => _fakeGestureTimer > 0f;
+        /// <summary>How far through the pump-fake gesture (0-1) — drives the ball/arm pump.</summary>
+        public float FakeGesture01 =>
+            fakeGestureTime > 0.0001f ? Mathf.Clamp01(1f - _fakeGestureTimer / fakeGestureTime) : 0f;
         public float Leverage => _leverage;
         public PlayerController EngagedDefender => _defender;
         public Vector3 DriveVelocity { get; private set; }
@@ -115,6 +122,7 @@ namespace MarioBasketball.Gameplay
         bool _fakeActive;
         float _fakeTimer;
         float _shimmyCooldown;
+        float _fakeGestureTimer;
         float _postShotTimer;
         float _postShotQuality;
         bool _postShotBlockable;
@@ -264,6 +272,7 @@ namespace MarioBasketball.Gameplay
                 if (_fakeTimer <= 0f) _fakeActive = false;
             }
             if (_shimmyCooldown > 0f) _shimmyCooldown -= dt;
+            if (_fakeGestureTimer > 0f) _fakeGestureTimer -= dt;
 
             if (_leverage <= knockdownThreshold) DefenderWins(knockdown: true);
             else if (_leverage <= shoveThreshold) DefenderWins(knockdown: false);
@@ -451,6 +460,7 @@ namespace MarioBasketball.Gameplay
 
         void ResolveFake(float offense, float defense)
         {
+            _fakeGestureTimer = fakeGestureTime; // pump the ball whether or not they bite
             float bite = Mathf.Clamp(fakeBiteBaseChance + 0.05f * (offense - defense), 0.1f, 0.9f);
             if (Random.value < bite)
             {

@@ -150,6 +150,8 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float adjustBlockReduction = 0.4f;
         [Tooltip("Max make% lost to an air-adjust (mitigated by Inside Scoring).")]
         [Range(0f, 1f)] public float maxAdjustPenalty = 0.35f;
+        [Tooltip("In the post, a Left-Trigger press shorter than this (and with no face-button move during it) fires the spin; a longer hold stays the advanced-move (turbo) modifier.")]
+        public float postSpinTapWindow = 0.25f;
 
         [Header("Alley-oop")]
         [Tooltip("A loft to a teammate skying within this of the rim becomes an alley-oop.")]
@@ -304,6 +306,14 @@ namespace MarioBasketball.Gameplay
                     Vector3 set = transform.position + Vector3.up * (0.70f * h);
                     return Vector3.Lerp(gather, set, k);
                 }
+                // Pump fake: jerk the ball up toward a shooting set and back down.
+                if (IsPostFaking)
+                {
+                    float pump = Mathf.Sin(Mathf.PI * PostFake01); // 0 → 1 → 0
+                    Vector3 low = transform.position + MFwd * (0.24f * h) + Vector3.up * (0.30f * h);
+                    Vector3 high = transform.position + MFwd * (0.12f * h) + Vector3.up * (0.66f * h);
+                    return Vector3.Lerp(low, high, pump);
+                }
                 // Snagged a board in the air — the ball is up in the raised hands.
                 if (IsAirborne)
                     return transform.position + MFwd * (0.12f * h) + Vector3.up * (0.72f * h);
@@ -328,7 +338,11 @@ namespace MarioBasketball.Gameplay
         /// <summary>Whether the ball should be bouncing as a live dribble. You keep
         /// your dribble in the post — backing down or posting up does NOT pick the
         /// ball up; it's only gathered when the post shot actually goes up.</summary>
-        public bool IsDribblingBall => HasBall && (_dribbling || (IsPosting && !IsPostShooting));
+        public bool IsDribblingBall => HasBall && (_dribbling || (IsPosting && !IsPostShooting)) && !IsPostFaking;
+        /// <summary>Mid pump-fake in the post (drives the ball/arm pump gesture).</summary>
+        public bool IsPostFaking => _post != null && _post.IsFaking;
+        /// <summary>How far through the post pump-fake (0-1).</summary>
+        public float PostFake01 => _post != null ? _post.FakeGesture01 : 0f;
         /// <summary>Briefly true right after a pass/throw (drives the throw pose).</summary>
         public bool IsPassing => _passGestureTimer > 0f;
         /// <summary>Briefly true while swiping for a steal (drives the swipe pose).</summary>
@@ -453,7 +467,11 @@ namespace MarioBasketball.Gameplay
         Vector3 _hangTarget;
         float _skyTimer;
         Vector2 _passAim;
-        bool _iconHeld;
+        bool _iconHeld;       // LB held — teammate pass icons
+        bool _adjustHeld;     // LT held — air-adjust a finish / spin in the post
+        bool _prevSprintHeld; // for detecting an LT tap (spin) vs a hold (turbo modifier)
+        float _sprintPressTime;
+        bool _sprintMoveConsumed;
         float _dribbleCooldown;
         float _dribbleBoostTimer;
         float _flickCooldown;
@@ -596,11 +614,22 @@ namespace MarioBasketball.Gameplay
                 _moveIntent = CameraRelative(_input.Move);
                 _passAim = _input.PassAim;
                 _sprintIntent = _input.SprintHeld;
-                _iconHeld = _input.IconHeld;
-                // Air-adjust: holding LB while up for a dunk/layup contorts the
-                // finish (not just a single press at the right instant) — so you can
-                // hold it through the leap and have it actually take.
-                if (_finishing && _iconHeld) _finishAdjusted = true;
+                _iconHeld = _input.IconHeld;     // LB — teammate pass icons only
+                _adjustHeld = _input.SprintHeld; // LT
+                // Air-adjust a finish: arm it on a FRESH LT press in the air. Doing
+                // it on the press (not a held LT) means sprinting into the rim with
+                // turbo held doesn't auto-contort every dunk — you tap LT mid-leap to
+                // adjust around a shot-blocker. Once armed it stays for this finish.
+                if (_finishing && _adjustHeld && !_prevSprintHeld) _finishAdjusted = true;
+                // In the post, a quick LT TAP is the spin move; HOLDING LT stays the
+                // advanced-move (turbo) modifier for the face buttons.
+                bool sprintNow = _input.SprintHeld;
+                if (sprintNow && !_prevSprintHeld) { _sprintPressTime = Time.unscaledTime; _sprintMoveConsumed = false; }
+                else if (!sprintNow && _prevSprintHeld && IsPosting && !_sprintMoveConsumed
+                         && Time.unscaledTime - _sprintPressTime <= postSpinTapWindow
+                         && _post != null && !_post.PostShotActive)
+                    TriggerPostMove(PostMove.Spin);
+                _prevSprintHeld = sprintNow;
                 HandlePostHold();
             }
 
@@ -707,7 +736,7 @@ namespace MarioBasketball.Gameplay
                 _finishSlamming = true;
                 _finishSlamTimer = finishSlamTime;
             }
-            else if (_finishTimer >= finishAirTime + (_iconHeld ? finishAdjustExtraAir : 0f))
+            else if (_finishTimer >= finishAirTime + (_finishAdjusted ? finishAdjustExtraAir : 0f))
             {
                 // Time's up before we cleanly reached the rim+apex (e.g. cut off):
                 // finish AT the rim anyway — drive the still-held ball down into the
@@ -793,7 +822,7 @@ namespace MarioBasketball.Gameplay
                 // of sailing past it. Stay squared to the hoop.
                 Vector3 toRim = RimDirection();
                 float d = toRim.magnitude;
-                bool adjusting = _iconHeld; // LB currently held → live air control
+                bool adjusting = _finishAdjusted; // armed by a deliberate LT tap in the air
                 // While adjusting, ease off the auto-pull to the rim so the player's
                 // own steer can reposition them around it.
                 float approach = d > finishReleaseDistance
@@ -868,7 +897,7 @@ namespace MarioBasketball.Gameplay
             // then soften on the way down so the player hangs while the lob arrives.
             float g = gravity;
             if (_shooting) g = gravity * shotGravityScale;
-            else if (_finishing) g = gravity * _finishGravityScale * (_iconHeld ? finishAdjustFloat : 1f);
+            else if (_finishing) g = gravity * _finishGravityScale * (_finishAdjusted ? finishAdjustFloat : 1f);
             else if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
             _verticalVelocity += g * dt;
 
@@ -1543,12 +1572,13 @@ namespace MarioBasketball.Gameplay
         }
 
         /// <summary>The B button: pass-icon select (LB held), dribble move (with
-        /// the ball), or dive for a loose ball.</summary>
+        /// the ball), or dive for a loose ball. (While posting, B is the post Fake,
+        /// handled by <see cref="TriggerFake"/>.)</summary>
         public void TriggerDive()
         {
             if (MatchPause.IsPaused || IsStunned) return;
             if (IconPassActive) { PassToSlot(1); return; }  // LB + B → pass to teammate 2
-            if (IsPosting) return;                          // B is Spin while posting
+            if (IsPosting) return;                          // B is Fake while posting
             if (HasBall) { TriggerDribbleMove(); return; }  // with the ball, it's a dribble move
 
             if (_diveTimer > 0f || !_cc.isGrounded) return;
@@ -1779,18 +1809,20 @@ namespace MarioBasketball.Gameplay
             TriggerPostMove(_sprintIntent ? PostMove.PowerDropStep : PostMove.DropStep);
         }
 
+        // Keyboard spin (V); the gamepad spin is the LT tap handled in Update. Hold
+        // turbo for the turnaround fade.
         void TriggerSpin() => TriggerPostMove(_sprintIntent ? PostMove.TurnaroundJumper : PostMove.Spin);
 
-        // L1: air-adjust while finishing, otherwise the post fake.
-        void TriggerFake()
-        {
-            if (_finishing) { _finishAdjusted = true; return; }
-            TriggerPostMove(PostMove.Fake);
-        }
+        // B while posting — the post fake. (Air-adjust moved to LT; the icon-pass
+        // modifier moved to its own LB action, so B / LB no longer fight the fake.)
+        void TriggerFake() => TriggerPostMove(PostMove.Fake);
 
         public void TriggerPostMove(PostMove move)
         {
             if (MatchPause.IsPaused || IsStunned || !IsPosting) return;
+            // A face-button move performed while LT is held is an advanced (turbo)
+            // move — flag it so releasing LT afterwards isn't also read as a spin tap.
+            if (_sprintIntent) _sprintMoveConsumed = true;
             // Once a move's shot is charging, any post button releases it (timing
             // the shot) rather than starting a new move.
             if (_post.PostShotActive) { _post.ReleasePostShot(); return; }

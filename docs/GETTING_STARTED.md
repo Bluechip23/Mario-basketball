@@ -58,7 +58,7 @@ bindings exist as a fallback.
 | Move | Left stick | WASD |
 | Turbo / speed burst | LT (L2) | Left Shift |
 | **Shoot** — jumper: hold + release at apex; inside: hold to dunk/layup | A (✕) | Space |
-| **Air-adjust** a dunk/layup (or post fake) | LB (L1) | C |
+| **Air-adjust** a dunk/layup (hold through the leap) | LT (L2) | Left Shift |
 | **Pass** — tap: loft (arcs over defenders) · hold: hard (fast, flat) | X (□) | E |
 | **Directed pass** — right stick aims, or **hold LB and press the teammate's button (A/B)** | RStick+X / hold LB then A·B | IJKL+E / hold C then A·B |
 | **Dribble move** (break the defender down) | B (○) with the ball | X |
@@ -70,8 +70,9 @@ bindings exist as a fallback.
 | **Back down** / bump / **push-foul** | RT (R2) | B |
 | Post move — **Hook** | Y (△) | H |
 | Post move — **Drop step** | A (✕) | G |
-| Post move — **Spin** | B (○) | V |
-| Post move — **Fake** | LB (L1) | C |
+| Post move — **Spin** | LT (L2) tap | V |
+| Post move — **Fake** | B (○) | T |
+| Post **advanced** (sky hook / power step / turnaround) | hold LT + Y/A | hold Shift + H/G/V |
 | Timeout (home) | D-pad Up | T |
 | Substitute (home) | D-pad Down | Y |
 | Pause / Stats | Start | Esc |
@@ -84,9 +85,10 @@ throw make% scales with the shooter's Mid Range). Nobody fouls out.
 **Post game:** with the ball, hold **RB** to turn your back to the basket, then
 tap **RT** (Back down) to bulldoze your defender toward the rim — a
 Power-vs-Power tap battle; if they win they shove you off or knock you down.
-With position, hit a post move: **Y** Hook, **A** Drop step, **B** Spin, **LB**
-Fake. You can still **pass out** with **X**. On defense against a poster, mash
-**RT** to bump them off.
+With position, hit a post move: **Y** Hook, **A** Drop step, a quick **LT** tap
+to Spin, **B** Fake. Hold **LT** while pressing a face button for the advanced
+versions (sky hook / power step / turnaround). You can still **pass out** with
+**X**. On defense against a poster, mash **RT** to bump them off.
 
 > Because the buttons are contextual, the same face button does different things
 > by situation (e.g. **A** shoots with the ball, switches on defense, and is the

@@ -47,7 +47,7 @@ the **right stick** scrolls long lists.
 | --- | --- | --- |
 | Shoot jumper (release at the marker) | X | Space |
 | Dunk / layup inside (hold) | X | Space |
-| Air-adjust a finish | LB | C |
+| Air-adjust a finish (hold) | LT | Left Shift |
 | Pass — tap = loft, hold = bullet | A | E |
 | Aim the pass | Right stick | IJKL |
 | Pass to a teammate icon | Hold LB + A/B | Hold C + A/B |
@@ -56,7 +56,8 @@ the **right stick** scrolls long lists.
 | Dribble flick — step-back / crossover | Right-stick flick | — |
 | Post up (hold) | RB | R |
 | Back down in the post | RT | B |
-| Post: hook / drop step / spin / fake | Y / A / B / LB | H / G / V / C |
+| Post: hook / drop step / spin / fake | Y / A / LT-tap / B | H / G / V / T |
+| Post advanced (hold LT + move) | sky hook / power step / turnaround | — |
 
 ### Offense — off the ball
 | Action | Gamepad | Keyboard |

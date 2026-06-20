@@ -490,8 +490,12 @@ namespace MarioBasketball.AI
             if (IsClosestTeammateTo(gm, ball.transform.position))
             {
                 MoveTo(ball.transform.position, sprint: true);
-                // Go up for the board when we're on top of it.
-                if (HDist(transform.position, ball.transform.position) < 1.6f)
+                // Only leave your feet for a ball that's actually up in the air and
+                // close — hopping repeatedly at a low/rolling ball just looks choppy
+                // and knocks you off it. A grounded ball is run down and scooped.
+                float ballAboveReach = ball.transform.position.y
+                                     - (transform.position.y + _pc.BodyHeight * 0.7f);
+                if (ballAboveReach > 0f && HDist(transform.position, ball.transform.position) < 1.5f)
                     _pc.TriggerJump();
             }
             else

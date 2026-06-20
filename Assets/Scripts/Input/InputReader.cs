@@ -21,7 +21,7 @@ namespace MarioBasketball.InputControl
         public Vector2 PassAim { get; private set; }
         public bool SprintHeld { get; private set; }
         public bool PostUpHeld { get; private set; }
-        /// <summary>LB held — bring up teammate pass icons.</summary>
+        /// <summary>LB held — bring up teammate pass icons (passing only).</summary>
         public bool IconHeld { get; private set; }
 
         /// <summary>The right stick was flicked (pushed hard and released within
@@ -61,6 +61,7 @@ namespace MarioBasketball.InputControl
         readonly InputAction _dropStep;
         readonly InputAction _spin;
         readonly InputAction _fake;
+        readonly InputAction _iconPass;
 
         public InputReader()
         {
@@ -112,11 +113,19 @@ namespace MarioBasketball.InputControl
             _dropStep = new InputAction("DropStep", InputActionType.Button, "<Keyboard>/g");
             _dropStep.AddBinding("<Gamepad>/buttonSouth"); // A
 
+            // Spin: keyboard V. On the gamepad it's a quick Left-Trigger tap in the
+            // post (detected in PlayerController) so the trigger stays free to HOLD
+            // as the advanced-move (turbo) modifier the rest of the time.
             _spin = new InputAction("Spin", InputActionType.Button, "<Keyboard>/v");
-            _spin.AddBinding("<Gamepad>/buttonEast"); // B
 
-            _fake = new InputAction("Fake", InputActionType.Button, "<Keyboard>/c");
-            _fake.AddBinding("<Gamepad>/leftShoulder"); // LB
+            _fake = new InputAction("Fake", InputActionType.Button, "<Keyboard>/t");
+            _fake.AddBinding("<Gamepad>/buttonEast"); // B (post fake)
+
+            // Icon-pass modifier: LB (C). Hold it and tap a face button to pass to
+            // that teammate. This is now LB's ONLY job — no more sharing it with the
+            // post fake or the finish air-adjust.
+            _iconPass = new InputAction("IconPass", InputActionType.Button, "<Keyboard>/c");
+            _iconPass.AddBinding("<Gamepad>/leftShoulder"); // LB
 
             _shoot.performed += _ => ShootPressed?.Invoke();
             _shoot.canceled += _ => ShootReleased?.Invoke();
@@ -137,6 +146,7 @@ namespace MarioBasketball.InputControl
             _move.Enable(); _passAim.Enable(); _sprint.Enable(); _postUp.Enable();
             _shoot.Enable(); _pass.Enable(); _jump.Enable(); _steal.Enable(); _dive.Enable();
             _backDown.Enable(); _hook.Enable(); _dropStep.Enable(); _spin.Enable(); _fake.Enable();
+            _iconPass.Enable();
         }
 
         public void Disable()
@@ -144,6 +154,7 @@ namespace MarioBasketball.InputControl
             _move.Disable(); _passAim.Disable(); _sprint.Disable(); _postUp.Disable();
             _shoot.Disable(); _pass.Disable(); _jump.Disable(); _steal.Disable(); _dive.Disable();
             _backDown.Disable(); _hook.Disable(); _dropStep.Disable(); _spin.Disable(); _fake.Disable();
+            _iconPass.Disable();
         }
 
         /// <summary>Sample the continuously-read values. Call once per frame.</summary>
@@ -153,7 +164,7 @@ namespace MarioBasketball.InputControl
             PassAim = _passAim.ReadValue<Vector2>();
             SprintHeld = _sprint.IsPressed();
             PostUpHeld = _postUp.IsPressed();
-            IconHeld = _fake.IsPressed(); // LB / C held = pass-icon modifier
+            IconHeld = _iconPass.IsPressed(); // LB / C held = pass-icon modifier
             DetectFlick();
             DetectTurboDoubleTap();
         }

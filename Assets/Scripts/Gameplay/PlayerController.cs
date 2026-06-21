@@ -186,19 +186,10 @@ namespace MarioBasketball.Gameplay
         public float hesitationWindow = 0.6f;
         [Tooltip("How long the defender freezes when a flick move shakes them (the full ankleStun is reserved for the hesitation cross).")]
         public float flickFreeze = 0.4f;
-
-        [Header("Dribble flick outcome tiers (Ball Handling vs Perimeter Defense)")]
-        [Tooltip("Baseline odds at an even BH-vs-PD matchup (normalized at runtime). Tier 2 (burst, but the D stays attached) is the common case, then tier 1 (blow-by), then tier 3 (stuffed), then tier 4 (stuffed AND the ball comes loose — the rare one).")]
-        public float flickTier1Base = 0.28f;
-        public float flickTier2Base = 0.45f;
-        public float flickTier3Base = 0.20f;
-        public float flickTier4Base = 0.07f;
-        [Tooltip("Per stat point, how hard the Ball Handling − Perimeter Defense gap tilts the flick mix (a handling edge toward the blow-by, a defense edge toward the stuffs). ~0.11 makes a full 9-point gap a near-total tilt.")]
-        public float flickTierStatScale = 0.11f;
-        [Tooltip("How long a stuffed flick (tier 3/4) immobilizes the ball handler before the matchup resets.")]
-        public float flickStuffStun = 0.35f;
-        [Tooltip("Pop force on the ball when a flick is stuffed AND lost (tier 4).")]
-        public float flickLooseBallPower = 4f;
+        [Tooltip("How tightly the on-ball defender rides a right-stick flick at an even matchup (0 = lets you blow by, 1 = glued to you). Scales up with their Perimeter Defense.")]
+        public float flickKeepUpBase = 0.45f;
+        [Tooltip("Per point of (Perimeter Defense − Ball Handling), how much tighter the defender stays attached on a flick.")]
+        public float flickKeepUpScale = 0.06f;
 
         [Header("Block (defense on a shot; contest % lives in ShotMath)")]
         public float contestRange = 3f;
@@ -1718,8 +1709,10 @@ namespace MarioBasketball.Gameplay
                 _lastLateralFlickSign = side;
             }
 
-            // The dribble move (ball path / body pose) always plays; whether it
-            // BEATS the defender is resolved in tiers below.
+            // The dribble itself always happens: a burst in the flick direction,
+            // with the move (and its ball path / pose) chosen from the gesture.
+            ApplyShove(dir * (stepBack ? stepBackPower : flickBurstPower));
+            _dribbleBoostTimer = attack || hesitationCross ? dribbleBoostTime : dribbleBoostTime * 0.5f;
             StartDribbleMove(stepBack ? DribbleMoveType.StepBack
                 : hesitationCross ? DribbleMoveType.Hesitation
                 : attack ? DribbleMoveType.BetweenLegs
@@ -1727,72 +1720,28 @@ namespace MarioBasketball.Gameplay
             // A step-back squares you to the hoop for the shot; otherwise face the move.
             transform.rotation = Quaternion.LookRotation(stepBack ? toBasket : dir, Vector3.up);
 
-            float burstPower = stepBack ? stepBackPower : flickBurstPower;
-
-            // Uncontested: nobody to beat — just take the clean burst (a tier-1 blow-by).
+            // Whether the on-ball defender keeps up is Ball Handling vs Perimeter
+            // Defense. Beat them and they're shaken a beat (a hesitation cross breaks
+            // ankles); otherwise they ride the move — and the higher their Perimeter
+            // Defense, the tighter they stay attached.
             var def = NearestOpponentTo(transform.position);
-            if (def == null || HorizontalDistance(transform.position, def.transform.position) > dribbleRange)
-            {
-                ApplyShove(dir * burstPower);
-                _dribbleBoostTimer = dribbleBoostTime * (attack || hesitationCross ? 1f : 0.85f);
-                return;
-            }
+            if (def == null || HorizontalDistance(transform.position, def.transform.position) > dribbleRange) return;
 
-            // Contested: Ball Handling vs Perimeter Defense picks one of four tiers.
             float bh = Effective(StatType.BallHandling, 5f);
             float pd = def.EffectiveStat(StatType.PerimeterDefense);
-            switch (RollFlickTier(bh, pd))
+            float shake = Mathf.Clamp(dribbleBaseChance + dribbleStatScale * (bh - pd), 0.05f, 0.85f);
+            if (Random.value < shake)
             {
-                case 1: // blow-by — burst past and leave the defender behind
-                    ApplyShove(dir * burstPower);
-                    _dribbleBoostTimer = dribbleBoostTime;
-                    if (hesitationCross) def.Stun(ankleStun, fall: true); // highlight: broken ankles
-                    else def.Stun(flickFreeze);
-                    break;
-
-                case 2: // most common — you get the burst, but the D rides with you
-                    ApplyShove(dir * burstPower);
-                    _dribbleBoostTimer = dribbleBoostTime * 0.5f;
-                    def.ApplyShove(dir * burstPower * 0.6f); // stays attached, spacing held
-                    break;
-
-                case 3: // stuffed — the D beats you to the spot and stops you cold
-                    _dribbleBoostTimer = 0f;
-                    Stun(flickStuffStun); // immobilized a beat, then the matchup resets
-                    break;
-
-                default: // tier 4 — stuffed AND you lose the handle (loose ball)
-                    _dribbleBoostTimer = 0f;
-                    Stun(flickStuffStun);
-                    var gm = GameManager.Instance;
-                    if (gm != null && gm.ball != null)
-                    {
-                        Vector3 loose = def.transform.position - transform.position; loose.y = 0f;
-                        loose = loose.sqrMagnitude > 0.01f ? loose.normalized : dir;
-                        gm.ball.Pass(loose, flickLooseBallPower); // pop it free — a scramble
-                    }
-                    break;
+                if (hesitationCross) def.Stun(ankleStun, fall: true); // highlight: broken ankles
+                else def.Stun(flickFreeze);                            // shaken off a beat
             }
-        }
-
-        /// <summary>Resolve a contested dribble flick into one of four tiers from
-        /// Ball Handling vs Perimeter Defense. Baselines (an even matchup): tier 2
-        /// (burst, but the D stays attached) is the common case, then tier 1
-        /// (blow-by), then tier 3 (stuffed), then tier 4 (stuffed + lost ball — the
-        /// rarest). A Ball-Handling edge tilts toward the blow-by; a Perimeter-
-        /// Defense edge toward the stuffs.</summary>
-        int RollFlickTier(float bh, float pd)
-        {
-            float skill = Mathf.Clamp((bh - pd) * flickTierStatScale, -1f, 1f);
-            float w1 = Mathf.Max(0.005f, flickTier1Base * (1f + skill));
-            float w2 = Mathf.Max(0.005f, flickTier2Base * (1f + 0.25f * skill));
-            float w3 = Mathf.Max(0.005f, flickTier3Base * (1f - skill));
-            float w4 = Mathf.Max(0.005f, flickTier4Base * (1f - 1.4f * skill));
-            float roll = Random.value * (w1 + w2 + w3 + w4);
-            if (roll < w1) return 1;
-            if (roll < w1 + w2) return 2;
-            if (roll < w1 + w2 + w3) return 3;
-            return 4;
+            else
+            {
+                // Stayed in front — ride the flick to hold the matchup, tighter the
+                // higher their Perimeter Defense.
+                float keepUp = Mathf.Clamp01(flickKeepUpBase + flickKeepUpScale * (pd - bh));
+                def.ApplyShove(dir * (stepBack ? stepBackPower : flickBurstPower) * keepUp);
+            }
         }
 
         public void TriggerBackDown()

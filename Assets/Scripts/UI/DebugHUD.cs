@@ -19,6 +19,7 @@ namespace MarioBasketball.UI
         GUIStyle _centerTop;
         GUIStyle _centerShot;
         GUIStyle _head;
+        GUIStyle _sideInfo;
 
         // Team jersey colours (match GameBootstrap HomeColor / AwayColor).
         static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
@@ -45,18 +46,12 @@ namespace MarioBasketball.UI
             _centerShot.normal.textColor = new Color(1f, 0.82f, 0.2f);
             _head ??= new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _head.normal.textColor = Color.white;
+            _sideInfo ??= new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold };
 
             var gm = GameManager.Instance;
             if (gm != null)
             {
-                DrawScoreboard(gm);
-                GUI.Label(new Rect(20, 56, 480, 24), $"Ball: {gm.Possession}   |   {gm.State}", _small);
-
-                string homePen = gm.Home.InPenalty ? "(PEN)" : "";
-                string awayPen = gm.Away.InPenalty ? "(PEN)" : "";
-                GUI.Label(new Rect(20, 86, 760, 24),
-                    $"Fouls  H:{gm.Home.Fouls}{homePen} A:{gm.Away.Fouls}{awayPen}     " +
-                    $"Timeouts  H:{gm.Home.TimeoutsRemaining} A:{gm.Away.TimeoutsRemaining}", _small);
+                DrawScoreboard(gm); // also draws each team's fouls/timeouts by the shot clock
 
                 if (gm.IsFreeThrow && gm.FreeThrowShooter != null && gm.FreeThrowShooter.Character != null)
                     GUI.Label(new Rect(20, 110, 760, 26),
@@ -77,12 +72,11 @@ namespace MarioBasketball.UI
                 PlayerCharacter human = humanPc != null ? humanPc.Character : null;
                 if (human != null)
                 {
-                    string fire = human.OnFire ? "   *** ON FIRE ***" : "";
+                    // Energy now lives as a bar under the turbo (see DrawScoreboard);
+                    // On Fire shows as the star-power body flash. Keep just a slim
+                    // name + posting tag here.
                     string posting = humanPc.IsPosting ? "   [POSTING]" : "";
-                    GUI.Label(new Rect(20, 138, 700, 24),
-                        $"{human.stats.characterName}   Energy {human.Energy:0}{fire}{posting}", _small);
-                    GUI.Box(new Rect(20, 160, 220, 14), GUIContent.none);
-                    GUI.Box(new Rect(20, 160, 220 * Mathf.Clamp01(human.EnergyFraction), 14), GUIContent.none);
+                    GUI.Label(new Rect(20, 138, 700, 24), $"{human.stats.characterName}{posting}", _small);
 
                     if (humanPc.IconPassActive) DrawIconButtons(gm, humanPc);
                     else if (humanPc.IsAimingPass) DrawPassIcons(gm, humanPc);
@@ -115,10 +109,12 @@ namespace MarioBasketball.UI
             }
         }
 
-        // Centred scoreboard: [head][turbo] HOME · Q/time + shot clock · AWAY [turbo][head].
+        // Centred scoreboard: [head][turbo+energy] HOME · Q/time + shot clock · AWAY
+        // [energy+turbo][head], with each team's fouls/timeouts tucked under the
+        // shot clock on their own side.
         void DrawScoreboard(GameManager gm)
         {
-            const float headSize = 50f, turboW = 120f, turboH = 14f, scoreW = 64f, centerW = 150f, gap = 8f;
+            const float headSize = 50f, turboW = 120f, turboH = 14f, energyH = 8f, scoreW = 64f, centerW = 150f, gap = 8f;
             float panelW = headSize * 2f + turboW * 2f + scoreW * 2f + centerW + gap * 6f;
             float x = (Screen.width - panelW) / 2f;
             float y = 10f;
@@ -133,17 +129,51 @@ namespace MarioBasketball.UI
             int quarter = gm.Clock != null ? gm.Clock.Quarter : 1;
             string shot = gm.Shot != null ? gm.Shot.Display : "20";
 
+            // Turbo bar with the energy bar stacked directly beneath it.
+            float stackH = turboH + 3f + energyH;
+            float stackTop = y + (rowH - stackH) / 2f;
+
             float cx = x;
             DrawHead(new Rect(cx, y + (rowH - headSize) / 2f, headSize, headSize), home, HomeColor); cx += headSize + gap;
-            DrawTurbo(new Rect(cx, y + (rowH - turboH) / 2f, turboW, turboH), home, fillTowardLeft: true); cx += turboW + gap;
+            DrawTurbo(new Rect(cx, stackTop, turboW, turboH), home, fillTowardLeft: true);
+            DrawEnergy(new Rect(cx, stackTop + turboH + 3f, turboW, energyH), home, fillTowardLeft: true); cx += turboW + gap;
             GUI.Label(new Rect(cx, y, scoreW, rowH), gm.HomeScore.ToString(), _score); cx += scoreW + gap;
 
+            float centerX = cx;
             GUI.Label(new Rect(cx, y + 4f, centerW, 30f), $"Q{quarter}    {clock}", _centerTop);
             GUI.Label(new Rect(cx, y + 33f, centerW, 28f), shot, _centerShot); cx += centerW + gap;
 
             GUI.Label(new Rect(cx, y, scoreW, rowH), gm.AwayScore.ToString(), _score); cx += scoreW + gap;
-            DrawTurbo(new Rect(cx, y + (rowH - turboH) / 2f, turboW, turboH), away, fillTowardLeft: false); cx += turboW + gap;
+            DrawTurbo(new Rect(cx, stackTop, turboW, turboH), away, fillTowardLeft: false);
+            DrawEnergy(new Rect(cx, stackTop + turboH + 3f, turboW, energyH), away, fillTowardLeft: false); cx += turboW + gap;
             DrawHead(new Rect(cx, y + (rowH - headSize) / 2f, headSize, headSize), away, AwayColor);
+
+            // Fouls / timeouts under the shot clock — home on its side, away on theirs.
+            float infoY = y + rowH + 4f;
+            Fill(new Rect(centerX - 6f, infoY - 2f, centerW + 12f, 40f), new Color(0f, 0f, 0f, 0.6f));
+            float half = centerW / 2f - 4f;
+            DrawTeamInfo(new Rect(centerX, infoY, half, 38f), gm.Home, TextAnchor.UpperLeft, HomeColor);
+            DrawTeamInfo(new Rect(centerX + centerW / 2f + 4f, infoY, half, 38f), gm.Away, TextAnchor.UpperRight, AwayColor);
+        }
+
+        void DrawTeamInfo(Rect r, TeamState team, TextAnchor align, Color color)
+        {
+            _sideInfo.alignment = align;
+            _sideInfo.normal.textColor = team.InPenalty ? new Color(1f, 0.5f, 0.45f) : color;
+            string pen = team.InPenalty ? " PEN" : "";
+            GUI.Label(new Rect(r.x, r.y, r.width, 18f), $"Fouls {team.Fouls}{pen}", _sideInfo);
+            GUI.Label(new Rect(r.x, r.y + 18f, r.width, 18f), $"T.O. {team.TimeoutsRemaining}", _sideInfo);
+        }
+
+        void DrawEnergy(Rect r, PlayerController p, bool fillTowardLeft)
+        {
+            Fill(r, new Color(0.06f, 0.10f, 0.06f, 0.9f)); // track
+            float e = p != null && p.Character != null ? Mathf.Clamp01(p.Character.EnergyFraction) : 0f;
+            Color c = Color.Lerp(new Color(0.85f, 0.25f, 0.15f), new Color(0.3f, 0.9f, 0.35f), e); // red→green
+            float w = r.width * e;
+            Rect fill = fillTowardLeft ? new Rect(r.xMax - w, r.y, w, r.height) : new Rect(r.x, r.y, w, r.height);
+            Fill(fill, c);
+            DrawBorder(r, new Color(1f, 1f, 1f, 0.5f), 1f);
         }
 
         /// <summary>Whose turbo to show for a team: the ball handler if they have it,

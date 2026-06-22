@@ -238,6 +238,7 @@ namespace MarioBasketball.Bootstrap
             // Every player has a brain; it yields on whoever the human controls.
             go.AddComponent<MarioBasketball.AI.PlayerAI>();
             go.AddComponent<MarioBasketball.Presentation.ProceduralAnimator>();
+            go.AddComponent<MarioBasketball.Presentation.OnFireFlash>(); // star-power strobe when On Fire
 
             go.SetActive(true);
 

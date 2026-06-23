@@ -80,6 +80,12 @@ namespace MarioBasketball.Gameplay
         [Tooltip("How long the defender is frozen when the shimmy shakes them.")]
         public float shimmyFreeze = 0.45f;
 
+        [Header("Post shot footwork (drive into the shot)")]
+        [Tooltip("Speed (m/s) a drop step / power drop step drives toward the rim as it goes up — explosive off the gather, easing to a plant at the apex.")]
+        public float dropStepDriveSpeed = 3.2f;
+        [Tooltip("Speed (m/s) a turnaround jumper fades back from the rim as it rises.")]
+        public float turnaroundFadeSpeed = 2.2f;
+
         [Header("Post shot timing (only the shot is timed; the footwork is not)")]
         [Tooltip("Seconds from starting the shot to its ideal release point. Kept short so post moves snap off quickly instead of dragging.")]
         public float postShotPerfectTime = 0.32f;
@@ -228,10 +234,11 @@ namespace MarioBasketball.Gameplay
             float dt = Time.deltaTime;
 
             // While a post shot is going up, the back-down battle freezes — the
-            // player plants and the release meter is all that matters.
+            // release meter is all that matters — but a drop step still drives into
+            // the rim and a turnaround still fades back (the footwork of the move).
             if (PostShotActive)
             {
-                DriveVelocity = Vector3.zero;
+                DriveVelocity = PostShotDrive();
                 _postShotTimer += dt;
                 if (!_pc.isHuman && _postShotTimer >= postShotPerfectTime) { ReleasePostShot(); return; }
                 if (_postShotTimer >= PostShotMeterDuration) ReleasePostShot(); // held too long → late
@@ -410,7 +417,30 @@ namespace MarioBasketball.Gameplay
             _postShotQuality = quality;
             _postShotBlockable = blockable;
             _postShotBlockMult = blockMult;
-            DriveVelocity = Vector3.zero; // plant and rise into the shot
+            DriveVelocity = Vector3.zero; // first frame; PostShotDrive takes over as it rises
+        }
+
+        /// <summary>Footwork drift while a post shot rises: a drop step / power drop
+        /// step drives toward the rim, a turnaround fades away from it, everything
+        /// else plants. Explosive off the gather, easing to a plant at the apex.</summary>
+        Vector3 PostShotDrive()
+        {
+            float dir;
+            switch (CurrentMove)
+            {
+                case PostMove.DropStep:
+                case PostMove.PowerDropStep: dir = 1f; break;   // drive into the rim
+                case PostMove.TurnaroundJumper: dir = -1f; break; // fade away from it
+                default: return Vector3.zero;                    // hook / spin / sky hook / up-and-under
+            }
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(_pc.team) : null;
+            if (hoop == null) return Vector3.zero;
+            Vector3 toBasket = hoop.AimPoint - transform.position; toBasket.y = 0f;
+            if (toBasket.sqrMagnitude < 0.01f) return Vector3.zero;
+            float ease = 1f - PostShotChargeFraction;           // strong at takeoff, planted at the top
+            float speed = dir > 0f ? dropStepDriveSpeed : turnaroundFadeSpeed;
+            return toBasket.normalized * (dir * speed * ease);
         }
 
         /// <summary>Release the timed post shot (human button press, or auto for

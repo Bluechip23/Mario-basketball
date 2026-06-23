@@ -75,6 +75,10 @@ namespace MarioBasketball.Gameplay
         [Range(0.3f, 1f)] public float shotGravityScale = 0.45f;
         [Tooltip("Jump-shot leap height (m) — a touch higher than a normal jump so the shooter elevates and hangs into the release.")]
         public float shotJumpHeight = 1.7f;
+        [Tooltip("How high a post shot (hook, drop step, turnaround…) hops off the floor — post shots leap and hang like a jumper instead of being flat-footed.")]
+        public float postShotJumpHeight = 0.7f;
+        [Tooltip("Sky-hook leap height (m) — released up high, so it skies more than a normal post hop.")]
+        public float skyHookJumpHeight = 1.1f;
         [Tooltip("Catch-and-shoot window for the quick-catch shooter trait.")]
         public float quickCatchWindow = 0.3f;
         [Tooltip("Window to shoot off a Playmaker's pass for the +2 assist bonus.")]
@@ -463,6 +467,10 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which post move is currently being shot — drives the distinct
         /// hook / power-drop-step / fadeaway body animation.</summary>
         public PostMove CurrentPostMove => _post != null ? _post.CurrentMove : PostMove.Hook;
+        /// <summary>How hard the player is backing their man down (0 = holding,
+        /// 1 = driving at full power) — sinks the post stance deeper as they go.</summary>
+        public float PostDrive01 => (_post != null && _post.IsPosting && !IsPostShooting && _post.maxBackdownSpeed > 0.01f)
+            ? Mathf.Clamp01(_post.Leverage * _post.leverageToSpeed / _post.maxBackdownSpeed) : 0f;
         /// <summary>World-space planar direction the current jump shot is fading
         /// toward (zero for a straight-up shot). Drives the body lean.</summary>
         public Vector3 FadeDirection => _fadeDir;
@@ -481,6 +489,7 @@ namespace MarioBasketball.Gameplay
         Camera _cam;
         bool _dribbling;
         float _verticalVelocity;
+        bool _wasPostShooting;   // rising edge → leap into the post shot
         Vector2 _moveIntent;
         bool _sprintIntent;
         bool _sprintingNow;
@@ -946,6 +955,15 @@ namespace MarioBasketball.Gameplay
             PlanarSpeed = horizontal.magnitude;
 
             if (_cc.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
+
+            // Post shots leap off the floor instead of being flat-footed: on the
+            // frame the shot starts, hop into it (the sky hook skies higher), then
+            // float on softened gravity so the apex lands near the release.
+            bool postShooting = IsPostShooting;
+            if (postShooting && !_wasPostShooting && _cc.isGrounded)
+                _verticalVelocity = PostShotTakeoffVelocity(CurrentPostMove);
+            _wasPostShooting = postShooting;
+
             // A jump shot and a dunk/layup both float (softened gravity) so the
             // player hangs — the shot is easier to time and the finish clearly
             // elevates to the rim with the ball. Skying for an oop: rise normally,
@@ -953,6 +971,7 @@ namespace MarioBasketball.Gameplay
             float g = gravity;
             if (_shooting) g = gravity * shotGravityScale;
             else if (_finishing) g = gravity * _finishGravityScale * (_finishAdjusted ? finishAdjustFloat : 1f);
+            else if (postShooting) g = gravity * shotGravityScale; // hang into the post shot
             else if (_skyTimer > 0f && _verticalVelocity < 0f) g = gravity * oopSkyGravityScale;
             _verticalVelocity += g * dt;
 
@@ -1136,6 +1155,15 @@ namespace MarioBasketball.Gameplay
         /// <summary>The vertical velocity a jump shot leaves the floor with — the
         /// reference "rise speed" that dunks and layups also take off at.</summary>
         float ShotTakeoffVelocity() => Mathf.Sqrt(-2f * (gravity * shotGravityScale) * shotJumpHeight);
+
+        /// <summary>Takeoff velocity for a post shot's hop. Uses the same floaty
+        /// gravity as a jump shot (so the apex lands near the timed release) and
+        /// skies higher for the sky hook.</summary>
+        float PostShotTakeoffVelocity(PostMove move)
+        {
+            float height = move == PostMove.SkyHook ? skyHookJumpHeight : postShotJumpHeight;
+            return Mathf.Sqrt(-2f * (gravity * shotGravityScale) * height);
+        }
 
         float FinishJumpHeight()
         {

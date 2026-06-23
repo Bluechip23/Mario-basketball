@@ -95,6 +95,12 @@ namespace MarioBasketball.Presentation
         public float postDefendLean = 16f;
         [Tooltip("Forward torso lean (deg) the poster sinks into while backing their man down — an athletic stance, chest over the thighs, instead of standing bolt upright.")]
         public float postPosterLean = 15f;
+        [Tooltip("Extra forward lean (deg) added at a full-power back-down drive.")]
+        public float postDriveLeanBonus = 12f;
+        [Tooltip("Knee bend (deg) in a post stance (holding / bracing).")]
+        public float postStanceKnees = 40f;
+        [Tooltip("Knee bend (deg) at a full-power back-down — a deep, explosive squat driving to the rim.")]
+        public float postDriveKnees = 64f;
 
         [Header("Bench")]
         [Tooltip("How long a benched player claps after their team scores.")]
@@ -236,8 +242,9 @@ namespace MarioBasketball.Presentation
                     else if (_pc.IsPosting)
                     {
                         // Backing your man down: sit into an athletic stance with the
-                        // chest forward over the thighs, not standing bolt upright.
-                        want = Quaternion.Euler(postPosterLean, 0f, 0f);
+                        // chest forward over the thighs, leaning harder into it the
+                        // more powerfully they drive (not standing bolt upright).
+                        want = Quaternion.Euler(postPosterLean + _pc.PostDrive01 * postDriveLeanBonus, 0f, 0f);
                     }
                     else if (!_pc.IsAirborne && !_pc.IsPosting && !_pc.IsHanging && !_pc.IsSkyingForOop
                              && !_pc.IsFinishing && _pc.PlanarSpeed > 0.6f)
@@ -286,13 +293,17 @@ namespace MarioBasketball.Presentation
                 SetX(_kneeL, 52f);
                 SetX(_kneeR, 52f);
             }
-            // Sit into an athletic stance: the poster sinks as they back down, and
-            // the engaged defender bends their knees and braces (even against a
-            // shorter poster they stay down in a stance — just with hands up).
+            // Sit into an athletic stance: the poster sinks DEEPER the harder they
+            // drive (a powerful back-down), and the engaged defender bends their
+            // knees and braces (even against a shorter poster they stay down in a
+            // stance — just with hands up).
             if (!_pc.IsAirborne && (_pc.IsPosting || postingMe != null))
             {
-                SetX(_kneeL, 40f);
-                SetX(_kneeR, 40f);
+                float knee = _pc.IsPosting
+                    ? Mathf.Lerp(postStanceKnees, postDriveKnees, _pc.PostDrive01)
+                    : postStanceKnees;
+                SetX(_kneeL, knee);
+                SetX(_kneeR, knee);
             }
 
             // Leg work for a finish: one-foot takeoff drives the opposite knee up
@@ -773,9 +784,10 @@ namespace MarioBasketball.Presentation
             }
             if (_benchClapTimer > 0f) _benchClapTimer -= Time.deltaTime;
 
-            // Sit: thighs forward off the bench, knees bent so the shins drop.
-            SetX(_legL, -52f); SetX(_legR, -52f);
-            SetX(_kneeL, 66f); SetX(_kneeR, 66f);
+            // Sit: thighs out forward along the seat (butt planted on it), knees
+            // bent ~90° so the shins hang straight down over the front edge.
+            SetX(_legL, -72f); SetX(_legR, -72f);
+            SetX(_kneeL, 88f); SetX(_kneeR, 88f);
 
             if (_benchClapTimer > 0f)
             {

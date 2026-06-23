@@ -35,8 +35,8 @@ namespace MarioBasketball.Gameplay
         public float leverageDecay = 1.0f;
         public float maxLeverage = 10f;
         [Tooltip("Back-down speed (m/s) per unit of leverage.")]
-        public float leverageToSpeed = 0.22f;
-        public float maxBackdownSpeed = 1.8f;
+        public float leverageToSpeed = 0.3f;
+        public float maxBackdownSpeed = 2.6f;
         [Tooltip("Leverage at/below which the defender shoves the offense out.")]
         public float shoveThreshold = -6f;
         [Tooltip("Leverage at/below which the offense is knocked down (turnover).")]

@@ -396,18 +396,22 @@ namespace MarioBasketball.Bootstrap
                 if (p == null) continue;
                 Vector3 at = p.transform.position;       // already at the sideline bench spot
                 float h = p.BodyHeight;
+                // The seated hips sit ~0.05h below the player origin, so dropping the
+                // origin to just above the seat surface plants the butt ON it (the old
+                // "+ h/2" parked the feet on top, leaving them floating in a sit pose).
+                float sit = h * 0.08f;
                 Vector3 face = new Vector3(-Mathf.Sign(at.x), 0f, 0f); // look in toward the court
                 if (onPipes)
                 {
                     const float pipeH = 1.0f;
                     BuildPipe(new Vector3(at.x, 0f, at.z), pipeH, root);
-                    SeatPlayer(p, new Vector3(at.x, pipeH + h * 0.5f, at.z), face);
+                    SeatPlayer(p, new Vector3(at.x, pipeH + sit, at.z), face);
                 }
                 else
                 {
                     const float floatY = 1.15f, size = 0.95f;
                     BuildQuestionBlock(new Vector3(at.x, floatY, at.z), size, root);
-                    SeatPlayer(p, new Vector3(at.x, floatY + size * 0.5f + h * 0.5f, at.z), face);
+                    SeatPlayer(p, new Vector3(at.x, floatY + size * 0.5f + sit, at.z), face);
                 }
             }
         }

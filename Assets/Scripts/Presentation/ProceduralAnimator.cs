@@ -108,9 +108,19 @@ namespace MarioBasketball.Presentation
         [Tooltip("Off-arm elbow bend (≈90°) while barring out space on a hook.")]
         public float hookGuardElbowDegrees = -100f;
 
+        [Header("Hand grip")]
+        [Tooltip("How far the fingers curl (deg) into a closed grip when grabbing the rim on a dunk.")]
+        public float gripCloseDegrees = 95f;
+        [Tooltip("How far the thumb curls in (deg) to clamp the grip shut around the rim.")]
+        public float thumbCloseDegrees = 60f;
+        [Tooltip("How fast the hands open/close. High so the grip snaps onto the rim as the slam lands.")]
+        public float gripLerp = 22f;
+
         PlayerController _pc;
         BallController _ball;
         Transform _model, _armL, _armR, _elbowL, _elbowR, _wristL, _wristR, _legL, _legR, _kneeL, _kneeR;
+        Transform _fingersL, _fingersR, _thumbL, _thumbR;
+        float _gripL, _gripR;
         float _phase;
         float _fallTilt;
         bool _wasShooting;
@@ -132,6 +142,10 @@ namespace MarioBasketball.Presentation
             _legR = FindDeep(transform, "JointLegR");
             _kneeL = FindDeep(transform, "JointKneeL");
             _kneeR = FindDeep(transform, "JointKneeR");
+            _fingersL = FindDeep(transform, "JointFingersL");
+            _fingersR = FindDeep(transform, "JointFingersR");
+            _thumbL = FindDeep(transform, "JointThumbL");
+            _thumbR = FindDeep(transform, "JointThumbR");
             _fallTilt = Random.Range(-25f, 25f);
         }
 
@@ -519,6 +533,28 @@ namespace MarioBasketball.Presentation
                 Pose(_armL, _elbowL, _wristL, -swing * armSwingDegrees * speedScale, elbow, 0f);
                 Pose(_armR, _elbowR, _wristR, swing * armSwingDegrees * speedScale, elbow, 0f);
             }
+
+            // The hands close into a grip to grab the rim: they ramp shut over the
+            // tail of a dunk's slam (so they clamp as the ball goes down) and stay
+            // locked through the rim hang, then spring back open. A one-hand flush
+            // only grips with the dunking (right) hand; the off-hand stays a guard.
+            bool oneHandFlush = _pc.CurrentFinishStyle == FinishStyle.OneFootOneHandDunk;
+            float wantGripR = 0f, wantGripL = 0f;
+            if (_pc.IsHanging)
+            {
+                wantGripR = 1f;
+                wantGripL = oneHandFlush ? 0f : 1f;
+            }
+            else if (_pc.IsFinishing && _pc.FinishIsDunk && _pc.IsSlammingFinish)
+            {
+                float g = Mathf.Clamp01((_pc.FinishSlamProgress01 - 0.6f) / 0.4f);
+                wantGripR = g;
+                wantGripL = oneHandFlush ? 0f : g;
+            }
+            _gripR = Mathf.Lerp(_gripR, wantGripR, gripLerp * Time.deltaTime);
+            _gripL = Mathf.Lerp(_gripL, wantGripL, gripLerp * Time.deltaTime);
+            ApplyGrip(_fingersR, _thumbR, _gripR);
+            ApplyGrip(_fingersL, _thumbL, _gripL);
         }
 
         /// <summary>Distinct arm work for each dribble move (the ball path lives in
@@ -703,6 +739,16 @@ namespace MarioBasketball.Presentation
             if (joint == null) return;
             Quaternion target = Quaternion.Euler(degrees, 0f, 0f);
             joint.localRotation = Quaternion.Slerp(joint.localRotation, target, poseLerp * Time.deltaTime);
+        }
+
+        /// <summary>Curl a hand toward a closed grip (0 = open, 1 = clamped shut):
+        /// the fingers hook in at the knuckle and the thumb closes to meet them.
+        /// A negative X rotation swings them toward the palm. The smoothing already
+        /// lives in <c>grip01</c>, so the pivots are set straight to the target.</summary>
+        void ApplyGrip(Transform fingers, Transform thumb, float grip01)
+        {
+            if (fingers != null) fingers.localRotation = Quaternion.Euler(-grip01 * gripCloseDegrees, 0f, 0f);
+            if (thumb != null) thumb.localRotation = Quaternion.Euler(-grip01 * thumbCloseDegrees, 0f, 0f);
         }
 
         static Transform FindDeep(Transform root, string name)

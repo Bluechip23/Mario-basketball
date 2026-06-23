@@ -114,21 +114,29 @@ namespace MarioBasketball.Presentation
             Hand(el, side, lower, armR, skin);
         }
 
-        /// <summary>Articulated hand: wrist joint → flattened palm + four
-        /// fingers + an inward thumb (replaces the old sphere mitt).</summary>
+        /// <summary>Articulated hand: wrist joint → flattened palm + four fingers
+        /// on a knuckle pivot + an inward thumb on its own pivot. The
+        /// <c>JointFingers</c>/<c>JointThumb</c> pivots let <c>ProceduralAnimator</c>
+        /// curl the hand shut into a grip (e.g. closing onto the rim on a dunk); at
+        /// rest both pivots are unrotated, so the open hand looks exactly as before.</summary>
         static void Hand(Transform el, string side, float lower, float armR, Color skin)
         {
             Transform wr = Joint(el, "JointWrist" + side, new Vector3(0f, -lower, 0f));
             var palm = Sphere(wr, new Vector3(0f, -armR * 0.9f, 0f), armR * 2.2f, skin, "palm" + side);
             palm.transform.localScale = new Vector3(armR * 2.0f, armR * 2.4f, armR * 1.2f);
+            // Four fingers hang from a knuckle pivot at their base; curling the pivot
+            // swings the whole set into the palm (their rest position is unchanged).
+            Transform knuckle = Joint(wr, "JointFingers" + side, new Vector3(0f, -armR * 1.6f, 0f));
             for (int i = 0; i < 4; i++)
             {
                 float x = (i - 1.5f) * armR * 0.5f;
-                Capsule(wr, new Vector3(x, -armR * 2.2f, 0f), new Vector3(armR * 0.42f, armR * 0.6f, armR * 0.42f), skin, "finger" + side);
+                Capsule(knuckle, new Vector3(x, -armR * 0.6f, 0f), new Vector3(armR * 0.42f, armR * 0.6f, armR * 0.42f), skin, "finger" + side);
             }
-            // Thumb angles in toward the body.
+            // Thumb on its own pivot so it can close in opposition to the fingers; it
+            // keeps the inward splay (z-tilt) as a child offset of the pivot.
             float inward = side == "L" ? 1f : -1f;
-            var thumb = Capsule(wr, new Vector3(inward * armR * 1.0f, -armR * 1.2f, armR * 0.3f), new Vector3(armR * 0.42f, armR * 0.55f, armR * 0.42f), skin, "thumb" + side);
+            Transform thumbJoint = Joint(wr, "JointThumb" + side, new Vector3(inward * armR * 1.0f, -armR * 0.7f, armR * 0.3f));
+            var thumb = Capsule(thumbJoint, new Vector3(0f, -armR * 0.5f, 0f), new Vector3(armR * 0.42f, armR * 0.55f, armR * 0.42f), skin, "thumb" + side);
             thumb.transform.localEulerAngles = new Vector3(0f, 0f, inward * -40f);
         }
 

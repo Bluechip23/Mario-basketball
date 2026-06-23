@@ -519,14 +519,15 @@ namespace MarioBasketball.Bootstrap
                 segCol.radius = 0.035f;
             }
 
-            // Net: a soft inverted cone that snaps on a make (NetSwish).
+            // Net: a diamond-mesh of cords hung from the rim (tapers in, hangs
+            // down) that snaps on a make (NetSwish).
             var net = new GameObject("Net");
             net.transform.SetParent(root.transform);
             net.transform.localPosition = rimCentre + new Vector3(0f, -0.02f, 0f);
-            net.transform.localScale = new Vector3(rimRadius * 1.7f, -0.5f, rimRadius * 1.7f); // apex down
-            net.AddComponent<MeshFilter>().sharedMesh = MarioBasketball.Presentation.CharacterModelBuilder.ConeMesh();
+            net.transform.localScale = new Vector3(rimRadius * 0.98f, 0.42f, rimRadius * 0.98f); // hangs to ~0.42m
+            net.AddComponent<MeshFilter>().sharedMesh = MarioBasketball.Presentation.CharacterModelBuilder.NetMesh();
             var netMr = net.AddComponent<MeshRenderer>();
-            netMr.material = new Material(LineMaterial) { color = new Color(0.95f, 0.95f, 0.95f, 0.85f) };
+            netMr.material = new Material(LineMaterial) { color = new Color(0.97f, 0.97f, 0.97f, 1f) };
             net.AddComponent<MarioBasketball.Presentation.NetSwish>();
 
             // Rim contact trigger (shot-clock "hit the rim" detection).

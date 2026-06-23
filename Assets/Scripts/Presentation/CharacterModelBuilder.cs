@@ -26,6 +26,7 @@ namespace MarioBasketball.Presentation
             : (_shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default"));
 
         static Mesh _cone;
+        static Mesh _net;
 
         public static void Build(Transform root, CharacterStats stats, float h, Color jersey)
         {
@@ -435,6 +436,63 @@ namespace MarioBasketball.Presentation
             _cone.SetTriangles(tris, 0);
             _cone.RecalculateNormals();
             return _cone;
+        }
+
+        /// <summary>A unit basketball net: 12 cords hung from a top ring of radius 1
+        /// that cross into a diamond mesh and taper inward as they fall to y=-1.
+        /// Built as line topology (the cords), so it reads as a real "netty" net
+        /// instead of a solid cone. Scale it by the rim radius (x/z) and the net
+        /// depth (y); <see cref="NetSwish"/> pinches/stretches that on a make.</summary>
+        public static Mesh NetMesh()
+        {
+            if (_net != null) return _net;
+            const int loops = 12;     // cords / nodes around each ring
+            const int rows = 9;       // rings top→bottom (even bands → closed diamonds)
+            const float bottomScale = 0.6f; // how far the net tapers in at the bottom
+
+            var verts = new List<Vector3>();
+            float step = Mathf.PI * 2f / loops;
+            for (int r = 0; r < rows; r++)
+            {
+                float t = r / (float)(rows - 1);
+                float radius = Mathf.Lerp(1f, bottomScale, t);
+                float y = -t;
+                // Alternate rings are offset half a segment so the cross-cords form
+                // diamonds rather than straight vertical lines.
+                float phase = (r & 1) * 0.5f * step;
+                for (int i = 0; i < loops; i++)
+                {
+                    float a = i * step + phase;
+                    verts.Add(new Vector3(Mathf.Cos(a) * radius, y, Mathf.Sin(a) * radius));
+                }
+            }
+
+            var lines = new List<int>();
+            for (int r = 0; r < rows - 1; r++)
+            {
+                int row = r * loops, below = (r + 1) * loops;
+                for (int i = 0; i < loops; i++)
+                {
+                    int a = row + i;
+                    // Each node drops two diagonal cords into the next ring; the pair
+                    // straddles the half-segment offset, and the direction flips each
+                    // row so successive bands close the diamonds.
+                    lines.Add(a); lines.Add(below + i);
+                    int other = (r & 1) == 0 ? (i + loops - 1) % loops : (i + 1) % loops;
+                    lines.Add(a); lines.Add(below + other);
+                }
+            }
+
+            _net = new Mesh { name = "Net" };
+            _net.SetVertices(verts);
+            // Sprites/Default tints by vertex colour × material colour — set the
+            // verts white so the cords show in the material's colour.
+            var cols = new Color[verts.Count];
+            for (int i = 0; i < cols.Length; i++) cols[i] = Color.white;
+            _net.colors = cols;
+            _net.SetIndices(lines.ToArray(), MeshTopology.Lines, 0);
+            _net.RecalculateBounds();
+            return _net;
         }
     }
 }

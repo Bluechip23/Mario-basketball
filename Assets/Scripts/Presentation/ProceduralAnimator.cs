@@ -95,6 +95,12 @@ namespace MarioBasketball.Presentation
         public float postDefendLean = 16f;
         [Tooltip("Forward torso lean (deg) the poster sinks into while backing their man down — an athletic stance, chest over the thighs, instead of standing bolt upright.")]
         public float postPosterLean = 15f;
+        [Tooltip("Extra forward lean (deg) added at a full-power back-down drive.")]
+        public float postDriveLeanBonus = 12f;
+        [Tooltip("Knee bend (deg) in a post stance (holding / bracing).")]
+        public float postStanceKnees = 40f;
+        [Tooltip("Knee bend (deg) at a full-power back-down — a deep, explosive squat driving to the rim.")]
+        public float postDriveKnees = 64f;
 
         [Header("Bench")]
         [Tooltip("How long a benched player claps after their team scores.")]
@@ -108,9 +114,35 @@ namespace MarioBasketball.Presentation
         [Tooltip("Off-arm elbow bend (≈90°) while barring out space on a hook.")]
         public float hookGuardElbowDegrees = -100f;
 
+        [Header("Hand grip")]
+        [Tooltip("How far the fingers curl (deg) into a closed grip when grabbing the rim on a dunk.")]
+        public float gripCloseDegrees = 95f;
+        [Tooltip("How far the thumb curls in (deg) to clamp the grip shut around the rim.")]
+        public float thumbCloseDegrees = 60f;
+        [Tooltip("How fast the hands open/close. High so the grip snaps onto the rim as the slam lands.")]
+        public float gripLerp = 22f;
+
+        [Header("Layup / finish")]
+        [Tooltip("Shooting-arm raise (deg) as a one-hand layup lays the ball up off the glass.")]
+        public float layupReleaseArmDegrees = -175f;
+        [Tooltip("Shoulder the off-hand rides at while it stays on the side of the ball through the layup (until release).")]
+        public float layupGuideArmDegrees = -110f;
+        public float layupGuideElbowDegrees = -55f;
+
+        [Header("Finish air-adjust")]
+        [Tooltip("Shooting-arm pitch the windmill starts from (0 = arm hanging down, matching the ball's gather).")]
+        public float windmillStartDegrees = 0f;
+        [Tooltip("Total sweep (deg) the shooting arm circles on a windmill. Keep at -360 (one full loop) to track the ball's windmill arc in PlayerController.CarriedBallPoint.")]
+        public float windmillSweepDegrees = -360f;
+        [Tooltip("Shooting-arm extension (deg) on a low scoop — out in front and low, not overhead.")]
+        public float lowScoopArmDegrees = -70f;
+        public float lowScoopElbowDegrees = -38f;
+
         PlayerController _pc;
         BallController _ball;
         Transform _model, _armL, _armR, _elbowL, _elbowR, _wristL, _wristR, _legL, _legR, _kneeL, _kneeR;
+        Transform _fingersL, _fingersR, _thumbL, _thumbR;
+        float _gripL, _gripR;
         float _phase;
         float _fallTilt;
         bool _wasShooting;
@@ -132,6 +164,10 @@ namespace MarioBasketball.Presentation
             _legR = FindDeep(transform, "JointLegR");
             _kneeL = FindDeep(transform, "JointKneeL");
             _kneeR = FindDeep(transform, "JointKneeR");
+            _fingersL = FindDeep(transform, "JointFingersL");
+            _fingersR = FindDeep(transform, "JointFingersR");
+            _thumbL = FindDeep(transform, "JointThumbL");
+            _thumbR = FindDeep(transform, "JointThumbR");
             _fallTilt = Random.Range(-25f, 25f);
         }
 
@@ -206,8 +242,9 @@ namespace MarioBasketball.Presentation
                     else if (_pc.IsPosting)
                     {
                         // Backing your man down: sit into an athletic stance with the
-                        // chest forward over the thighs, not standing bolt upright.
-                        want = Quaternion.Euler(postPosterLean, 0f, 0f);
+                        // chest forward over the thighs, leaning harder into it the
+                        // more powerfully they drive (not standing bolt upright).
+                        want = Quaternion.Euler(postPosterLean + _pc.PostDrive01 * postDriveLeanBonus, 0f, 0f);
                     }
                     else if (!_pc.IsAirborne && !_pc.IsPosting && !_pc.IsHanging && !_pc.IsSkyingForOop
                              && !_pc.IsFinishing && _pc.PlanarSpeed > 0.6f)
@@ -256,13 +293,17 @@ namespace MarioBasketball.Presentation
                 SetX(_kneeL, 52f);
                 SetX(_kneeR, 52f);
             }
-            // Sit into an athletic stance: the poster sinks as they back down, and
-            // the engaged defender bends their knees and braces (even against a
-            // shorter poster they stay down in a stance — just with hands up).
+            // Sit into an athletic stance: the poster sinks DEEPER the harder they
+            // drive (a powerful back-down), and the engaged defender bends their
+            // knees and braces (even against a shorter poster they stay down in a
+            // stance — just with hands up).
             if (!_pc.IsAirborne && (_pc.IsPosting || postingMe != null))
             {
-                SetX(_kneeL, 40f);
-                SetX(_kneeR, 40f);
+                float knee = _pc.IsPosting
+                    ? Mathf.Lerp(postStanceKnees, postDriveKnees, _pc.PostDrive01)
+                    : postStanceKnees;
+                SetX(_kneeL, knee);
+                SetX(_kneeR, knee);
             }
 
             // Leg work for a finish: one-foot takeoff drives the opposite knee up
@@ -369,53 +410,9 @@ namespace MarioBasketball.Presentation
                 else
                     Pose(_armL, _elbowL, _wristL, -178f, -2f, 0f);
             }
-            else if (_pc.IsFinishing && _pc.IsSlammingFinish)
-            {
-                // Drive the ball down into the rim: the arms sweep from overhead
-                // down to the basket, following the ball (which rides the hand to
-                // the rim). A two-hand slam uses both; a one-hand flush / layup
-                // throws it down with the shooting hand and guards with the other.
-                float p = _pc.FinishSlamProgress01;
-                float sh = Mathf.Lerp(_pc.FinishIsDunk ? dunkArmDegrees : layupArmDegrees, -38f, p);
-                float el = Mathf.Lerp(_pc.FinishIsDunk ? dunkElbowDegrees : layupElbowDegrees, -8f, p);
-                float wr = Mathf.Lerp(0f, dunkWristDegrees, p);
-                Pose(_armR, _elbowR, _wristR, sh, el, wr);
-                if (_pc.FinishIsDunk && _pc.CurrentFinishStyle != FinishStyle.OneFootOneHandDunk)
-                    Pose(_armL, _elbowL, _wristL, sh, el, wr);
-                else
-                    Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
-            }
-            else if (_pc.IsFinishing && _pc.IsAdjustingFinish)
-            {
-                // Air-adjust (L1): a double-clutch — cradle the ball back in and
-                // shield with the off-hand before laying it up around the block.
-                Pose(_armR, _elbowR, _wristR, layupArmDegrees + 34f, gatherElbowDegrees, gatherWristDegrees);
-                Pose(_armL, _elbowL, _wristL, guideArmDegrees, guideElbowDegrees, 0f);
-            }
-            else if (_pc.IsFinishing && _pc.CurrentFinishStyle == FinishStyle.Layup)
-            {
-                // One-hand layup, laid up high off the glass.
-                Pose(_armR, _elbowR, _wristR, layupArmDegrees, layupElbowDegrees, releaseWristDegrees * 0.5f);
-                Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
-            }
-            else if (_pc.IsFinishing && _pc.CurrentFinishStyle == FinishStyle.OneFootOneHandDunk)
-            {
-                // One-handed flush: cock the ball overhead in the dunking hand.
-                Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
-                Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
-            }
             else if (_pc.IsFinishing)
             {
-                // Two-hand dunk (the two-foot gather slam, or two-hand off one foot):
-                // gather the ball in both hands off the floor and EXTEND it overhead
-                // as you rise to the rim — not held up the whole way. The wrists stay
-                // neutral until the slam drives the ball down through the rim.
-                float rp = _pc.FinishRiseProgress01;
-                float arm = Mathf.Lerp(holdArmDegrees, dunkArmDegrees, rp);
-                float elb = Mathf.Lerp(holdElbowDegrees, dunkElbowDegrees, rp);
-                float wr = Mathf.Lerp(holdWristDegrees, 0f, rp);
-                Pose(_armR, _elbowR, _wristR, arm, elb, wr);
-                Pose(_armL, _elbowL, _wristL, arm, elb, wr);
+                FinishArms();
             }
             else if (_pc.IsPostFaking)
             {
@@ -519,6 +516,28 @@ namespace MarioBasketball.Presentation
                 Pose(_armL, _elbowL, _wristL, -swing * armSwingDegrees * speedScale, elbow, 0f);
                 Pose(_armR, _elbowR, _wristR, swing * armSwingDegrees * speedScale, elbow, 0f);
             }
+
+            // The hands close into a grip to grab the rim: they ramp shut over the
+            // tail of a dunk's slam (so they clamp as the ball goes down) and stay
+            // locked through the rim hang, then spring back open. A one-hand flush
+            // only grips with the dunking (right) hand; the off-hand stays a guard.
+            bool oneHandFlush = _pc.CurrentFinishStyle == FinishStyle.OneFootOneHandDunk;
+            float wantGripR = 0f, wantGripL = 0f;
+            if (_pc.IsHanging)
+            {
+                wantGripR = 1f;
+                wantGripL = oneHandFlush ? 0f : 1f;
+            }
+            else if (_pc.IsFinishing && _pc.FinishIsDunk && _pc.IsSlammingFinish)
+            {
+                float g = Mathf.Clamp01((_pc.FinishSlamProgress01 - 0.6f) / 0.4f);
+                wantGripR = g;
+                wantGripL = oneHandFlush ? 0f : g;
+            }
+            _gripR = Mathf.Lerp(_gripR, wantGripR, gripLerp * Time.deltaTime);
+            _gripL = Mathf.Lerp(_gripL, wantGripL, gripLerp * Time.deltaTime);
+            ApplyGrip(_fingersR, _thumbR, _gripR);
+            ApplyGrip(_fingersL, _thumbL, _gripL);
         }
 
         /// <summary>Distinct arm work for each dribble move (the ball path lives in
@@ -585,6 +604,114 @@ namespace MarioBasketball.Presentation
                     Pose(offArm, offElbow, offWrist, guardArmDegrees, dribbleElbowBent * 0.5f, 0f);
                     break;
                 }
+            }
+        }
+
+        /// <summary>All in-air arm work for a dunk/layup: the gather→extend on the
+        /// way up, the chosen air-adjust contort (windmill / switch hands / low
+        /// scoop), and the release. A one-hand layup finishes with the hand opposite
+        /// the takeoff foot and keeps the off-hand on the side of the ball until the
+        /// release; a two-foot gather goes up with both hands and releases right.</summary>
+        void FinishArms()
+        {
+            bool shL = _pc.ShootHandLeft;
+            Transform shArm = shL ? _armL : _armR, shElb = shL ? _elbowL : _elbowR, shWr = shL ? _wristL : _wristR;
+            Transform ofArm = shL ? _armR : _armL, ofElb = shL ? _elbowR : _elbowL, ofWr = shL ? _wristR : _wristL;
+
+            // Release / lay-in: drive a dunk down through the rim, or flick a layup
+            // up off the glass. The off-hand (which rode the ball) drops to a guard.
+            if (_pc.IsSlammingFinish)
+            {
+                float p = _pc.FinishSlamProgress01;
+                if (_pc.FinishIsDunk)
+                {
+                    float sh = Mathf.Lerp(dunkArmDegrees, -38f, p);
+                    float el = Mathf.Lerp(dunkElbowDegrees, -8f, p);
+                    float wr = Mathf.Lerp(0f, dunkWristDegrees, p);
+                    Pose(_armR, _elbowR, _wristR, sh, el, wr);
+                    if (_pc.CurrentFinishStyle != FinishStyle.OneFootOneHandDunk)
+                        Pose(_armL, _elbowL, _wristL, sh, el, wr);
+                    else
+                        Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
+                }
+                else
+                {
+                    // Lay it up high and flick the wrist (gooseneck) — not slammed down.
+                    Pose(shArm, shElb, shWr,
+                        Mathf.Lerp(layupArmDegrees, layupReleaseArmDegrees, p),
+                        Mathf.Lerp(layupElbowDegrees, -6f, p),
+                        Mathf.Lerp(0f, releaseWristDegrees, p));
+                    Pose(ofArm, ofElb, ofWr, guardArmDegrees, dribbleElbowBent, 0f);
+                }
+                return;
+            }
+
+            // Air-adjust contort on the way up (before the release).
+            if (_pc.IsAdjustingFinish)
+            {
+                switch (_pc.CurrentAdjustMove)
+                {
+                    case AdjustMove.Windmill:
+                        // The shooting arm circles a big loop to carry the ball around
+                        // the block; the off-arm tucks in for balance.
+                        Pose(shArm, shElb, shWr,
+                            windmillStartDegrees + windmillSweepDegrees * _pc.FinishRiseProgress01, -10f, 0f);
+                        Pose(ofArm, ofElb, ofWr, guardArmDegrees, dribbleElbowBent, 0f);
+                        return;
+                    case AdjustMove.LowRelease:
+                        // Drop the ball to a low scoop out front, shielded by the off-hand.
+                        Pose(shArm, shElb, shWr, lowScoopArmDegrees, lowScoopElbowDegrees, gatherWristDegrees);
+                        Pose(ofArm, ofElb, ofWr, layupGuideArmDegrees, layupGuideElbowDegrees, 0f);
+                        return;
+                    default: // SwitchHands — finish on the (already-switched) shooting side
+                        Pose(shArm, shElb, shWr, layupArmDegrees, layupElbowDegrees, gatherWristDegrees);
+                        Pose(ofArm, ofElb, ofWr, layupGuideArmDegrees, layupGuideElbowDegrees, gatherWristDegrees * 0.5f);
+                        return;
+                }
+            }
+
+            // Straight layups (no adjust).
+            if (!_pc.FinishIsDunk)
+            {
+                if (_pc.FinishOneFoot)
+                {
+                    // One-hand layup: the shooting hand rises to lay it up while the
+                    // off-hand stays on the SIDE of the ball (a guide) until release.
+                    Pose(shArm, shElb, shWr, layupArmDegrees, layupElbowDegrees, gatherWristDegrees);
+                    Pose(ofArm, ofElb, ofWr, layupGuideArmDegrees, layupGuideElbowDegrees, gatherWristDegrees * 0.5f);
+                }
+                else
+                {
+                    // Two-foot gather: both hands carry the ball up together (it
+                    // releases from the shooting hand in the lay-in above).
+                    float rp = _pc.FinishRiseProgress01;
+                    float arm = Mathf.Lerp(holdArmDegrees, -160f, rp);
+                    float elb = Mathf.Lerp(holdElbowDegrees, -12f, rp);
+                    Pose(_armR, _elbowR, _wristR, arm, elb, 0f);
+                    Pose(_armL, _elbowL, _wristL, arm, elb, 0f);
+                }
+                return;
+            }
+
+            // Straight dunks.
+            if (_pc.CurrentFinishStyle == FinishStyle.OneFootOneHandDunk)
+            {
+                // One-handed flush: cock the ball overhead in the dunking hand.
+                Pose(_armR, _elbowR, _wristR, dunkArmDegrees, dunkElbowDegrees, dunkWristDegrees);
+                Pose(_armL, _elbowL, _wristL, guardArmDegrees, dribbleElbowBent, 0f);
+                return;
+            }
+
+            // Two-hand dunk: gather the ball low and EXTEND it overhead as you rise
+            // to the rim — not held up the whole way. Wrists stay neutral until the
+            // slam drives it down through the rim.
+            {
+                float rp = _pc.FinishRiseProgress01;
+                float arm = Mathf.Lerp(holdArmDegrees, dunkArmDegrees, rp);
+                float elb = Mathf.Lerp(holdElbowDegrees, dunkElbowDegrees, rp);
+                float wr = Mathf.Lerp(holdWristDegrees, 0f, rp);
+                Pose(_armR, _elbowR, _wristR, arm, elb, wr);
+                Pose(_armL, _elbowL, _wristL, arm, elb, wr);
             }
         }
 
@@ -657,9 +784,10 @@ namespace MarioBasketball.Presentation
             }
             if (_benchClapTimer > 0f) _benchClapTimer -= Time.deltaTime;
 
-            // Sit: thighs forward off the bench, knees bent so the shins drop.
-            SetX(_legL, -52f); SetX(_legR, -52f);
-            SetX(_kneeL, 66f); SetX(_kneeR, 66f);
+            // Sit: thighs out forward along the seat (butt planted on it), knees
+            // bent ~90° so the shins hang straight down over the front edge.
+            SetX(_legL, -72f); SetX(_legR, -72f);
+            SetX(_kneeL, 88f); SetX(_kneeR, 88f);
 
             if (_benchClapTimer > 0f)
             {
@@ -703,6 +831,16 @@ namespace MarioBasketball.Presentation
             if (joint == null) return;
             Quaternion target = Quaternion.Euler(degrees, 0f, 0f);
             joint.localRotation = Quaternion.Slerp(joint.localRotation, target, poseLerp * Time.deltaTime);
+        }
+
+        /// <summary>Curl a hand toward a closed grip (0 = open, 1 = clamped shut):
+        /// the fingers hook in at the knuckle and the thumb closes to meet them.
+        /// A negative X rotation swings them toward the palm. The smoothing already
+        /// lives in <c>grip01</c>, so the pivots are set straight to the target.</summary>
+        void ApplyGrip(Transform fingers, Transform thumb, float grip01)
+        {
+            if (fingers != null) fingers.localRotation = Quaternion.Euler(-grip01 * gripCloseDegrees, 0f, 0f);
+            if (thumb != null) thumb.localRotation = Quaternion.Euler(-grip01 * thumbCloseDegrees, 0f, 0f);
         }
 
         static Transform FindDeep(Transform root, string name)

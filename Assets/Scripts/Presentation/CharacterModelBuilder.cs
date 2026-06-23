@@ -26,6 +26,7 @@ namespace MarioBasketball.Presentation
             : (_shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default"));
 
         static Mesh _cone;
+        static Mesh _net;
 
         public static void Build(Transform root, CharacterStats stats, float h, Color jersey)
         {
@@ -114,21 +115,29 @@ namespace MarioBasketball.Presentation
             Hand(el, side, lower, armR, skin);
         }
 
-        /// <summary>Articulated hand: wrist joint → flattened palm + four
-        /// fingers + an inward thumb (replaces the old sphere mitt).</summary>
+        /// <summary>Articulated hand: wrist joint → flattened palm + four fingers
+        /// on a knuckle pivot + an inward thumb on its own pivot. The
+        /// <c>JointFingers</c>/<c>JointThumb</c> pivots let <c>ProceduralAnimator</c>
+        /// curl the hand shut into a grip (e.g. closing onto the rim on a dunk); at
+        /// rest both pivots are unrotated, so the open hand looks exactly as before.</summary>
         static void Hand(Transform el, string side, float lower, float armR, Color skin)
         {
             Transform wr = Joint(el, "JointWrist" + side, new Vector3(0f, -lower, 0f));
             var palm = Sphere(wr, new Vector3(0f, -armR * 0.9f, 0f), armR * 2.2f, skin, "palm" + side);
             palm.transform.localScale = new Vector3(armR * 2.0f, armR * 2.4f, armR * 1.2f);
+            // Four fingers hang from a knuckle pivot at their base; curling the pivot
+            // swings the whole set into the palm (their rest position is unchanged).
+            Transform knuckle = Joint(wr, "JointFingers" + side, new Vector3(0f, -armR * 1.6f, 0f));
             for (int i = 0; i < 4; i++)
             {
                 float x = (i - 1.5f) * armR * 0.5f;
-                Capsule(wr, new Vector3(x, -armR * 2.2f, 0f), new Vector3(armR * 0.42f, armR * 0.6f, armR * 0.42f), skin, "finger" + side);
+                Capsule(knuckle, new Vector3(x, -armR * 0.6f, 0f), new Vector3(armR * 0.42f, armR * 0.6f, armR * 0.42f), skin, "finger" + side);
             }
-            // Thumb angles in toward the body.
+            // Thumb on its own pivot so it can close in opposition to the fingers; it
+            // keeps the inward splay (z-tilt) as a child offset of the pivot.
             float inward = side == "L" ? 1f : -1f;
-            var thumb = Capsule(wr, new Vector3(inward * armR * 1.0f, -armR * 1.2f, armR * 0.3f), new Vector3(armR * 0.42f, armR * 0.55f, armR * 0.42f), skin, "thumb" + side);
+            Transform thumbJoint = Joint(wr, "JointThumb" + side, new Vector3(inward * armR * 1.0f, -armR * 0.7f, armR * 0.3f));
+            var thumb = Capsule(thumbJoint, new Vector3(0f, -armR * 0.5f, 0f), new Vector3(armR * 0.42f, armR * 0.55f, armR * 0.42f), skin, "thumb" + side);
             thumb.transform.localEulerAngles = new Vector3(0f, 0f, inward * -40f);
         }
 
@@ -427,6 +436,63 @@ namespace MarioBasketball.Presentation
             _cone.SetTriangles(tris, 0);
             _cone.RecalculateNormals();
             return _cone;
+        }
+
+        /// <summary>A unit basketball net: 12 cords hung from a top ring of radius 1
+        /// that cross into a diamond mesh and taper inward as they fall to y=-1.
+        /// Built as line topology (the cords), so it reads as a real "netty" net
+        /// instead of a solid cone. Scale it by the rim radius (x/z) and the net
+        /// depth (y); <see cref="NetSwish"/> pinches/stretches that on a make.</summary>
+        public static Mesh NetMesh()
+        {
+            if (_net != null) return _net;
+            const int loops = 12;     // cords / nodes around each ring
+            const int rows = 9;       // rings top→bottom (even bands → closed diamonds)
+            const float bottomScale = 0.6f; // how far the net tapers in at the bottom
+
+            var verts = new List<Vector3>();
+            float step = Mathf.PI * 2f / loops;
+            for (int r = 0; r < rows; r++)
+            {
+                float t = r / (float)(rows - 1);
+                float radius = Mathf.Lerp(1f, bottomScale, t);
+                float y = -t;
+                // Alternate rings are offset half a segment so the cross-cords form
+                // diamonds rather than straight vertical lines.
+                float phase = (r & 1) * 0.5f * step;
+                for (int i = 0; i < loops; i++)
+                {
+                    float a = i * step + phase;
+                    verts.Add(new Vector3(Mathf.Cos(a) * radius, y, Mathf.Sin(a) * radius));
+                }
+            }
+
+            var lines = new List<int>();
+            for (int r = 0; r < rows - 1; r++)
+            {
+                int row = r * loops, below = (r + 1) * loops;
+                for (int i = 0; i < loops; i++)
+                {
+                    int a = row + i;
+                    // Each node drops two diagonal cords into the next ring; the pair
+                    // straddles the half-segment offset, and the direction flips each
+                    // row so successive bands close the diamonds.
+                    lines.Add(a); lines.Add(below + i);
+                    int other = (r & 1) == 0 ? (i + loops - 1) % loops : (i + 1) % loops;
+                    lines.Add(a); lines.Add(below + other);
+                }
+            }
+
+            _net = new Mesh { name = "Net" };
+            _net.SetVertices(verts);
+            // Sprites/Default tints by vertex colour × material colour — set the
+            // verts white so the cords show in the material's colour.
+            var cols = new Color[verts.Count];
+            for (int i = 0; i < cols.Length; i++) cols[i] = Color.white;
+            _net.colors = cols;
+            _net.SetIndices(lines.ToArray(), MeshTopology.Lines, 0);
+            _net.RecalculateBounds();
+            return _net;
         }
     }
 }

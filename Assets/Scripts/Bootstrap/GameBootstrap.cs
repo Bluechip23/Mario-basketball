@@ -396,18 +396,22 @@ namespace MarioBasketball.Bootstrap
                 if (p == null) continue;
                 Vector3 at = p.transform.position;       // already at the sideline bench spot
                 float h = p.BodyHeight;
+                // The seated hips sit ~0.05h below the player origin, so dropping the
+                // origin to just above the seat surface plants the butt ON it (the old
+                // "+ h/2" parked the feet on top, leaving them floating in a sit pose).
+                float sit = h * 0.08f;
                 Vector3 face = new Vector3(-Mathf.Sign(at.x), 0f, 0f); // look in toward the court
                 if (onPipes)
                 {
                     const float pipeH = 1.0f;
                     BuildPipe(new Vector3(at.x, 0f, at.z), pipeH, root);
-                    SeatPlayer(p, new Vector3(at.x, pipeH + h * 0.5f, at.z), face);
+                    SeatPlayer(p, new Vector3(at.x, pipeH + sit, at.z), face);
                 }
                 else
                 {
                     const float floatY = 1.15f, size = 0.95f;
                     BuildQuestionBlock(new Vector3(at.x, floatY, at.z), size, root);
-                    SeatPlayer(p, new Vector3(at.x, floatY + size * 0.5f + h * 0.5f, at.z), face);
+                    SeatPlayer(p, new Vector3(at.x, floatY + size * 0.5f + sit, at.z), face);
                 }
             }
         }
@@ -519,14 +523,15 @@ namespace MarioBasketball.Bootstrap
                 segCol.radius = 0.035f;
             }
 
-            // Net: a soft inverted cone that snaps on a make (NetSwish).
+            // Net: a diamond-mesh of cords hung from the rim (tapers in, hangs
+            // down) that snaps on a make (NetSwish).
             var net = new GameObject("Net");
             net.transform.SetParent(root.transform);
             net.transform.localPosition = rimCentre + new Vector3(0f, -0.02f, 0f);
-            net.transform.localScale = new Vector3(rimRadius * 1.7f, -0.5f, rimRadius * 1.7f); // apex down
-            net.AddComponent<MeshFilter>().sharedMesh = MarioBasketball.Presentation.CharacterModelBuilder.ConeMesh();
+            net.transform.localScale = new Vector3(rimRadius * 0.98f, 0.42f, rimRadius * 0.98f); // hangs to ~0.42m
+            net.AddComponent<MeshFilter>().sharedMesh = MarioBasketball.Presentation.CharacterModelBuilder.NetMesh();
             var netMr = net.AddComponent<MeshRenderer>();
-            netMr.material = new Material(LineMaterial) { color = new Color(0.95f, 0.95f, 0.95f, 0.85f) };
+            netMr.material = new Material(LineMaterial) { color = new Color(0.97f, 0.97f, 0.97f, 1f) };
             net.AddComponent<MarioBasketball.Presentation.NetSwish>();
 
             // Rim contact trigger (shot-clock "hit the rim" detection).

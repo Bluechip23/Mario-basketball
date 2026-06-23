@@ -15,4 +15,32 @@ namespace MarioBasketball.Gameplay
         /// <summary>Two-foot gather into a two-hand slam: grab the rim and hang.</summary>
         TwoHandSlam
     }
+
+    /// <summary>Which foot (feet) a finish leaves the floor from. A one-foot
+    /// layup drives the opposite knee and arm up and finishes with the hand
+    /// opposite the takeoff foot (left foot → right hand, and vice-versa); a
+    /// two-foot gather goes up with both hands and releases right.</summary>
+    public enum TakeoffFoot
+    {
+        Left,
+        Right,
+        Both
+    }
+
+    /// <summary>How a finisher contorts a shot in the air to beat the defender
+    /// (chosen from where the defender is). <see cref="None"/> = a straight
+    /// finish, no air-adjust.</summary>
+    public enum AdjustMove
+    {
+        None,
+        /// <summary>Switch the ball to the other hand and finish away from a
+        /// defender sitting on one side.</summary>
+        SwitchHands,
+        /// <summary>Drop the ball and scoop it in from a lower release, under a
+        /// defender contesting high.</summary>
+        LowRelease,
+        /// <summary>Windmill the ball way around to clear a rim protector going
+        /// straight up in front of you.</summary>
+        Windmill
+    }
 }

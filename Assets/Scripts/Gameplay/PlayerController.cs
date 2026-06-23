@@ -146,10 +146,26 @@ namespace MarioBasketball.Gameplay
         public float dunkThreshold = 5f;
         [Tooltip("Dunk block resistance per point of Power.")]
         public float dunkPowerBlockResist = 0.3f;
-        [Tooltip("Block chance multiplier when the shot is air-adjusted.")]
+        [Tooltip("Block chance multiplier when the shot is air-adjusted (fallback when no specific contort is picked).")]
         [Range(0f, 1f)] public float adjustBlockReduction = 0.4f;
         [Tooltip("Max make% lost to an air-adjust (mitigated by Inside Scoring).")]
         [Range(0f, 1f)] public float maxAdjustPenalty = 0.35f;
+        [Tooltip("Block multiplier for a windmill contort — clears the most space.")]
+        [Range(0f, 1f)] public float windmillBlockMult = 0.3f;
+        [Tooltip("Block multiplier for a switch-hands contort.")]
+        [Range(0f, 1f)] public float switchHandsBlockMult = 0.5f;
+        [Tooltip("Block multiplier for a low-scoop contort.")]
+        [Range(0f, 1f)] public float lowReleaseBlockMult = 0.55f;
+        [Tooltip("Make-penalty weight for a windmill (>1 = harder than a plain adjust).")]
+        public float windmillPenaltyWeight = 1.3f;
+        [Tooltip("Make-penalty weight for a low scoop (<1 = safer than a plain adjust).")]
+        public float lowReleasePenaltyWeight = 0.7f;
+        [Tooltip("Defender lateral offset (× body height) beyond which an adjust switches hands to finish away from them.")]
+        public float adjustSideThreshold = 0.4f;
+        [Tooltip("Chance a non-dunk layup gathers off both feet (a power layup / floater) instead of one foot.")]
+        [Range(0f, 1f)] public float layupBothFeetChance = 0.25f;
+        [Tooltip("How far to the shooting-hand side a one-hand layup carries the ball (× body height).")]
+        public float layupBallSideOffset = 0.14f;
         [Tooltip("In the post, a Left-Trigger press shorter than this (and with no face-button move during it) fires the spin; a longer hold stays the advanced-move (turbo) modifier.")]
         public float postSpinTapWindow = 0.25f;
 
@@ -273,9 +289,30 @@ namespace MarioBasketball.Gameplay
                     // (FinishRiseProgress01) so the ball stays glued to the hands
                     // instead of racing ahead of them on the way up.
                     float k = FinishRiseProgress01;
+                    // Windmill adjust: the ball loops a big vertical circle beside the
+                    // shooting shoulder as the player rises (the shooting hand follows
+                    // it — see ProceduralAnimator.FinishArms; keep its windmill sweep at
+                    // one full -360° loop to stay in sync). The slam drives it to the rim.
+                    if (_finishAdjusted && _adjustMove == AdjustMove.Windmill && !_finishSlamming)
+                    {
+                        float loop = Mathf.PI * 2f * k;
+                        float r = 0.36f * h;
+                        float sideSign = _shootHandLeft ? -1f : 1f;
+                        Vector3 shoulder = transform.position + Vector3.up * (0.35f * h) + MRight * (sideSign * 0.18f * h);
+                        return shoulder + MFwd * (Mathf.Sin(loop) * r) + Vector3.up * (-Mathf.Cos(loop) * r);
+                    }
                     float up = Mathf.Lerp(0.5f, _finishIsDunk ? 0.98f : 0.86f, k);
                     float fwd = Mathf.Lerp(0.18f, _finishIsDunk ? 0.10f : 0.16f, k);
-                    Vector3 hand = transform.position + MFwd * (fwd * h) + Vector3.up * (up * h);
+                    // A low-scoop adjust keeps the ball down (waist/chest) instead of
+                    // overhead, so it's released from under a high contest.
+                    if (_finishAdjusted && _adjustMove == AdjustMove.LowRelease)
+                        up = Mathf.Lerp(0.34f, 0.52f, k);
+                    // A one-hand layup carries the ball out to the shooting-hand side;
+                    // dunks and two-foot gathers keep it centred overhead.
+                    float side = 0f;
+                    if (!_finishIsDunk && _finishFoot != TakeoffFoot.Both)
+                        side = (_shootHandLeft ? -1f : 1f) * layupBallSideOffset;
+                    Vector3 hand = transform.position + MFwd * (fwd * h) + MRight * (side * h) + Vector3.up * (up * h);
 
                     // Slam phase: the hand drives the ball the last stretch down
                     // into the rim — it stays in the hand and only lets go once
@@ -380,10 +417,17 @@ namespace MarioBasketball.Gameplay
             Mathf.Clamp01(1f - _verticalVelocity / Mathf.Max(0.01f, ShotTakeoffVelocity()));
         /// <summary>How the current finish looks (layup / one-foot dunk / slam).</summary>
         public FinishStyle CurrentFinishStyle => _finishStyle;
-        /// <summary>This finish leaves off one foot (layups and the one-foot dunks).</summary>
-        public bool FinishOneFoot => _finishStyle != FinishStyle.TwoHandSlam;
+        /// <summary>This finish leaves off a single foot (vs a two-foot gather) —
+        /// true for one-foot layups and the one-foot dunks.</summary>
+        public bool FinishOneFoot => _finishFoot != TakeoffFoot.Both;
         /// <summary>Which foot the one-foot finish leaves from (drives the leg pose).</summary>
-        public bool FinishTakeoffLeft => _finishTakeoffLeft;
+        public bool FinishTakeoffLeft => _finishFoot == TakeoffFoot.Left;
+        /// <summary>Which hand finishes the layup: left-foot takeoff → right hand,
+        /// right-foot → left hand, two-foot → right. A switch-hands air-adjust
+        /// flips it to finish away from the defender.</summary>
+        public bool ShootHandLeft => _shootHandLeft;
+        /// <summary>How an air-adjust is contorting this finish (None when straight).</summary>
+        public AdjustMove CurrentAdjustMove => _adjustMove;
         /// <summary>Hanging on the rim after a two-hand slam (held a beat).</summary>
         public bool IsHanging => _hangTimer > 0f;
         /// <summary>Skying for an alley-oop — up above the rim, hands ready, hanging.</summary>
@@ -465,7 +509,9 @@ namespace MarioBasketball.Gameplay
         bool _finishSlamming;
         float _finishSlamTimer;
         FinishStyle _finishStyle;
-        bool _finishTakeoffLeft;
+        TakeoffFoot _finishFoot;          // which foot/feet this finish leaves from
+        bool _shootHandLeft;              // which hand finishes (flips on a switch-hands adjust)
+        AdjustMove _adjustMove;           // how an air-adjust contorts the shot (None when straight)
         float _finishGravityScale = 0.4f; // per-finish, so the takeoff matches a jump shot's rise (see StartFinish)
         float _hangTimer;
         Vector3 _hangTarget;
@@ -623,8 +669,13 @@ namespace MarioBasketball.Gameplay
                 // Air-adjust a finish: arm it on a FRESH LT press in the air. Doing
                 // it on the press (not a held LT) means sprinting into the rim with
                 // turbo held doesn't auto-contort every dunk — you tap LT mid-leap to
-                // adjust around a shot-blocker. Once armed it stays for this finish.
-                if (_finishing && _adjustHeld && !_prevSprintHeld) _finishAdjusted = true;
+                // adjust around a shot-blocker. Once armed it stays for this finish,
+                // and we lock in WHICH contort (from where the defender is) right then.
+                if (_finishing && _adjustHeld && !_prevSprintHeld && !_finishAdjusted)
+                {
+                    _finishAdjusted = true;
+                    _adjustMove = PickAdjustMove();
+                }
                 // In the post, a quick LT TAP is the spin move; HOLDING LT stays the
                 // advanced-move (turbo) modifier for the face buttons.
                 bool sprintNow = _input.SprintHeld;
@@ -1053,6 +1104,7 @@ namespace MarioBasketball.Gameplay
             _finishSlamming = false;
             _finishTimer = 0f;
             _finishAdjusted = false;
+            _adjustMove = AdjustMove.None;
             // Commit to a dunk if this player can throw it down (off the base Dunk
             // rating, so fatigue doesn't quietly demote a real dunker). The human
             // holds the button to keep the dunk; releasing before the rim drops it
@@ -1060,7 +1112,12 @@ namespace MarioBasketball.Gameplay
             // dunks. A non-dunker always lays it in.
             _finishIsDunk = (_character != null ? _character.stats.Get(StatType.Dunk) : 5) >= dunkThreshold;
             _finishStyle = PickFinishStyle(_finishIsDunk);
-            _finishTakeoffLeft = Random.value < 0.5f;
+            // Pick the takeoff foot, then the finishing hand: a one-foot layup
+            // finishes with the hand opposite the takeoff foot, a two-foot gather
+            // releases right (see ShootHandLeft / OnShootReleased can drop a dunk
+            // to a layup but keeps the foot).
+            _finishFoot = PickTakeoffFoot();
+            _shootHandLeft = _finishFoot == TakeoffFoot.Right;
             // Arcade air: layups are a small hop, dunks soar (over the rim for big
             // dunkers) — the apex still scales with the Dunk stat. But the player
             // leaves the floor at the SAME rise speed as a jump shot, then gravity
@@ -1107,6 +1164,46 @@ namespace MarioBasketball.Gameplay
             float slamBias = 0.35f + 0.4f * Mathf.Clamp01((power - 4f) / 6f);
             if (Random.value < slamBias) return FinishStyle.TwoHandSlam;
             return Random.value < 0.5f ? FinishStyle.OneFootOneHandDunk : FinishStyle.OneFootTwoHandDunk;
+        }
+
+        /// <summary>Pick which foot/feet a finish leaves from: a two-hand slam
+        /// always gathers off both, a layup occasionally goes up off both (a power
+        /// layup / floater) but usually drives off a single foot.</summary>
+        TakeoffFoot PickTakeoffFoot()
+        {
+            if (_finishStyle == FinishStyle.TwoHandSlam) return TakeoffFoot.Both;
+            if (!_finishIsDunk && Random.value < layupBothFeetChance) return TakeoffFoot.Both;
+            return Random.value < 0.5f ? TakeoffFoot.Left : TakeoffFoot.Right;
+        }
+
+        /// <summary>Choose how to contort an air-adjust from where the nearest
+        /// defender is: off to one side → switch hands and finish away from them;
+        /// square in front and tight (a rim protector going vertical) → windmill
+        /// the ball around it; otherwise drop into a low scoop. A switch also flips
+        /// the finishing hand to the side away from the defender.</summary>
+        AdjustMove PickAdjustMove()
+        {
+            PlayerController def = NearestOpponentTo(transform.position);
+            if (def == null) return _finishIsDunk ? AdjustMove.Windmill : AdjustMove.LowRelease;
+
+            Vector3 toDef = def.transform.position - transform.position; toDef.y = 0f;
+            float dist = toDef.magnitude;
+            float lateral = Vector3.Dot(toDef, MRight);     // + = defender on my right
+            Vector3 toRim = RimDirection();
+            float front = (toRim.sqrMagnitude > 0.01f && dist > 0.01f)
+                ? Vector3.Dot(toDef / dist, toRim.normalized) : 0f;
+            float h = BodyHeight;
+
+            // Defender clearly off to one side → finish on the other side.
+            if (Mathf.Abs(lateral) > adjustSideThreshold * h && Mathf.Abs(lateral) >= Mathf.Abs(front) * dist)
+            {
+                _shootHandLeft = lateral > 0f;  // defender on the right → finish lefty
+                return AdjustMove.SwitchHands;
+            }
+            // Defender square in front and tight → go around it.
+            if (front > 0.4f && dist < blockRange * 1.2f) return AdjustMove.Windmill;
+            // Otherwise scoop it under.
+            return AdjustMove.LowRelease;
         }
 
         void ResolveFinish()
@@ -1169,7 +1266,7 @@ namespace MarioBasketball.Gameplay
                     float blk = defender.EffectiveStat(StatType.Blocks);
                     float resist = isDunk ? Effective(StatType.Power, 5f) * dunkPowerBlockResist : 0f;
                     float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - finisherStat - resist), 0f, blockMaxChance) * closeness;
-                    if (adjusted) chance *= adjustBlockReduction; // contort away from the block
+                    if (adjusted) chance *= AdjustBlockMult(); // contort away from the block
                     if (Random.value < chance)
                     {
                         Vector3 away = transform.position - aim; away.y = 0f;
@@ -1239,14 +1336,28 @@ namespace MarioBasketball.Gameplay
             if (ball.ForceMake()) _calledShotsUsed++;
         }
 
-        /// <summary>Make% lost to an air-adjust — fully mitigated at Inside 10,
-        /// and waived entirely for an Acrobat (Baby Mario alters in the air free).</summary>
+        /// <summary>Make% lost to an air-adjust. Driven by Inside Scoring (fully
+        /// mitigated at Inside 10, full penalty at Inside 1), then weighted by the
+        /// contort — a windmill is showier and costs more, a low scoop is safer.
+        /// Waived entirely for an Acrobat (Baby Mario alters in the air free).</summary>
         float AdjustPenalty()
         {
             if (HasTrait(HiddenTrait.Acrobat)) return 0f;
             float inside = Effective(StatType.InsideScoring, 5f);
-            return maxAdjustPenalty * (1f - Mathf.Clamp01((inside - 1f) / 9f));
+            float insideMit = 1f - Mathf.Clamp01((inside - 1f) / 9f);
+            float moveWeight =
+                _adjustMove == AdjustMove.Windmill ? windmillPenaltyWeight :
+                _adjustMove == AdjustMove.LowRelease ? lowReleasePenaltyWeight : 1f;
+            return maxAdjustPenalty * insideMit * moveWeight;
         }
+
+        /// <summary>Block-chance multiplier for the chosen contort — a windmill
+        /// clears the most space, a switch / low scoop a bit less. Falls back to
+        /// the generic reduction when no specific move was picked.</summary>
+        float AdjustBlockMult() =>
+            _adjustMove == AdjustMove.Windmill ? windmillBlockMult :
+            _adjustMove == AdjustMove.SwitchHands ? switchHandsBlockMult :
+            _adjustMove == AdjustMove.LowRelease ? lowReleaseBlockMult : adjustBlockReduction;
 
         /// <summary>How much of the requested fade actually comes out, given the
         /// momentum carried into the jump: leaning <b>with</b> your run direction

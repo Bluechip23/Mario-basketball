@@ -85,14 +85,17 @@ namespace MarioBasketball.UI
                         GUI.Label(new Rect((Screen.width - 320) / 2f, Screen.height - 232f, 320f, 22f),
                             "In the air — hold LT + stick to steer around the block  ·  X pass", _mid);
 
-                    if (humanPc.IsShooting)
+                    // Timing meter: rises for both a jump shot and a post move (hook,
+                    // turnaround, drop step…). Hit the marker for a perfect release.
+                    if (humanPc.IsShooting || humanPc.IsPostShooting)
                     {
-                        // Shot meter: fill rises; hit the marker for a perfect release.
+                        float charge = humanPc.IsPostShooting ? humanPc.PostShotChargeFraction : humanPc.ShotChargeFraction;
+                        float perfect = humanPc.IsPostShooting ? humanPc.PostShotPerfectFraction : humanPc.ShotPerfectFraction;
                         const float mw = 240f, mh = 16f;
                         float mx = (Screen.width - mw) / 2f, my = Screen.height - 210f;
                         GUI.Box(new Rect(mx, my, mw, mh), GUIContent.none);
-                        GUI.Box(new Rect(mx, my, mw * humanPc.ShotChargeFraction, mh), GUIContent.none);
-                        float markX = mx + mw * humanPc.ShotPerfectFraction;
+                        GUI.Box(new Rect(mx, my, mw * charge, mh), GUIContent.none);
+                        float markX = mx + mw * perfect;
                         GUI.Box(new Rect(markX - 2f, my - 4f, 4f, mh + 8f), GUIContent.none);
                         GUI.Label(new Rect(mx, my - 22f, mw, 20f), "Release at the marker!", _small);
                     }
@@ -101,7 +104,7 @@ namespace MarioBasketball.UI
                     {
                         float lev = Mathf.Clamp(humanPc.Post.Leverage, -humanPc.Post.maxLeverage, humanPc.Post.maxLeverage);
                         float frac = Mathf.InverseLerp(-humanPc.Post.maxLeverage, humanPc.Post.maxLeverage, lev);
-                        GUI.Label(new Rect(20, 178, 300, 20), "Back-down (tap B):", _small);
+                        GUI.Label(new Rect(20, 178, 300, 20), "Back-down (tap RT):", _small);
                         GUI.Box(new Rect(150, 180, 160, 14), GUIContent.none);
                         GUI.Box(new Rect(150, 180, 160 * frac, 14), GUIContent.none);
                     }

@@ -68,11 +68,10 @@ bindings exist as a fallback.
 | **Dive** for a loose ball | B (○) | X |
 | **Post up** (hold) | RB (R1) | R |
 | **Back down** / bump / **push-foul** | RT (R2) | B |
-| Post move — **Hook** | Y (△) | H |
-| Post move — **Drop step** | A (✕) | G |
-| Post move — **Spin** | LT (L2) tap | V |
-| Post move — **Fake** | B (○) | T |
-| Post **advanced** (sky hook / power step / turnaround) | hold LT + Y/A | hold Shift + H/G/V |
+| Post move — **Pump fake** | Y (△) | T |
+| Post move — **Spin** | B (○) | V |
+| Post move — **Turnaround jumper** | X (□) | H |
+| Post **advanced** — **Hook** / **Power drop step** | hold LT + Y / LT + X | hold Shift + T / Shift + H |
 | Timeout (home) | D-pad Up | T |
 | Substitute (home) | D-pad Down | Y |
 | Pause / Stats | Start | Esc |
@@ -85,10 +84,11 @@ throw make% scales with the shooter's Mid Range). Nobody fouls out.
 **Post game:** with the ball, hold **RB** to turn your back to the basket, then
 tap **RT** (Back down) to bulldoze your defender toward the rim — a
 Power-vs-Power tap battle; if they win they shove you off or knock you down.
-With position, hit a post move: **Y** Hook, **A** Drop step, a quick **LT** tap
-to Spin, **B** Fake. Hold **LT** while pressing a face button for the advanced
-versions (sky hook / power step / turnaround). You can still **pass out** with
-**X**. On defense against a poster, mash **RT** to bump them off.
+With position, hit a post move: **Y** pump fake, **B** spin, **X** turnaround
+jumper. Hold **LT** for the heavy versions — **LT + Y** is the hook shot,
+**LT + X** the power drop step. Each shot pops a release meter you time like a
+jumper. **A** is always the pass, so you can kick it out at any time. On defense
+against a poster, mash **RT** to bump them off.
 
 > Because the buttons are contextual, the same face button does different things
 > by situation (e.g. **A** shoots with the ball, switches on defense, and is the

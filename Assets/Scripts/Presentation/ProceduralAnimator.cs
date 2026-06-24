@@ -187,7 +187,7 @@ namespace MarioBasketball.Presentation
             // Body tilt: whip around on a spin move, sprawl to the floor when
             // knocked down, or lean into a fadeaway jump shot.
             bool spinMove = _pc.IsDribbleMoveGesture && _pc.CurrentDribbleMove == DribbleMoveType.Spin;
-            bool postSpin = _pc.IsDoingPostMove && _pc.CurrentPostMove == PostMove.Spin;
+            bool postSpin = _pc.IsDoingPostMove && _pc.PostMoveType == PostMove.Spin;
             if (_model != null)
             {
                 if (spinMove && !_pc.IsFallen)

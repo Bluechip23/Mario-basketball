@@ -234,6 +234,12 @@ namespace MarioBasketball.Gameplay
         public float diveBallSeekRange = 6f;
         public float shoveDuration = 0.35f;
 
+        [Header("Post separation moves (spin / power drop step → drive out)")]
+        [Tooltip("Burst speed (m/s) a spin / power drop step drives toward the rim as it breaks out of the post.")]
+        public float postDriveBurstSpeed = 6.5f;
+        [Tooltip("How long the spin whirl / drop-step lunge animates as the player breaks out of the post to finish.")]
+        public float postMoveDriveTime = 0.4f;
+
         [Header("Push / foul (Power)")]
         public float pushRange = 1.7f;
         public float pushCooldown = 0.8f;
@@ -464,11 +470,17 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which post move is currently being shot — drives the distinct
         /// hook / power-drop-step / fadeaway body animation.</summary>
         public PostMove CurrentPostMove => _post != null ? _post.CurrentMove : PostMove.Hook;
-        /// <summary>Mid spin / power-drop-step footwork (a separation move, not a
-        /// shot) — drives the spin/lunge body animation.</summary>
-        public bool IsDoingPostMove => _post != null && _post.IsDoingPostMove;
+        /// <summary>Mid spin / power-drop-step footwork — a move that beats the
+        /// defender and drives you OUT of the post toward the rim (you finish it
+        /// yourself). Lives here, not on the post, so it survives the post ending.
+        /// Drives the spin/lunge body animation.</summary>
+        public bool IsDoingPostMove => _postMoveGestureTimer > 0f;
         /// <summary>How far through the spin / drop-step footwork (0-1).</summary>
-        public float PostMoveGesture01 => _post != null ? _post.PostMoveGesture01 : 0f;
+        public float PostMoveGesture01 =>
+            postMoveDriveTime > 0.0001f ? Mathf.Clamp01(1f - _postMoveGestureTimer / postMoveDriveTime) : 0f;
+        /// <summary>Which separation move is driving out of the post (spin vs power
+        /// drop step) — picks the spin whirl vs the shoulder-down lunge animation.</summary>
+        public PostMove PostMoveType => _postMoveType;
         /// <summary>How hard the player is backing their man down (0 = holding,
         /// 1 = driving at full power) — sinks the post stance deeper as they go.</summary>
         public float PostDrive01 => (_post != null && _post.IsPosting && !IsPostShooting && _post.maxBackdownSpeed > 0.01f)
@@ -495,6 +507,9 @@ namespace MarioBasketball.Gameplay
         Vector2 _moveIntent;
         bool _sprintIntent;
         bool _sprintingNow;
+        float _postMoveGestureTimer; // spin / power-drop footwork driving out of the post
+        PostMove _postMoveType;
+        bool _postRepostBlocked;     // after a drive-out, block re-posting until RB is released
         float _turbo = 1f;
         float _stealCooldown;
         float _stunTimer;
@@ -647,6 +662,7 @@ namespace MarioBasketball.Gameplay
             float dt = Time.deltaTime;
             if (_stealCooldown > 0f) _stealCooldown -= dt;
             if (_stunTimer > 0f) _stunTimer -= dt;
+            if (_postMoveGestureTimer > 0f) _postMoveGestureTimer -= dt;
             if (_fallTimer > 0f) _fallTimer -= dt;
             if (_hangTimer > 0f) _hangTimer -= dt;
             if (_skyTimer > 0f) _skyTimer -= dt;
@@ -817,6 +833,13 @@ namespace MarioBasketball.Gameplay
                 if (!_input.PostUpHeld) _post.ReleasePostShot();
                 return;
             }
+            // Mid spin / power-drop drive-out: don't re-post on top of the drive.
+            if (IsDoingPostMove) return;
+            // After driving out of the post, don't auto-repost while the post button
+            // is still held — you have to release it and press again to post anew.
+            if (!_input.PostUpHeld) _postRepostBlocked = false;
+            if (_postRepostBlocked) return;
+
             bool wantPost = _input.PostUpHeld && HasBall && !IsStunned && _cc.isGrounded;
             if (wantPost && !IsPosting) _post.Begin(NearestOpponentTo(transform.position));
             else if (!_input.PostUpHeld && IsPosting) _post.End();
@@ -1982,6 +2005,25 @@ namespace MarioBasketball.Gameplay
             // the shot) rather than starting a new move.
             if (_post.PostShotActive) { _post.ReleasePostShot(); return; }
             _post.DoMove(move);
+        }
+
+        /// <summary>A spin / power drop step beat the defender — break OUT of the
+        /// post and drive at the rim (the move never scores on its own; the player
+        /// finishes with a dunk/layup, pulls a shot, or passes). Called by
+        /// <see cref="PostUpController"/> after it resolves the move's footwork.</summary>
+        public void StartPostDrive(PostMove move)
+        {
+            Vector3 toRim = RimDirection();
+            if (_post != null) _post.End();          // leave the post — now a live driver
+            _postRepostBlocked = true;               // don't snap back into the post on the held button
+            _postMoveType = move;
+            _postMoveGestureTimer = postMoveDriveTime;
+            if (toRim.sqrMagnitude > 0.01f)
+            {
+                Vector3 d = toRim.normalized;
+                ApplyShove(d * postDriveBurstSpeed); // carry toward the rim
+                transform.rotation = Quaternion.LookRotation(d, Vector3.up); // face up to finish
+            }
         }
 
         // ---- AI hooks ------------------------------------------------------

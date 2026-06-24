@@ -177,11 +177,12 @@ Saved players show up alongside the roster on the Team Select screen.
 - **Post game** — Hold to back your defender down (a Power-vs-Power battle).
   Your **shots** are the **turnaround fadeaway** (X) and the **hook** (LT + Y):
   each pops a release meter you time like a jumper — hold to rise, let go at the
-  marker to bury it. Your **moves** create space but never score on their own —
-  a **spin** (B) to shake the defender, or a **power drop step** (LT + X) to
-  bulldoze into the lane — then you shoot, drive to the rim, or **pass out**
-  (A). A **pump fake** (Y) gets the defender in the air first. Lose the back-down
-  battle and you get shoved off or put on the floor.
+  marker to bury it. Your **moves** never score on their own — they beat the
+  defender and break you **out of the post on a drive to the rim**, where you
+  finish it yourself (a dunk/layup) or kick it out: a **spin** (B) shakes the
+  man, a **power drop step** (LT + X) bulldozes him aside. A **pump fake** (Y)
+  gets him in the air first; **A** passes any time. Lose the back-down battle and
+  you get shoved off or put on the floor.
 - **Above-the-rim finishes** — Dunkers soar over the rim, grab iron and throw
   it down; everyone gets enough air to adjust a layup or dunk around a
   shot-blocker. Defenders can rise to the rim to swat it.

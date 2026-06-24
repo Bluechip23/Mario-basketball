@@ -74,17 +74,9 @@ namespace MarioBasketball.Gameplay
         [Tooltip("Block-chance multiplier on an up-and-under off a bitten fake.")]
         [Range(0f, 1f)] public float upAndUnderBlockMult = 0.25f;
 
-        [Header("Separation moves (spin / power drop step — NEVER score on their own)")]
-        [Tooltip("Leverage a spin gains as it works into better post position.")]
-        public float spinLeverageGain = 1.5f;
-        [Tooltip("Burst speed (m/s) a spin pushes off toward the rim for separation.")]
-        public float spinSeparationSpeed = 4.5f;
-        [Tooltip("How long the spin freezes a shaken defender.")]
+        [Header("Separation moves (spin / power drop step — beat the man, drive OUT to finish)")]
+        [Tooltip("How long a shaken defender is frozen when a spin shakes them loose.")]
         public float spinFreeze = 0.5f;
-        [Tooltip("Burst speed (m/s) a power drop step steps into the lane with.")]
-        public float dropStepStepSpeed = 3.6f;
-        [Tooltip("How long the spin / drop-step footwork animates.")]
-        public float postMoveGestureTime = 0.5f;
 
         [Header("Shimmy (right-stick hard dribble in the post)")]
         public float shimmyPower = 5f;
@@ -128,13 +120,6 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which post move is currently going up (drives the body
         /// animation — a hook reads very differently from a power drop step).</summary>
         public PostMove CurrentMove { get; private set; }
-
-        /// <summary>A separation move (spin / power drop step) is mid-footwork. These
-        /// never shoot — they create space, then the player shoots/finishes/passes.</summary>
-        public bool IsDoingPostMove => _postMoveGestureTimer > 0f;
-        /// <summary>How far through the spin / drop-step footwork (0-1).</summary>
-        public float PostMoveGesture01 =>
-            postMoveGestureTime > 0.0001f ? Mathf.Clamp01(1f - _postMoveGestureTimer / postMoveGestureTime) : 0f;
         float PostShotMeterDuration => Mathf.Max(0.01f, postShotPerfectTime + postShotAutoReleaseAfter);
         /// <summary>How full the post-shot release meter is (0-1).</summary>
         public float PostShotChargeFraction => PostShotActive ? Mathf.Clamp01(_postShotTimer / PostShotMeterDuration) : 0f;
@@ -148,7 +133,6 @@ namespace MarioBasketball.Gameplay
         float _fakeTimer;
         float _shimmyCooldown;
         float _fakeGestureTimer;
-        float _postMoveGestureTimer;
         float _postShotTimer;
         float _postShotQuality;
         bool _postShotBlockable;
@@ -168,7 +152,6 @@ namespace MarioBasketball.Gameplay
             _fakeActive = false;
             PostShotActive = false;
             _postShotTimer = 0f;
-            _postMoveGestureTimer = 0f;
             DriveVelocity = Vector3.zero;
         }
 
@@ -178,7 +161,6 @@ namespace MarioBasketball.Gameplay
             _defender = null;
             _fakeActive = false;
             PostShotActive = false;
-            _postMoveGestureTimer = 0f;
             DriveVelocity = Vector3.zero;
         }
 
@@ -302,7 +284,6 @@ namespace MarioBasketball.Gameplay
             }
             if (_shimmyCooldown > 0f) _shimmyCooldown -= dt;
             if (_fakeGestureTimer > 0f) _fakeGestureTimer -= dt;
-            if (_postMoveGestureTimer > 0f) _postMoveGestureTimer -= dt;
 
             if (_leverage <= knockdownThreshold) DefenderWins(knockdown: true);
             else if (_leverage <= shoveThreshold) DefenderWins(knockdown: false);
@@ -420,31 +401,22 @@ namespace MarioBasketball.Gameplay
                 return;
             }
 
-            _leverage = Mathf.Min(maxLeverage, _leverage + spinLeverageGain);
-            BeginPostMoveGesture(PostMove.Spin);
-
-            // Spin off toward the rim for a beat of separation.
-            Vector3 toRim = RimDir();
-            if (toRim.sqrMagnitude > 0.01f) _pc.ApplyShove(toRim.normalized * spinSeparationSpeed);
-
-            // Shake the defender (Post Offense vs Post Defense) → frozen for a beat.
+            // Shake the defender (Post Offense vs Post Defense) → frozen for a beat,
+            // then spin off and drive OUT of the post toward the rim (you finish it).
             if (_defender != null)
             {
                 float shake = Mathf.Clamp(0.45f + 0.05f * (offense - defense), 0.1f, 0.9f);
                 if (Random.value < shake) _defender.Stun(spinFreeze);
             }
+            _pc.StartPostDrive(PostMove.Spin);
         }
 
-        /// <summary>Power drop step: bulldoze into the lane off the Power stat,
-        /// shoving the defender aside (or flattening an overpowered one) and stepping
-        /// into better position. It NEVER scores — afterward the player finishes,
-        /// shoots, or passes.</summary>
+        /// <summary>Power drop step: bulldoze off the Power stat, shoving the defender
+        /// aside (or flattening an overpowered one), then drive OUT of the post toward
+        /// the rim. It NEVER scores on its own — the player finishes it.</summary>
         void ResolvePowerDropStep()
         {
             float power = _pc.EffectiveStat(StatType.Power);
-            _leverage = Mathf.Min(maxLeverage, _leverage + dropStepLungeLeverage + 0.2f * power);
-            BeginPostMoveGesture(PostMove.PowerDropStep);
-
             if (_defender != null)
             {
                 Vector3 aside = _defender.transform.position - transform.position; aside.y = 0f;
@@ -453,28 +425,7 @@ namespace MarioBasketball.Gameplay
                 if (power - _defender.EffectiveStat(StatType.Power) >= powerDropKnockdownGap)
                     _defender.Stun(0.7f, fall: true); // run clean over them
             }
-
-            // Step into the lane toward the rim to create the finish.
-            Vector3 toRim = RimDir();
-            if (toRim.sqrMagnitude > 0.01f) _pc.ApplyShove(toRim.normalized * dropStepStepSpeed);
-        }
-
-        /// <summary>Start the spin / power-drop footwork window (drives the body
-        /// animation). The move's effect already happened; this is the visual beat.</summary>
-        void BeginPostMoveGesture(PostMove move)
-        {
-            CurrentMove = move;
-            _postMoveGestureTimer = postMoveGestureTime;
-        }
-
-        /// <summary>Horizontal direction from the player to the attacking rim.</summary>
-        Vector3 RimDir()
-        {
-            var gm = GameManager.Instance;
-            Hoop hoop = gm != null ? gm.GetAttackingHoop(_pc.team) : null;
-            if (hoop == null) return Vector3.zero;
-            Vector3 d = hoop.AimPoint - transform.position; d.y = 0f;
-            return d;
+            _pc.StartPostDrive(PostMove.PowerDropStep);
         }
 
         /// <summary>Footwork is done — launch the shot and start its release

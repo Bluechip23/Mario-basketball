@@ -210,13 +210,17 @@ so kicking it out is always live. There are two kinds of button:
 - **Up & Under** (X while a bitten fake is live): step through under the
   airborne defender for a nearly free finish.
 
-**Setup moves** (create space, then hand control back — they **never score on
-their own**; the player shoots, drives to a finish, or passes afterward):
+**Setup moves** (they **never score on their own** — they beat the defender and
+break the player OUT of the post on a drive to the rim, where he finishes the
+play himself with a dunk/layup, pulls a shot, or passes):
 - **Pump Fake** (Y): a ball-fake that can get the defender in the air.
-- **Spin** (B): spin off the defender for a burst of separation; can shake them
-  (freezing them for a beat) and still risks a strip into a strong defender.
+- **Spin** (B): spin off the defender — can shake them (freezing them for a beat)
+  and still risks a strip into a strong defender — then drive out to the rim.
 - **Power Drop Step** (LT+X): a Power-driven bulldoze that shoves (or flattens)
-  the defender and steps into the lane.
+  the defender, then drives out of the post toward the rim.
+The drive itself is a normal live drive: the player breaks contact, faces up, and
+finishes with the inside-finish system (or kicks it out). The AI sticks to the
+scoring post moves; these drive-outs are a human-skill option.
 
 **Timing a post shot.** The footwork is instant — but the **shot is timed**,
 like a jump shot. Triggering a shooting move plants the player and starts a short

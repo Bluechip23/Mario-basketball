@@ -95,6 +95,8 @@ namespace MarioBasketball.Gameplay
         public int calledShotMax = 2;
         [Tooltip("Called Shot: only shots launched within this distance (m) of the hoop — i.e. within half court — qualify.")]
         public float calledShotRange = 14f;
+        [Tooltip("Called Shot: how long the on-screen callout (\"CALLED SHOT!\" etc.) lingers.")]
+        public float calledShotCalloutTime = 1.4f;
         [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
         public float dribbleMoveThreshold = 0.6f;
 
@@ -481,6 +483,16 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which separation move is driving out of the post (spin vs power
         /// drop step) — picks the spin whirl vs the shoulder-down lunge animation.</summary>
         public PostMove PostMoveType => _postMoveType;
+        /// <summary>This player has Delfan's Called Shot trait (the HUD shows charges).</summary>
+        public bool HasCalledShot => HasTrait(HiddenTrait.CalledShot);
+        /// <summary>Called Shot charges left this game.</summary>
+        public int CalledShotsRemaining => HasCalledShot ? Mathf.Max(0, calledShotMax - _calledShotsUsed) : 0;
+        /// <summary>A brief Called-Shot message to surface (or null) — "CALLED SHOT!"
+        /// on a make, or a nudge explaining why a double-tap didn't take.</summary>
+        public string CalledShotCallout => _calledShotCalloutTimer > 0f ? _calledShotCallout : null;
+        /// <summary>Fade weight (0-1) for the current callout, for the HUD to dim it out.</summary>
+        public float CalledShotCallout01 =>
+            calledShotCalloutTime > 0.0001f ? Mathf.Clamp01(_calledShotCalloutTimer / calledShotCalloutTime) : 0f;
         /// <summary>How hard the player is backing their man down (0 = holding,
         /// 1 = driving at full power) — sinks the post stance deeper as they go.</summary>
         public float PostDrive01 => (_post != null && _post.IsPosting && !IsPostShooting && _post.maxBackdownSpeed > 0.01f)
@@ -560,6 +572,8 @@ namespace MarioBasketball.Gameplay
         bool _gainedFromRebound;
         float _lastShotDistance;
         int _calledShotsUsed;
+        string _calledShotCallout;
+        float _calledShotCalloutTimer;
         float _passGestureTimer;
         float _stealGestureTimer;
         DribbleMoveType _dribbleMoveType;
@@ -663,6 +677,7 @@ namespace MarioBasketball.Gameplay
             if (_stealCooldown > 0f) _stealCooldown -= dt;
             if (_stunTimer > 0f) _stunTimer -= dt;
             if (_postMoveGestureTimer > 0f) _postMoveGestureTimer -= dt;
+            if (_calledShotCalloutTimer > 0f) _calledShotCalloutTimer -= dt;
             if (_fallTimer > 0f) _fallTimer -= dt;
             if (_hangTimer > 0f) _hangTimer -= dt;
             if (_skyTimer > 0f) _skyTimer -= dt;
@@ -1384,11 +1399,21 @@ namespace MarioBasketball.Gameplay
         void OnTurboDoubleTap()
         {
             if (MatchPause.IsPaused || !HasTrait(HiddenTrait.CalledShot)) return;
-            if (_calledShotsUsed >= calledShotMax) return;
+            if (_calledShotsUsed >= calledShotMax) { ShowCalledShotCallout("No called shots left"); return; }
             var ball = Ball;
-            if (ball == null || ball.State != BallController.BallState.Shot || ball.Shooter != this) return;
-            if (_lastShotDistance > calledShotRange) return; // beyond half court — no dice
-            if (ball.ForceMake()) _calledShotsUsed++;
+            if (ball == null || ball.State != BallController.BallState.Shot || ball.Shooter != this)
+            {
+                ShowCalledShotCallout("Call it while your shot's in the air!");
+                return;
+            }
+            if (_lastShotDistance > calledShotRange) { ShowCalledShotCallout("Too far — within half court only"); return; }
+            if (ball.ForceMake()) { _calledShotsUsed++; ShowCalledShotCallout("CALLED SHOT!"); }
+        }
+
+        void ShowCalledShotCallout(string msg)
+        {
+            _calledShotCallout = msg;
+            _calledShotCalloutTimer = calledShotCalloutTime;
         }
 
         /// <summary>Make% lost to an air-adjust. Driven by Inside Scoring (fully

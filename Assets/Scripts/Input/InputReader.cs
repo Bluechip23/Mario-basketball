@@ -181,7 +181,7 @@ namespace MarioBasketball.InputControl
         }
 
         /// <summary>Max seconds between the two turbo taps to count as a double-tap.</summary>
-        public float turboDoubleTapWindow = 0.3f;
+        public float turboDoubleTapWindow = 0.45f;
         bool _prevSprint;
         float _lastSprintPressTime = -10f;
 

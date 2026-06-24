@@ -602,6 +602,7 @@ namespace MarioBasketball.Gameplay
             _input.PostNorthPressed += OnPostNorth;
             _input.PostEastPressed += OnPostEast;
             _input.PostWestPressed += OnPostWest;
+            _input.PostButtonReleased += OnPostButtonReleased;
             _input.DribbleFlick += OnDribbleFlick;
             _input.TurboDoubleTap += OnTurboDoubleTap;
             _input.Enable();
@@ -621,6 +622,7 @@ namespace MarioBasketball.Gameplay
             _input.PostNorthPressed -= OnPostNorth;
             _input.PostEastPressed -= OnPostEast;
             _input.PostWestPressed -= OnPostWest;
+            _input.PostButtonReleased -= OnPostButtonReleased;
             _input.DribbleFlick -= OnDribbleFlick;
             _input.TurboDoubleTap -= OnTurboDoubleTap;
             _input.Disable();
@@ -801,6 +803,15 @@ namespace MarioBasketball.Gameplay
 
         void HandlePostHold()
         {
+            // While a post shot is going up, releasing the post-up button is NOT a
+            // cancel — it's how you let the shot go (you naturally come off the post
+            // button as you rise into it). Put the shot up instead of dropping out of
+            // the post empty-handed. The post ends itself when the shot resolves.
+            if (_post != null && _post.PostShotActive)
+            {
+                if (!_input.PostUpHeld) _post.ReleasePostShot();
+                return;
+            }
             bool wantPost = _input.PostUpHeld && HasBall && !IsStunned && _cc.isGrounded;
             if (wantPost && !IsPosting) _post.Begin(NearestOpponentTo(transform.position));
             else if (!_input.PostUpHeld && IsPosting) _post.End();
@@ -1946,6 +1957,15 @@ namespace MarioBasketball.Gameplay
 
         // B — the spin move.
         void OnPostEast() => TriggerPostMove(PostMove.Spin);
+
+        // Letting go of a post button puts the shot up, timed like a jump shot: the
+        // press starts the move and its release meter, the button-up fires it at that
+        // point. (Pressing a post button again still releases it too, so either the
+        // hold-and-release or a second tap works.)
+        void OnPostButtonReleased()
+        {
+            if (IsPosting && _post != null && _post.PostShotActive) _post.ReleasePostShot();
+        }
 
         public void TriggerPostMove(PostMove move)
         {

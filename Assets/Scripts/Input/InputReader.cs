@@ -50,6 +50,10 @@ namespace MarioBasketball.InputControl
         /// <summary>West face button (X) while posting — the turnaround (fadeaway)
         /// jumper, or the power drop step with turbo (LT) held.</summary>
         public event Action PostWestPressed;
+        /// <summary>Any post face button was released — times a post shot's release
+        /// (hold the move button to rise, let go at the marker to put it up, like a
+        /// jump shot).</summary>
+        public event Action PostButtonReleased;
 
         readonly InputAction _move;
         readonly InputAction _passAim;
@@ -142,6 +146,10 @@ namespace MarioBasketball.InputControl
             _postNorth.performed += _ => PostNorthPressed?.Invoke();
             _postEast.performed += _ => PostEastPressed?.Invoke();
             _postWest.performed += _ => PostWestPressed?.Invoke();
+            // Releasing any post face button times the shot's release.
+            _postNorth.canceled += _ => PostButtonReleased?.Invoke();
+            _postEast.canceled += _ => PostButtonReleased?.Invoke();
+            _postWest.canceled += _ => PostButtonReleased?.Invoke();
         }
 
         public void Enable()

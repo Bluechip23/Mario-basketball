@@ -464,6 +464,11 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which post move is currently being shot — drives the distinct
         /// hook / power-drop-step / fadeaway body animation.</summary>
         public PostMove CurrentPostMove => _post != null ? _post.CurrentMove : PostMove.Hook;
+        /// <summary>Mid spin / power-drop-step footwork (a separation move, not a
+        /// shot) — drives the spin/lunge body animation.</summary>
+        public bool IsDoingPostMove => _post != null && _post.IsDoingPostMove;
+        /// <summary>How far through the spin / drop-step footwork (0-1).</summary>
+        public float PostMoveGesture01 => _post != null ? _post.PostMoveGesture01 : 0f;
         /// <summary>How hard the player is backing their man down (0 = holding,
         /// 1 = driving at full power) — sinks the post stance deeper as they go.</summary>
         public float PostDrive01 => (_post != null && _post.IsPosting && !IsPostShooting && _post.maxBackdownSpeed > 0.01f)

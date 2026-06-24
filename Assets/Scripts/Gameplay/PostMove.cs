@@ -13,7 +13,9 @@ namespace MarioBasketball.Gameplay
         Hook,
         /// <summary>Quick step into the lane for a point-blank finish (blockable).</summary>
         DropStep,
-        /// <summary>Spin off the defender for a layup; risks a strip if it fails.</summary>
+        /// <summary>Spin off the defender to create separation — a setup move that
+        /// never scores on its own; risks a strip if it fails. The player shoots,
+        /// finishes, or passes afterward.</summary>
         Spin,
         /// <summary>Shoulder/pump fake; if the defender bites, the next move is freer.</summary>
         Fake,
@@ -21,7 +23,8 @@ namespace MarioBasketball.Gameplay
         /// can never be blocked, but a tougher shot to convert.</summary>
         SkyHook,
         /// <summary>Turbo + Drop Step: a Power-driven bulldoze into the lane that
-        /// shoves (or flattens) the defender on the way to the rim.</summary>
+        /// shoves (or flattens) the defender and steps into position — a separation
+        /// move that never scores on its own; the player finishes/shoots afterward.</summary>
         PowerDropStep,
         /// <summary>Turbo + Spin: face up and fade away over the defender — a
         /// Mid Range shot that the fade makes very hard to block.</summary>

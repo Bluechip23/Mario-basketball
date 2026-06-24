@@ -275,12 +275,14 @@ namespace MarioBasketball.AI
                 _pc.DoPostMove(ChoosePostMove(lev));
         }
 
-        /// <summary>Pick a finisher that fits the player: deep + strong bullies
-        /// with the power drop step, shallow shooters fade or go to the sky hook.</summary>
+        /// <summary>Pick a finisher that fits the player: deep bullies go to the drop
+        /// step, shallow shooters fade or go to the sky hook. (Spin and power drop
+        /// step are non-scoring separation moves, so the AI finishes with a move that
+        /// actually puts the ball up.)</summary>
         PostMove ChoosePostMove(float leverage)
         {
             if (leverage >= aiPostDeepLeverage)
-                return _pc.EffectiveStat(StatType.Power) >= 7f ? PostMove.PowerDropStep : PostMove.DropStep;
+                return PostMove.DropStep;
             if (_pc.EffectiveStat(StatType.MidRange) > _pc.EffectiveStat(StatType.PostOffense))
                 return PostMove.TurnaroundJumper;
             return Random.value < 0.3f ? PostMove.SkyHook : PostMove.Hook;

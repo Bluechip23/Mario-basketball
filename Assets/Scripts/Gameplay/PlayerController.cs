@@ -487,6 +487,18 @@ namespace MarioBasketball.Gameplay
         public bool HasCalledShot => HasTrait(HiddenTrait.CalledShot);
         /// <summary>Called Shot charges left this game.</summary>
         public int CalledShotsRemaining => HasCalledShot ? Mathf.Max(0, calledShotMax - _calledShotsUsed) : 0;
+        /// <summary>Right now there's a callable shot in the air (within half court,
+        /// charge to spend) — the HUD prompts the double-tap.</summary>
+        public bool CanCallShotNow
+        {
+            get
+            {
+                if (!HasCalledShot || _calledShotsUsed >= calledShotMax) return false;
+                var ball = Ball;
+                return ball != null && ball.State == BallController.BallState.Shot
+                    && ball.Shooter == this && _lastShotDistance <= calledShotRange;
+            }
+        }
         /// <summary>A brief Called-Shot message to surface (or null) — "CALLED SHOT!"
         /// on a make, or a nudge explaining why a double-tap didn't take.</summary>
         public string CalledShotCallout => _calledShotCalloutTimer > 0f ? _calledShotCallout : null;
@@ -721,6 +733,7 @@ namespace MarioBasketball.Gameplay
                 // so the trigger no longer doubles as a tap-to-spin gesture.
                 _prevSprintHeld = _input.SprintHeld;
                 HandlePostHold();
+                HandleBackDownHold();
             }
 
             UpdateKillerInstinct();
@@ -1399,14 +1412,12 @@ namespace MarioBasketball.Gameplay
         void OnTurboDoubleTap()
         {
             if (MatchPause.IsPaused || !HasTrait(HiddenTrait.CalledShot)) return;
-            if (_calledShotsUsed >= calledShotMax) { ShowCalledShotCallout("No called shots left"); return; }
             var ball = Ball;
-            if (ball == null || ball.State != BallController.BallState.Shot || ball.Shooter != this)
-            {
-                ShowCalledShotCallout("Call it while your shot's in the air!");
-                return;
-            }
+            // The called shot only exists while one of his own shots is in the air —
+            // a double-tap at any other time is a no-op (no spurious nudge).
+            if (ball == null || ball.State != BallController.BallState.Shot || ball.Shooter != this) return;
             if (_lastShotDistance > calledShotRange) { ShowCalledShotCallout("Too far — within half court only"); return; }
+            if (_calledShotsUsed >= calledShotMax) { ShowCalledShotCallout("No called shots left"); return; }
             if (ball.ForceMake()) { _calledShotsUsed++; ShowCalledShotCallout("CALLED SHOT!"); }
         }
 
@@ -1938,13 +1949,28 @@ namespace MarioBasketball.Gameplay
             }
         }
 
+        // RT tapped. Backing your man down (posting) and bumping a poster off
+        // (defending one) are now continuous HOLDS handled in HandleBackDownHold,
+        // so a tap here only matters in open space — a shove / reach foul attempt.
         public void TriggerBackDown()
         {
             if (MatchPause.IsPaused || IsStunned) return;
-            if (IsPosting) { _post.OffenseTap(); return; }       // push in
+            if (IsPosting || FindPosterGuardingMe() != null) return; // those are holds now
+            TryPush();                                              // push/foul in space
+        }
+
+        // Held RT: drive the back-down battle every frame. Backing down while you
+        // post, bumping off while you defend a poster.
+        void HandleBackDownHold()
+        {
+            if (IsStunned || _input == null || !_input.BackDownHeld) return;
+            if (IsPosting)
+            {
+                if (!IsPostShooting) _post.OffensePush(Time.deltaTime);
+                return;
+            }
             var poster = FindPosterGuardingMe();
-            if (poster != null) { poster.DefenderTap(); return; } // bump a poster
-            TryPush();                                            // push/foul in space
+            if (poster != null) poster.DefenderPush(Time.deltaTime);
         }
 
         /// <summary>AI hook to commit a foul.</summary>

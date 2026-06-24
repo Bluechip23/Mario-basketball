@@ -9,11 +9,12 @@ namespace MarioBasketball.Gameplay
     /// back to the basket and a <b>back-down battle</b> plays out against the
     /// engaged defender:
     /// <list type="bullet">
-    ///   <item>The offense taps Back Down (<see cref="OffenseTap"/>) to push in;
-    ///   each tap is worth their effective <b>Power</b>.</item>
-    ///   <item>The defender resists — a human defender taps
-    ///   (<see cref="DefenderTap"/>); an AI defender resists automatically from
-    ///   Power + Post Defense. More power means fewer taps are needed.</item>
+    ///   <item>The offense backs down to push in — a human <b>holds</b> RT
+    ///   (<see cref="OffensePush"/>), the AI taps (<see cref="OffenseTap"/>);
+    ///   the push is worth their effective <b>Power</b>.</item>
+    ///   <item>The defender resists — a human defender <b>holds</b> RT to push off
+    ///   (<see cref="DefenderPush"/>); an AI defender resists automatically from
+    ///   Power + Post Defense.</item>
     /// </list>
     /// A running <see cref="Leverage"/> value tilts toward whoever's winning:
     /// positive backs the offense toward the rim (better post shots); a big
@@ -27,8 +28,10 @@ namespace MarioBasketball.Gameplay
     public class PostUpController : MonoBehaviour
     {
         [Header("Back-down battle")]
-        [Tooltip("Leverage gained per Power point on each offense tap.")]
+        [Tooltip("Leverage gained per Power point on each offense tap (AI uses taps).")]
         public float tapImpulse = 0.06f;
+        [Tooltip("Leverage gained/lost per Power point per second while a human HOLDS RT to back down (offense) or bump off (defense).")]
+        public float backDownHoldRate = 1.6f;
         [Tooltip("AI defender passive resist scale (× Power per second).")]
         public float autoDefenderResist = 0.45f;
         [Tooltip("Leverage bleeds back to zero at this rate per second.")]
@@ -170,6 +173,35 @@ namespace MarioBasketball.Gameplay
             float power = _pc.EffectiveStat(StatType.Power);
             _leverage += power * tapImpulse * (_fakeActive ? 1.5f : 1f);
             _leverage = Mathf.Min(_leverage, maxLeverage);
+        }
+
+        /// <summary>Human poster holding RT: drive leverage up continuously (a real
+        /// back-down) at a rate that overcomes the defender's resist and walks them
+        /// toward the rim. <paramref name="dt"/> is this frame's delta time.</summary>
+        public void OffensePush(float dt)
+        {
+            if (!IsPosting || PostShotActive) return;
+            float power = _pc.EffectiveStat(StatType.Power);
+            _leverage += power * backDownHoldRate * dt * (_fakeActive ? 1.5f : 1f);
+            _leverage = Mathf.Min(_leverage, maxLeverage);
+        }
+
+        /// <summary>Human defender holding RT: continuously push off the back-down
+        /// (mirror of <see cref="DefenderTap"/> over time). Overwhelmed by a sealed
+        /// poster, the push barely moves them and risks getting put on the floor.</summary>
+        public void DefenderPush(float dt)
+        {
+            if (!IsPosting || _defender == null) return;
+            float power = _defender.EffectiveStat(StatType.Power);
+            if (_leverage >= overwhelmLeverage)
+            {
+                if (Random.value < overwhelmFallChance * dt) { _defender.Stun(overwhelmFallStun, fall: true); return; }
+                _leverage -= power * backDownHoldRate * dt * 0.5f; // can barely move them
+            }
+            else
+            {
+                _leverage -= power * backDownHoldRate * dt;        // push off toward breaking free
+            }
         }
 
         /// <summary>The defender taps RT to push off and disengage from the

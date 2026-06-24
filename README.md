@@ -55,7 +55,7 @@ the **right stick** scrolls long lists.
 | Dribble move (break the defender down) | B | X |
 | Dribble flick — step-back / crossover | Right-stick flick | — |
 | Post up (hold) | RB | R |
-| Back down in the post | RT | B |
+| Back down in the post (hold) | RT | B |
 | Post: pump fake / spin / turnaround jumper | Y / B / X | T / V / H |
 | Post advanced (hold LT) | hook (LT + Y) / power drop step (LT + X) | Shift + T / Shift + H |
 

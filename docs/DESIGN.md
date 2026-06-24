@@ -397,9 +397,10 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   scores**. Per-player shot attribution via the ball's `Shooter`; the HUD flags
   who's hot.
 - **Post-up** (`PostUpController`): hold Post Up to turn your back to the basket
-  and start a **back-down battle** — offense taps Back Down (worth their
-  **Power**), the defender resists (human taps the same button; AI resists from
-  Power + Post Defense). Running `Leverage` backs you toward the rim; a big loss
+  and start a **back-down battle** — offense **holds** Back Down (worth their
+  **Power**; AI taps it), the defender resists (a human **holds** the same button
+  to push off; AI resists from Power + Post Defense). Running `Leverage` backs you
+  toward the rim; a big loss
   **shoves you out**, a bigger one **knocks you down and turns it over**. Post
   moves: **Hook** (high, hard to block), **Drop Step** (lunge + point-blank
   finish, blockable), **Spin** (layup; risks a strip), **Fake** (if the defender

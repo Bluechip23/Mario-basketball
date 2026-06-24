@@ -81,15 +81,16 @@ namespace MarioBasketball.UI
                     GUI.Label(new Rect(20, 138, 700, 24), $"{human.stats.characterName}{posting}", _small);
 
                     // Called Shot (Delfan): show charges left so the player knows the
-                    // gesture is available, plus a fading callout when it fires/misfires.
+                    // ability is there; the prominent "call it" prompt only appears
+                    // while a shot is actually in the air, plus a fading result callout.
                     if (humanPc.HasCalledShot)
                     {
                         int left = humanPc.CalledShotsRemaining;
                         string pips = new string('●', left)
                                     + new string('○', Mathf.Max(0, humanPc.calledShotMax - left));
-                        GUI.Label(new Rect(20, 158, 320, 22),
-                            $"CALLED SHOT  {pips}  (double-tap LT in flight)", _small);
+                        GUI.Label(new Rect(20, 158, 320, 22), $"CALLED SHOT  {pips}", _small);
                     }
+                    DrawCallShotPrompt(humanPc);
                     DrawCalledShotCallout(humanPc);
 
                     if (humanPc.IconPassActive) DrawIconButtons(gm, humanPc);
@@ -118,7 +119,7 @@ namespace MarioBasketball.UI
                     {
                         float lev = Mathf.Clamp(humanPc.Post.Leverage, -humanPc.Post.maxLeverage, humanPc.Post.maxLeverage);
                         float frac = Mathf.InverseLerp(-humanPc.Post.maxLeverage, humanPc.Post.maxLeverage, lev);
-                        GUI.Label(new Rect(20, 178, 300, 20), "Back-down (tap RT):", _small);
+                        GUI.Label(new Rect(20, 178, 300, 20), "Back-down (hold RT):", _small);
                         GUI.Box(new Rect(150, 180, 160, 14), GUIContent.none);
                         GUI.Box(new Rect(150, 180, 160 * frac, 14), GUIContent.none);
                     }
@@ -171,6 +172,17 @@ namespace MarioBasketball.UI
             float half = centerW / 2f - 4f;
             DrawTeamInfo(new Rect(centerX, infoY, half, 38f), gm.Home, TextAnchor.UpperLeft, HomeColor);
             DrawTeamInfo(new Rect(centerX + centerW / 2f + 4f, infoY, half, 38f), gm.Away, TextAnchor.UpperRight, AwayColor);
+        }
+
+        // While a callable shot is in the air, pulse a prompt so the player knows
+        // NOW is the moment to double-tap LT. Only shows when the shot qualifies.
+        void DrawCallShotPrompt(PlayerController human)
+        {
+            if (!human.CanCallShotNow) return;
+            float pulse = 0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 12f);
+            _callout.normal.textColor = new Color(1f, 0.82f, 0.2f, pulse);
+            GUI.Label(new Rect(0, Screen.height * 0.42f, Screen.width, 44f),
+                "DOUBLE-TAP LT — CALL IT!", _callout);
         }
 
         // A short Called-Shot message that flashes centre-screen and fades out — gold

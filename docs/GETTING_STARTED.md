@@ -67,7 +67,7 @@ bindings exist as a fallback.
 | **Switch player** (defense) | A (✕) or LB (L1) | Q |
 | **Dive** for a loose ball | B (○) | X |
 | **Post up** (hold) | RB (R1) | R |
-| **Back down** / bump / **push-foul** | RT (R2) | B |
+| **Back down** (hold) / bump / **push-foul** | RT (R2) | B |
 | Post move — **Pump fake** | Y (△) | T |
 | Post move — **Spin** | B (○) | V |
 | Post move — **Turnaround jumper** | X (□) | H |
@@ -82,8 +82,8 @@ Power, it knocks players around (and can pop the ball loose). It's free up to
 throw make% scales with the shooter's Mid Range). Nobody fouls out.
 
 **Post game:** with the ball, hold **RB** to turn your back to the basket, then
-tap **RT** (Back down) to bulldoze your defender toward the rim — a
-Power-vs-Power tap battle; if they win they shove you off or knock you down.
+**hold RT** (Back down) to bulldoze your defender toward the rim — a
+Power-vs-Power battle; if they win they shove you off or knock you down.
 With position, your **shots** are **X** (turnaround fadeaway) and **LT + Y**
 (hook): each pops a release meter you time like a jumper — hold to rise, let go
 at the marker. Your **moves** never score on their own — they beat the defender

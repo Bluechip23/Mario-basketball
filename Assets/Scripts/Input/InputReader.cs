@@ -42,10 +42,14 @@ namespace MarioBasketball.InputControl
         public event Action StealPressed;
         public event Action DivePressed;
         public event Action BackDownPressed;
-        public event Action HookPressed;
-        public event Action DropStepPressed;
-        public event Action SpinPressed;
-        public event Action FakePressed;
+        /// <summary>North face button (Y) while posting — pump fake, or the hook
+        /// shot with turbo (LT) held.</summary>
+        public event Action PostNorthPressed;
+        /// <summary>East face button (B) while posting — the spin move.</summary>
+        public event Action PostEastPressed;
+        /// <summary>West face button (X) while posting — the turnaround (fadeaway)
+        /// jumper, or the power drop step with turbo (LT) held.</summary>
+        public event Action PostWestPressed;
 
         readonly InputAction _move;
         readonly InputAction _passAim;
@@ -57,10 +61,9 @@ namespace MarioBasketball.InputControl
         readonly InputAction _steal;
         readonly InputAction _dive;
         readonly InputAction _backDown;
-        readonly InputAction _hook;
-        readonly InputAction _dropStep;
-        readonly InputAction _spin;
-        readonly InputAction _fake;
+        readonly InputAction _postNorth;
+        readonly InputAction _postEast;
+        readonly InputAction _postWest;
         readonly InputAction _iconPass;
 
         public InputReader()
@@ -106,20 +109,21 @@ namespace MarioBasketball.InputControl
             _backDown = new InputAction("BackDown", InputActionType.Button, "<Keyboard>/b");
             _backDown.AddBinding("<Gamepad>/rightTrigger"); // RT
 
-            // Post moves map to the face buttons while posting (contextual).
-            _hook = new InputAction("Hook", InputActionType.Button, "<Keyboard>/h");
-            _hook.AddBinding("<Gamepad>/buttonNorth"); // Y
+            // Post moves map to the face buttons by POSITION while posting, so the
+            // turbo (LT) modifier can layer an advanced move onto each:
+            //   Y → pump fake        · LT + Y → hook shot
+            //   B → spin
+            //   X → turnaround jumper · LT + X → power drop step
+            // A is never a post move — it stays the pass button at all times, so it
+            // no longer fights the back-to-the-basket game.
+            _postNorth = new InputAction("PostNorth", InputActionType.Button, "<Keyboard>/t");
+            _postNorth.AddBinding("<Gamepad>/buttonNorth"); // Y
 
-            _dropStep = new InputAction("DropStep", InputActionType.Button, "<Keyboard>/g");
-            _dropStep.AddBinding("<Gamepad>/buttonSouth"); // A
+            _postEast = new InputAction("PostEast", InputActionType.Button, "<Keyboard>/v");
+            _postEast.AddBinding("<Gamepad>/buttonEast"); // B
 
-            // Spin: keyboard V. On the gamepad it's a quick Left-Trigger tap in the
-            // post (detected in PlayerController) so the trigger stays free to HOLD
-            // as the advanced-move (turbo) modifier the rest of the time.
-            _spin = new InputAction("Spin", InputActionType.Button, "<Keyboard>/v");
-
-            _fake = new InputAction("Fake", InputActionType.Button, "<Keyboard>/t");
-            _fake.AddBinding("<Gamepad>/buttonEast"); // B (post fake)
+            _postWest = new InputAction("PostWest", InputActionType.Button, "<Keyboard>/h");
+            _postWest.AddBinding("<Gamepad>/buttonWest"); // X
 
             // Icon-pass modifier: LB (C). Hold it and tap a face button to pass to
             // that teammate. This is now LB's ONLY job — no more sharing it with the
@@ -135,17 +139,16 @@ namespace MarioBasketball.InputControl
             _steal.performed += _ => StealPressed?.Invoke();
             _dive.performed += _ => DivePressed?.Invoke();
             _backDown.performed += _ => BackDownPressed?.Invoke();
-            _hook.performed += _ => HookPressed?.Invoke();
-            _dropStep.performed += _ => DropStepPressed?.Invoke();
-            _spin.performed += _ => SpinPressed?.Invoke();
-            _fake.performed += _ => FakePressed?.Invoke();
+            _postNorth.performed += _ => PostNorthPressed?.Invoke();
+            _postEast.performed += _ => PostEastPressed?.Invoke();
+            _postWest.performed += _ => PostWestPressed?.Invoke();
         }
 
         public void Enable()
         {
             _move.Enable(); _passAim.Enable(); _sprint.Enable(); _postUp.Enable();
             _shoot.Enable(); _pass.Enable(); _jump.Enable(); _steal.Enable(); _dive.Enable();
-            _backDown.Enable(); _hook.Enable(); _dropStep.Enable(); _spin.Enable(); _fake.Enable();
+            _backDown.Enable(); _postNorth.Enable(); _postEast.Enable(); _postWest.Enable();
             _iconPass.Enable();
         }
 
@@ -153,7 +156,7 @@ namespace MarioBasketball.InputControl
         {
             _move.Disable(); _passAim.Disable(); _sprint.Disable(); _postUp.Disable();
             _shoot.Disable(); _pass.Disable(); _jump.Disable(); _steal.Disable(); _dive.Disable();
-            _backDown.Disable(); _hook.Disable(); _dropStep.Disable(); _spin.Disable(); _fake.Disable();
+            _backDown.Disable(); _postNorth.Disable(); _postEast.Disable(); _postWest.Disable();
             _iconPass.Disable();
         }
 

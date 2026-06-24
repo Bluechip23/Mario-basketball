@@ -56,8 +56,8 @@ the **right stick** scrolls long lists.
 | Dribble flick — step-back / crossover | Right-stick flick | — |
 | Post up (hold) | RB | R |
 | Back down in the post | RT | B |
-| Post: hook / drop step / spin / fake | Y / A / LT-tap / B | H / G / V / T |
-| Post advanced (hold LT + move) | sky hook / power step / turnaround | — |
+| Post: pump fake / spin / turnaround jumper | Y / B / X | T / V / H |
+| Post advanced (hold LT) | hook (LT + Y) / power drop step (LT + X) | Shift + T / Shift + H |
 
 ### Offense — off the ball
 | Action | Gamepad | Keyboard |
@@ -175,10 +175,12 @@ Saved players show up alongside the roster on the Team Select screen.
 ## 🔥 On the Court
 
 - **Post game** — Hold to back your defender down (a Power-vs-Power battle),
-  then go to your moves: **hook**, **drop step**, **spin** or **pump fake**.
-  Add turbo for the advanced versions — sky hook, power drop step, turnaround
-  fadeaway and the up-and-under off a bitten fake. Win the battle and you bury
-  it; lose it and you get shoved off or put on the floor.
+  then go to your moves: **pump fake** (Y), **spin** (B) or **turnaround
+  fadeaway** (X). Hold turbo (LT) for the heavy versions — **hook shot**
+  (LT + Y) and **power drop step** (LT + X) — or step through under a bitten
+  fake for the up-and-under. Each shot pops a release meter you time like a
+  jumper: hit the marker to bury it; lose the back-down battle and you get
+  shoved off or put on the floor.
 - **Above-the-rim finishes** — Dunkers soar over the rim, grab iron and throw
   it down; everyone gets enough air to adjust a layup or dunk around a
   shot-blocker. Defenders can rise to the rim to swat it.

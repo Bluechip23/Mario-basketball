@@ -199,15 +199,17 @@ shaken (a botched move can be stripped):
 This layers on top of the dribble-move button; it does not replace it.
 
 ### Post moves (buttons while posted)
-Base: **Hook** (Y) · **Drop Step** (A) · **Spin** (B) · **Fake** (LB). Holding
-**turbo (LT)** upgrades each to its advanced version, and chaining off a fake
-unlocks the step-through:
-- **Sky Hook** (LT+Y): released too high to ever be blocked, but a tougher make.
-- **Power Drop Step** (LT+A): a Power-driven bulldoze that shoves (or flattens)
+The face buttons map by position; **A stays the pass** and is never a post move,
+so kicking it out is always live. Base moves: **Pump Fake** (Y) · **Spin** (B) ·
+**Turnaround Jumper** (X). Holding **turbo (LT)** swaps Y and X to their heavy
+version, and chaining off a fake unlocks the step-through:
+- **Hook** (LT+Y): a high, hard-to-block jump hook — the bread-and-butter post
+  shot.
+- **Power Drop Step** (LT+X): a Power-driven bulldoze that shoves (or flattens)
   the defender on the way to the rim.
-- **Turnaround Jumper** (LT+B): face up and fade — scored off **Mid Range**;
-  the fade nearly kills the block.
-- **Up & Under** (A while a bitten fake is live): step through under the
+- **Turnaround Jumper** (X): face up and fade — scored off **Mid Range**; the
+  fade nearly kills the block.
+- **Up & Under** (X while a bitten fake is live): step through under the
   airborne defender for a nearly free finish.
 
 **Timing the shot.** The footwork (the lunge, spin, power bulldoze, shove) is

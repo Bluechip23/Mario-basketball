@@ -170,9 +170,6 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float layupBothFeetChance = 0.25f;
         [Tooltip("How far to the shooting-hand side a one-hand layup carries the ball (× body height).")]
         public float layupBallSideOffset = 0.14f;
-        [Tooltip("In the post, a Left-Trigger press shorter than this (and with no face-button move during it) fires the spin; a longer hold stays the advanced-move (turbo) modifier.")]
-        public float postSpinTapWindow = 0.25f;
-
         [Header("Alley-oop")]
         [Tooltip("A loft to a teammate skying within this of the rim becomes an alley-oop.")]
         public float oopRange = 3.0f;
@@ -527,10 +524,8 @@ namespace MarioBasketball.Gameplay
         float _skyTimer;
         Vector2 _passAim;
         bool _iconHeld;       // LB held — teammate pass icons
-        bool _adjustHeld;     // LT held — air-adjust a finish / spin in the post
-        bool _prevSprintHeld; // for detecting an LT tap (spin) vs a hold (turbo modifier)
-        float _sprintPressTime;
-        bool _sprintMoveConsumed;
+        bool _adjustHeld;     // LT held — air-adjust a finish / advanced post move
+        bool _prevSprintHeld; // edge-detects a fresh LT press (arms the finish air-adjust)
         float _dribbleCooldown;
         float _dribbleBoostTimer;
         float _flickCooldown;
@@ -604,10 +599,9 @@ namespace MarioBasketball.Gameplay
             _input.StealPressed += TriggerSteal;
             _input.DivePressed += TriggerDive;
             _input.BackDownPressed += TriggerBackDown;
-            _input.HookPressed += TriggerHook;
-            _input.DropStepPressed += TriggerDropStep;
-            _input.SpinPressed += TriggerSpin;
-            _input.FakePressed += TriggerFake;
+            _input.PostNorthPressed += OnPostNorth;
+            _input.PostEastPressed += OnPostEast;
+            _input.PostWestPressed += OnPostWest;
             _input.DribbleFlick += OnDribbleFlick;
             _input.TurboDoubleTap += OnTurboDoubleTap;
             _input.Enable();
@@ -624,10 +618,9 @@ namespace MarioBasketball.Gameplay
             _input.StealPressed -= TriggerSteal;
             _input.DivePressed -= TriggerDive;
             _input.BackDownPressed -= TriggerBackDown;
-            _input.HookPressed -= TriggerHook;
-            _input.DropStepPressed -= TriggerDropStep;
-            _input.SpinPressed -= TriggerSpin;
-            _input.FakePressed -= TriggerFake;
+            _input.PostNorthPressed -= OnPostNorth;
+            _input.PostEastPressed -= OnPostEast;
+            _input.PostWestPressed -= OnPostWest;
             _input.DribbleFlick -= OnDribbleFlick;
             _input.TurboDoubleTap -= OnTurboDoubleTap;
             _input.Disable();
@@ -685,15 +678,10 @@ namespace MarioBasketball.Gameplay
                     _finishAdjusted = true;
                     _adjustMove = PickAdjustMove();
                 }
-                // In the post, a quick LT TAP is the spin move; HOLDING LT stays the
-                // advanced-move (turbo) modifier for the face buttons.
-                bool sprintNow = _input.SprintHeld;
-                if (sprintNow && !_prevSprintHeld) { _sprintPressTime = Time.unscaledTime; _sprintMoveConsumed = false; }
-                else if (!sprintNow && _prevSprintHeld && IsPosting && !_sprintMoveConsumed
-                         && Time.unscaledTime - _sprintPressTime <= postSpinTapWindow
-                         && _post != null && !_post.PostShotActive)
-                    TriggerPostMove(PostMove.Spin);
-                _prevSprintHeld = sprintNow;
+                // Holding LT is the advanced-move (turbo) modifier for the post face
+                // buttons (LT + Y = hook, LT + X = power drop step). Spin lives on B,
+                // so the trigger no longer doubles as a tap-to-spin gesture.
+                _prevSprintHeld = _input.SprintHeld;
                 HandlePostHold();
             }
 
@@ -1684,7 +1672,7 @@ namespace MarioBasketball.Gameplay
 
         public void TriggerJump()
         {
-            if (MatchPause.IsPaused || IsStunned || IsPosting) return; // Y is Hook while posting
+            if (MatchPause.IsPaused || IsStunned || IsPosting) return; // Y is the pump fake while posting
             if (_cc.isGrounded) _verticalVelocity = Mathf.Sqrt(-2f * gravity * jumpHeight);
         }
 
@@ -1715,13 +1703,13 @@ namespace MarioBasketball.Gameplay
         }
 
         /// <summary>The B button: pass-icon select (LB held), dribble move (with
-        /// the ball), or dive for a loose ball. (While posting, B is the post Fake,
-        /// handled by <see cref="TriggerFake"/>.)</summary>
+        /// the ball), or dive for a loose ball. (While posting, B is the spin move,
+        /// handled by <see cref="OnPostEast"/>.)</summary>
         public void TriggerDive()
         {
             if (MatchPause.IsPaused || IsStunned) return;
             if (IconPassActive) { PassToSlot(1); return; }  // LB + B → pass to teammate 2
-            if (IsPosting) return;                          // B is Fake while posting
+            if (IsPosting) return;                          // B is the spin while posting
             if (HasBall) { TriggerDribbleMove(); return; }  // with the ball, it's a dribble move
 
             if (_diveTimer > 0f || !_cc.isGrounded) return;
@@ -1940,30 +1928,28 @@ namespace MarioBasketball.Gameplay
             }
         }
 
-        // The post buttons are layered: turbo (LT) upgrades each to its advanced
-        // version, and Drop Step pressed while a fake is live is the up-and-under.
-        void TriggerHook() => TriggerPostMove(_sprintIntent ? PostMove.SkyHook : PostMove.Hook);
+        // The post face buttons map by POSITION; holding turbo (LT) upgrades the
+        // Y and X moves to their advanced version. A is left alone as the pass.
 
-        void TriggerDropStep()
+        // Y — pump fake, or the hook shot with turbo held (LT + Y).
+        void OnPostNorth() => TriggerPostMove(_sprintIntent ? PostMove.Hook : PostMove.Fake);
+
+        // X — the turnaround (fadeaway) jumper, or the power drop step with turbo
+        // held (LT + X). Pressed while a pump fake is live, it steps through under
+        // the airborne defender for the up-and-under instead.
+        void OnPostWest()
         {
+            if (_sprintIntent) { TriggerPostMove(PostMove.PowerDropStep); return; }
             if (IsPosting && _post.FakeActive) { TriggerPostMove(PostMove.UpAndUnder); return; }
-            TriggerPostMove(_sprintIntent ? PostMove.PowerDropStep : PostMove.DropStep);
+            TriggerPostMove(PostMove.TurnaroundJumper);
         }
 
-        // Keyboard spin (V); the gamepad spin is the LT tap handled in Update. Hold
-        // turbo for the turnaround fade.
-        void TriggerSpin() => TriggerPostMove(_sprintIntent ? PostMove.TurnaroundJumper : PostMove.Spin);
-
-        // B while posting — the post fake. (Air-adjust moved to LT; the icon-pass
-        // modifier moved to its own LB action, so B / LB no longer fight the fake.)
-        void TriggerFake() => TriggerPostMove(PostMove.Fake);
+        // B — the spin move.
+        void OnPostEast() => TriggerPostMove(PostMove.Spin);
 
         public void TriggerPostMove(PostMove move)
         {
             if (MatchPause.IsPaused || IsStunned || !IsPosting) return;
-            // A face-button move performed while LT is held is an advanced (turbo)
-            // move — flag it so releasing LT afterwards isn't also read as a spin tap.
-            if (_sprintIntent) _sprintMoveConsumed = true;
             // Once a move's shot is charging, any post button releases it (timing
             // the shot) rather than starting a new move.
             if (_post.PostShotActive) { _post.ReleasePostShot(); return; }

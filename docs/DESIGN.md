@@ -200,23 +200,29 @@ This layers on top of the dribble-move button; it does not replace it.
 
 ### Post moves (buttons while posted)
 The face buttons map by position; **A stays the pass** and is never a post move,
-so kicking it out is always live. Base moves: **Pump Fake** (Y) · **Spin** (B) ·
-**Turnaround Jumper** (X). Holding **turbo (LT)** swaps Y and X to their heavy
-version, and chaining off a fake unlocks the step-through:
-- **Hook** (LT+Y): a high, hard-to-block jump hook — the bread-and-butter post
-  shot.
-- **Power Drop Step** (LT+X): a Power-driven bulldoze that shoves (or flattens)
-  the defender on the way to the rim.
+so kicking it out is always live. There are two kinds of button:
+
+**Shots** (start a timed release meter, then score):
 - **Turnaround Jumper** (X): face up and fade — scored off **Mid Range**; the
   fade nearly kills the block.
+- **Hook** (LT+Y): a high, hard-to-block jump hook — the bread-and-butter post
+  shot.
 - **Up & Under** (X while a bitten fake is live): step through under the
   airborne defender for a nearly free finish.
 
-**Timing the shot.** The footwork (the lunge, spin, power bulldoze, shove) is
-instant — but the **shot at the end is timed**, like a jump shot. Triggering a
-move plants the player and starts a short release meter (the arms and ball rise
-to a peak); press a post button again near the top to release. A clean release
-shoots at full make%, an early or late one drops it (down to
+**Setup moves** (create space, then hand control back — they **never score on
+their own**; the player shoots, drives to a finish, or passes afterward):
+- **Pump Fake** (Y): a ball-fake that can get the defender in the air.
+- **Spin** (B): spin off the defender for a burst of separation; can shake them
+  (freezing them for a beat) and still risks a strip into a strong defender.
+- **Power Drop Step** (LT+X): a Power-driven bulldoze that shoves (or flattens)
+  the defender and steps into the lane.
+
+**Timing a post shot.** The footwork is instant — but the **shot is timed**,
+like a jump shot. Triggering a shooting move plants the player and starts a short
+release meter (the arms and ball rise to a peak); **let go of the move button**
+(or the post-up button, or tap a post button again) near the top to release. A
+clean release shoots at full make%, an early or late one drops it (down to
 `postMinTimingMultiplier`). The AI releases on time automatically. Baby Mario's
 **Acrobat** trait applies here too — he barely suffers from a mistimed post
 release (so a hook fired the instant he goes up still drops).

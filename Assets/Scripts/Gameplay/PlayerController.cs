@@ -1489,9 +1489,12 @@ namespace MarioBasketball.Gameplay
         // passHoldThreshold → hard pass (fast, flat, lives in the steal lane).
         void OnPassPressed()
         {
-            // A is also the post Drop Step — don't start a pass while posting, so
-            // the two don't fight (exit the post to pass it out).
-            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _passCharging) return;
+            // A is the pass at all times — you can kick it out of the post too (the
+            // release ends the post and throws). The one exception is a post shot
+            // already going up: that's committed, so A there releases the shot rather
+            // than starting a pass.
+            if (MatchPause.IsPaused || IsStunned || !HasBall || _passCharging) return;
+            if (_post != null && _post.PostShotActive) return;
             if (IconPassActive) { PassToSlot(0); return; } // LB + A → pass to teammate 1
             _passCharging = true;
             _passChargeTime = 0f;

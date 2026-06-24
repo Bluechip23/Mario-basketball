@@ -84,11 +84,13 @@ throw make% scales with the shooter's Mid Range). Nobody fouls out.
 **Post game:** with the ball, hold **RB** to turn your back to the basket, then
 tap **RT** (Back down) to bulldoze your defender toward the rim — a
 Power-vs-Power tap battle; if they win they shove you off or knock you down.
-With position, hit a post move: **Y** pump fake, **B** spin, **X** turnaround
-jumper. Hold **LT** for the heavy versions — **LT + Y** is the hook shot,
-**LT + X** the power drop step. Each shot pops a release meter you time like a
-jumper. **A** is always the pass, so you can kick it out at any time. On defense
-against a poster, mash **RT** to bump them off.
+With position, your **shots** are **X** (turnaround fadeaway) and **LT + Y**
+(hook): each pops a release meter you time like a jumper — hold to rise, let go
+at the marker. Your **moves** make space but never score on their own — **B**
+spins off the defender, **LT + X** is a power drop step into the lane — then you
+shoot, drive, or pass. **Y** is a pump fake to get the defender airborne. **A**
+is always the pass, so you can kick it out at any time. On defense against a
+poster, mash **RT** to bump them off.
 
 > Because the buttons are contextual, the same face button does different things
 > by situation (e.g. **A** shoots with the ball, switches on defense, and is the

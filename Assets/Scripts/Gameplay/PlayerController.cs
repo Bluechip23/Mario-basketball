@@ -196,13 +196,14 @@ namespace MarioBasketball.Gameplay
         public float dribbleStatScale = 0.06f;
 
         [Header("Dribble flicks (right-stick hard dribbles for separation)")]
-        public float flickCooldownTime = 0.45f;
-        [Tooltip("Burst impulse on a flick toward / across the defender.")]
-        public float flickBurstPower = 4f;
+        [Tooltip("Min gap between flicks — kept above the move length so each breakdown plays out before the next instead of stacking into a blur.")]
+        public float flickCooldownTime = 0.55f;
+        [Tooltip("Burst impulse on a flick toward / across the defender. Gentle — the move is a beat to read, not a sprint.")]
+        public float flickBurstPower = 3.2f;
         [Tooltip("Backward impulse on a step-back (flick away from the basket).")]
-        public float stepBackPower = 5f;
-        [Tooltip("Opposite lateral flicks within this window chain into a hesitation cross.")]
-        public float hesitationWindow = 0.6f;
+        public float stepBackPower = 4f;
+        [Tooltip("Opposite lateral flicks within this window chain into a hesitation cross. Kept above the flick cooldown so the chain is still reachable.")]
+        public float hesitationWindow = 0.75f;
         [Tooltip("How long the defender freezes when a flick move shakes them (the full ankleStun is reserved for the hesitation cross).")]
         public float flickFreeze = 0.4f;
         [Tooltip("How tightly the on-ball defender rides a right-stick flick at an even matchup (0 = lets you blow by, 1 = glued to you). Scales up with their Perimeter Defense.")]
@@ -244,9 +245,9 @@ namespace MarioBasketball.Gameplay
 
         [Header("Post separation moves (spin / power drop step → drive out)")]
         [Tooltip("Burst speed (m/s) a spin / power drop step drives toward the rim as it breaks out of the post. Kept modest so the move reads before you finish.")]
-        public float postDriveBurstSpeed = 4f;
-        [Tooltip("How long the spin whirl / drop-step lunge animates as the player breaks out of the post to finish — long enough to actually see the move.")]
-        public float postMoveDriveTime = 0.6f;
+        public float postDriveBurstSpeed = 3.5f;
+        [Tooltip("How long the spin whirl / drop-step lunge animates as the player breaks out of the post to finish — long enough to actually watch the move.")]
+        public float postMoveDriveTime = 0.85f;
 
         [Header("Push / foul (Power)")]
         public float pushRange = 1.7f;

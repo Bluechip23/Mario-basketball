@@ -30,17 +30,19 @@ namespace MarioBasketball.Gameplay
     public static class DribbleMoves
     {
         /// <summary>How long the move animation / ball path runs (seconds).</summary>
+        // Durations are deliberately unhurried: a breakdown move isn't about speed,
+        // it's a beat you watch — the handle, then the defender bites (or breaks).
         public static float Duration(DribbleMoveType t)
         {
             switch (t)
             {
-                case DribbleMoveType.BehindBack:  return 0.42f;
-                case DribbleMoveType.BetweenLegs: return 0.38f;
-                case DribbleMoveType.Spin:        return 0.5f;
-                case DribbleMoveType.OffTheHead:  return 0.55f;
-                case DribbleMoveType.Hesitation:  return 0.5f;
-                case DribbleMoveType.StepBack:    return 0.3f;
-                default:                          return 0.32f; // Crossover
+                case DribbleMoveType.BehindBack:  return 0.68f;
+                case DribbleMoveType.BetweenLegs: return 0.62f;
+                case DribbleMoveType.Spin:        return 0.8f;
+                case DribbleMoveType.OffTheHead:  return 0.88f;
+                case DribbleMoveType.Hesitation:  return 0.82f;
+                case DribbleMoveType.StepBack:    return 0.5f;
+                default:                          return 0.55f; // Crossover
             }
         }
 

@@ -71,8 +71,8 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   pass**: fast and flat, but it travels through the **steal lane**.
 - **Directed / icon passing (wired):** **hold LB** to bring up teammate **icons**
   labelled with face buttons (A/B), then press one to pass to that teammate; or
-  push the **right stick** toward a teammate and press Pass. With neither, Pass
-  goes to the most open teammate.
+  push the **left stick** (your movement stick — the right stick also works) toward
+  a teammate and press Pass. With neither, Pass goes to the most open teammate.
 - Governed by **Ball Handling**: a weak handler's lead pass lands off-target.
   An **in-flight pass can be intercepted with Steals** (a defender jumping the
   lane); once the ball goes stale it becomes a true loose ball decided by

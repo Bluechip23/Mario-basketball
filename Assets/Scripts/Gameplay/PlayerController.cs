@@ -446,7 +446,8 @@ namespace MarioBasketball.Gameplay
         /// <summary>True if this possession came from a rebound / loose-ball grab
         /// (not a caught pass) — only these get put-back / tip behaviour.</summary>
         public bool GainedFromRebound => _gainedFromRebound;
-        /// <summary>The human is aiming a directed pass (right stick pushed).</summary>
+        /// <summary>The human is aiming a directed pass (the aim stick — left stick,
+        /// or the right-stick override — is pushed past the deadzone).</summary>
         public bool IsAimingPass => _passAim.magnitude >= passAimDeadzone && HasBall;
         /// <summary>The teammate currently targeted by the pass aim (for icons).</summary>
         public PlayerController PassTarget => IsAimingPass ? TargetedTeammate(_passAim) : null;
@@ -714,7 +715,10 @@ namespace MarioBasketball.Gameplay
                 // The stick is read relative to the camera, so "up" on the stick
                 // is "up the screen" regardless of where the sideline camera sits.
                 _moveIntent = CameraRelative(_input.Move);
-                _passAim = _input.PassAim;
+                // Pass aim: the LEFT stick (your movement stick) directs the pass —
+                // hold it toward a teammate and A throws that way. The right stick
+                // still works as a dedicated aim override when you push it.
+                _passAim = _input.PassAim.magnitude >= passAimDeadzone ? _input.PassAim : _input.Move;
                 _sprintIntent = _input.SprintHeld;
                 _iconHeld = _input.IconHeld;     // LB — teammate pass icons only
                 _adjustHeld = _input.SprintHeld; // LT
@@ -1575,9 +1579,11 @@ namespace MarioBasketball.Gameplay
             if (IsPosting) _post.End();   // kick out of the post
             _finishing = false;           // or dump it off out of the air
 
-            // Aim with the right stick to direct it to a specific teammate
-            // (icons); otherwise pass to whoever's most open.
-            var mate = IsAimingPass ? TargetedTeammate(_passAim) : FindOpenTeammate();
+            // Aim the pass with the stick to direct it to a specific teammate;
+            // if you're not aiming (or the aim lines up with nobody), pass to
+            // whoever's most open instead of throwing it into space.
+            PlayerController mate = IsAimingPass ? TargetedTeammate(_passAim) : null;
+            if (mate == null) mate = FindOpenTeammate();
             if (mate == null) { Ball.Pass(transform.forward, passPower); return; }
 
             // A loft to a teammate near the rim is an alley-oop.
@@ -1691,36 +1697,29 @@ namespace MarioBasketball.Gameplay
             return null;
         }
 
-        /// <summary>Teammate whose on-screen direction best matches the aim.</summary>
+        /// <summary>The teammate the aim stick is pointing at, in world space. The
+        /// stick is read camera-relative (same as movement), so pushing it toward a
+        /// teammate on screen — left, up-court, wherever — targets them.</summary>
         PlayerController TargetedTeammate(Vector2 aim)
         {
             var gm = GameManager.Instance;
             if (gm == null || aim.sqrMagnitude < 0.0001f) return null;
-            Vector2 a = aim.normalized;
-            Camera cam = Camera.main;
-            Vector2 from = ScreenOf(cam, transform.position);
+            Vector2 camRel = CameraRelative(aim.normalized); // stick → world XZ
+            Vector3 aimDir = new Vector3(camRel.x, 0f, camRel.y);
+            if (aimDir.sqrMagnitude < 1e-4f) return null;
+            aimDir.Normalize();
 
             PlayerController best = null;
             float bestDot = 0.25f; // require some alignment
             foreach (var mate in gm.TeamFor(team).onCourt)
             {
                 if (mate == null || mate == this || !mate.enabled) continue;
-                Vector2 dir = ScreenOf(cam, mate.transform.position) - from;
-                if (dir.sqrMagnitude < 1f) continue;
-                float dot = Vector2.Dot(dir.normalized, a);
+                Vector3 dir = mate.transform.position - transform.position; dir.y = 0f;
+                if (dir.sqrMagnitude < 0.5f) continue;
+                float dot = Vector3.Dot(dir.normalized, aimDir);
                 if (dot > bestDot) { bestDot = dot; best = mate; }
             }
             return best;
-        }
-
-        static Vector2 ScreenOf(Camera cam, Vector3 world)
-        {
-            if (cam != null)
-            {
-                Vector3 sp = cam.WorldToScreenPoint(world);
-                return new Vector2(sp.x, sp.y);
-            }
-            return new Vector2(world.x, world.z); // fallback: world plane
         }
 
         /// <summary>A directed pass to a teammate (used by the AI).</summary>

@@ -49,7 +49,7 @@ the **right stick** scrolls long lists.
 | Dunk / layup inside (hold) | X | Space |
 | Air-adjust a finish (hold) | LT | Left Shift |
 | Pass — tap = loft, hold = bullet | A | E |
-| Aim the pass | Right stick | IJKL |
+| Aim the pass (toward a teammate) | Left stick (or right stick) | WASD (or IJKL) |
 | Pass to a teammate icon | Hold LB + A/B | Hold C + A/B |
 | Fade on a jumper | Hold Move | Hold Move |
 | Dribble move (break the defender down) | B | X |

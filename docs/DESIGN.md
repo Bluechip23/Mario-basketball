@@ -71,8 +71,8 @@ gamebreakers. Flashy, stylish, score-heavy play is the point.
   pass**: fast and flat, but it travels through the **steal lane**.
 - **Directed / icon passing (wired):** **hold LB** to bring up teammate **icons**
   labelled with face buttons (A/B), then press one to pass to that teammate; or
-  push the **right stick** toward a teammate and press Pass. With neither, Pass
-  goes to the most open teammate.
+  push the **left stick** (your movement stick — the right stick also works) toward
+  a teammate and press Pass. With neither, Pass goes to the most open teammate.
 - Governed by **Ball Handling**: a weak handler's lead pass lands off-target.
   An **in-flight pass can be intercepted with Steals** (a defender jumping the
   lane); once the ball goes stale it becomes a true loose ball decided by
@@ -134,6 +134,16 @@ the relevant scoring stat (1-10 → ~28-85%), then modifiers add/subtract:
 - **On fire** adds +30% (after the block roll).
 Blocks are a separate roll *before* the make check, so on-fire never helps you
 avoid a block. All knobs are public statics on `ShotMath`.
+
+When a block lands (`PlayerController.ResolveBlock`) it resolves one of two ways
+— mostly a coin flip, nudged up a little by the blocker's **Blocks** (so hand
+choice barely moves block *likelihood*):
+- **One-handed swat** — the ball caroms off the blocker's hand (`BallController.
+  Swat`) into a chaotic **loose ball**.
+- **Two-handed snatch** — the blocker clamps it clean out of the air for an
+  immediate change of possession, **no loose ball**.
+Either way the blocker plays a swat/snatch arm-swing and, if they went up to
+contest, hangs at the top for a beat (the Mario stall).
 
 **Shot timing (jump shots).** Mid-range and three-point shots use a hold-and-
 release meter (`PlayerController`): press to rise into the jump, release at the

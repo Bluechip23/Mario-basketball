@@ -378,6 +378,26 @@ namespace MarioBasketball.Gameplay
             _rb.linearVelocity = direction.normalized * power + Vector3.up * 1.5f;
         }
 
+        /// <summary>A shot got swatted away (one-handed block): snap the ball to the
+        /// blocker's hand <paramref name="from"/> and fling it off in
+        /// <paramref name="dir"/> with a hard, spinning ricochet — a chaotic loose
+        /// ball that clearly reads as a block rather than a quiet miss.</summary>
+        public void Swat(Vector3 from, Vector3 dir, float power)
+        {
+            MarkReleased();
+            PendingPoints = 0;
+            State = BallState.Free;
+            IsPass = false;
+            IsAlleyOop = false;
+            IntendedReceiver = null;
+            GoLive();
+            transform.position = from;                 // the ball is up at the block point
+            Vector3 v = dir.normalized * power;
+            v.y = 2.5f;                                 // a little pop so it arcs as it caroms off
+            _rb.linearVelocity = v;
+            _rb.angularVelocity = new Vector3(0f, 0f, power) + Vector3.up * power; // visible spin off the hand
+        }
+
         public void ResetToCentre()
         {
             Holder = null;

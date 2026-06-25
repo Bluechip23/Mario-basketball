@@ -135,6 +135,16 @@ the relevant scoring stat (1-10 → ~28-85%), then modifiers add/subtract:
 Blocks are a separate roll *before* the make check, so on-fire never helps you
 avoid a block. All knobs are public statics on `ShotMath`.
 
+When a block lands (`PlayerController.ResolveBlock`) it resolves one of two ways
+— mostly a coin flip, nudged up a little by the blocker's **Blocks** (so hand
+choice barely moves block *likelihood*):
+- **One-handed swat** — the ball caroms off the blocker's hand (`BallController.
+  Swat`) into a chaotic **loose ball**.
+- **Two-handed snatch** — the blocker clamps it clean out of the air for an
+  immediate change of possession, **no loose ball**.
+Either way the blocker plays a swat/snatch arm-swing and, if they went up to
+contest, hangs at the top for a beat (the Mario stall).
+
 **Shot timing (jump shots).** Mid-range and three-point shots use a hold-and-
 release meter (`PlayerController`): press to rise into the jump, release at the
 apex for a **perfect** shot (full make%); mistiming multiplies make% down toward

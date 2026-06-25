@@ -217,6 +217,12 @@ namespace MarioBasketball.Gameplay
         public float blockStatScale = 0.05f;
         public float blockMaxChance = 0.5f;
         public float blockKnockPower = 4f;
+        [Tooltip("How long the swat / snatch arm-swing animates after a block lands.")]
+        public float blockGestureTime = 0.5f;
+        [Tooltip("How long an airborne blocker hangs at the top of the contest after swatting (the Mario stall).")]
+        public float blockHangTime = 0.45f;
+        [Tooltip("Base chance a block is a clean two-handed snatch (their possession) vs a one-handed swat (loose ball). Scales up a little with Blocks.")]
+        [Range(0f, 1f)] public float blockTwoHandBaseChance = 0.35f;
 
         [Header("Steal (Steals vs Ball Handling)")]
         [Tooltip("How far you can reach in to poke at the ball (body separation keeps players ~0.8 m apart, so this needs headroom above that).")]
@@ -237,10 +243,10 @@ namespace MarioBasketball.Gameplay
         public float shoveDuration = 0.35f;
 
         [Header("Post separation moves (spin / power drop step → drive out)")]
-        [Tooltip("Burst speed (m/s) a spin / power drop step drives toward the rim as it breaks out of the post.")]
-        public float postDriveBurstSpeed = 6.5f;
-        [Tooltip("How long the spin whirl / drop-step lunge animates as the player breaks out of the post to finish.")]
-        public float postMoveDriveTime = 0.4f;
+        [Tooltip("Burst speed (m/s) a spin / power drop step drives toward the rim as it breaks out of the post. Kept modest so the move reads before you finish.")]
+        public float postDriveBurstSpeed = 4f;
+        [Tooltip("How long the spin whirl / drop-step lunge animates as the player breaks out of the post to finish — long enough to actually see the move.")]
+        public float postMoveDriveTime = 0.6f;
 
         [Header("Push / foul (Power)")]
         public float pushRange = 1.7f;
@@ -439,6 +445,15 @@ namespace MarioBasketball.Gameplay
         public AdjustMove CurrentAdjustMove => _adjustMove;
         /// <summary>Hanging on the rim after a two-hand slam (held a beat).</summary>
         public bool IsHanging => _hangTimer > 0f;
+        /// <summary>Mid swat / snatch just after blocking a shot — drives the
+        /// block arm-swing animation.</summary>
+        public bool IsBlocking => _blockGestureTimer > 0f;
+        /// <summary>How far through the block swat (0-1).</summary>
+        public float BlockProgress01 =>
+            blockGestureTime > 0.0001f ? Mathf.Clamp01(1f - _blockGestureTimer / blockGestureTime) : 0f;
+        /// <summary>The block in progress was a two-handed snatch (both hands clamp
+        /// the ball) rather than a one-handed swat.</summary>
+        public bool BlockTwoHanded => _blockTwoHanded;
         /// <summary>Skying for an alley-oop — up above the rim, hands ready, hanging.</summary>
         public bool IsSkyingForOop => _skyTimer > 0f;
         /// <summary>Seconds since this player gained the ball (0 if they don't have it).</summary>
@@ -566,6 +581,8 @@ namespace MarioBasketball.Gameplay
         float _finishGravityScale = 0.4f; // per-finish, so the takeoff matches a jump shot's rise (see StartFinish)
         float _hangTimer;
         Vector3 _hangTarget;
+        float _blockGestureTimer;
+        bool _blockTwoHanded;
         float _skyTimer;
         Vector2 _passAim;
         bool _iconHeld;       // LB held — teammate pass icons
@@ -693,6 +710,7 @@ namespace MarioBasketball.Gameplay
             if (_calledShotCalloutTimer > 0f) _calledShotCalloutTimer -= dt;
             if (_fallTimer > 0f) _fallTimer -= dt;
             if (_hangTimer > 0f) _hangTimer -= dt;
+            if (_blockGestureTimer > 0f) _blockGestureTimer -= dt;
             if (_skyTimer > 0f) _skyTimer -= dt;
             if (_diveTimer > 0f) _diveTimer -= dt;
             if (_shoveTimer > 0f) _shoveTimer -= dt;
@@ -1325,6 +1343,61 @@ namespace MarioBasketball.Gameplay
             if (face.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(face.normalized, Vector3.up);
         }
 
+        /// <summary>A shot by <paramref name="shooter"/> got blocked by this player.
+        /// Two-handed it's a clean snatch (this player's ball, no loose ball); one-
+        /// handed it's a swat that caroms the ball off the hand into a loose ball.
+        /// Either way records the block, breaks the shooter's streak, and fires the
+        /// blocker's swat/snatch animation (and an air-hang if they're up).</summary>
+        public void ResolveBlock(PlayerController shooter, Vector3 shotAim)
+        {
+            var gm = GameManager.Instance;
+            if (gm != null)
+            {
+                gm.RecordBlock(this);
+                gm.OnShotMissed(shooter); // blocked → shooter's streak broken
+            }
+
+            bool twoHand = Random.value <
+                Mathf.Lerp(blockTwoHandBaseChance, blockTwoHandBaseChance + 0.25f,
+                           Mathf.Clamp01((Effective(StatType.Blocks, 5f) - 1f) / 9f));
+
+            if (twoHand && shooter.Ball != null)
+            {
+                // Snatch it clean out of the air — possession to the blocker.
+                shooter.Ball.PickUp(this);
+                if (gm != null) gm.OnPossessionGained(this);
+            }
+            else if (shooter.Ball != null)
+            {
+                // Swat it away off the hand — a chaotic loose ball.
+                Vector3 away = shooter.transform.position - shotAim; away.y = 0f;
+                if (away.sqrMagnitude < 0.01f) away = -shooter.transform.forward;
+                shooter.Ball.Swat(BlockHandPoint(), away, blockKnockPower);
+            }
+
+            RegisterBlock(twoHand, shooter.transform.position);
+        }
+
+        /// <summary>Start the swat/snatch gesture, face the blocked shot, and (if
+        /// airborne) hang at the top of the contest for a beat.</summary>
+        void RegisterBlock(bool twoHanded, Vector3 toward)
+        {
+            _blockTwoHanded = twoHanded;
+            _blockGestureTimer = blockGestureTime;
+            Vector3 d = toward - transform.position; d.y = 0f;
+            if (d.sqrMagnitude > 0.01f)
+                transform.rotation = Quaternion.LookRotation(d.normalized, Vector3.up);
+            if (_cc != null && !_cc.isGrounded) // stall in the air like a finisher
+            {
+                _hangTimer = Mathf.Max(_hangTimer, blockHangTime);
+                _hangTarget = transform.position;
+            }
+        }
+
+        /// <summary>World point up at the blocker's hands — where the ball is met.</summary>
+        Vector3 BlockHandPoint() =>
+            transform.position + Vector3.up * (BodyHeight + 0.45f) + transform.forward * 0.25f;
+
         /// <summary>Resolve a dunk or layup: a block roll first (reduced by an
         /// air-adjust, and resisted by Power on dunks), then a make roll. A dunk
         /// scores off the Dunk stat, a layup off Inside Scoring.</summary>
@@ -1356,11 +1429,8 @@ namespace MarioBasketball.Gameplay
                     if (adjusted) chance *= AdjustBlockMult(); // contort away from the block
                     if (Random.value < chance)
                     {
-                        Vector3 away = transform.position - aim; away.y = 0f;
-                        Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
-                        GameManager.Instance.RecordBlock(defender);
-                        GameManager.Instance.OnShotMissed(this);
-                        return false; // swatted — no rim grab
+                        defender.ResolveBlock(this, aim); // swat away or snatch clean
+                        return false; // no rim grab
                     }
                 }
             }
@@ -1527,10 +1597,7 @@ namespace MarioBasketball.Gameplay
                     chance *= 1f - fadeBlockReduction * fadeAmount; // fading away from the contest
                     if (Random.value < chance)
                     {
-                        Vector3 away = transform.position - aim; away.y = 0f;
-                        Ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, blockKnockPower);
-                        GameManager.Instance.RecordBlock(defender);
-                        GameManager.Instance.OnShotMissed(this); // blocked → streak broken
+                        defender.ResolveBlock(this, aim); // swat away or snatch clean
                         return;
                     }
                 }

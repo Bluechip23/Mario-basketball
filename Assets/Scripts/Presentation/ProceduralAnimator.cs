@@ -409,6 +409,25 @@ namespace MarioBasketball.Presentation
                         gatherWristDegrees * 0.5f);
                 }
             }
+            else if (_pc.IsBlocking)
+            {
+                // Just blocked a shot. A two-handed snatch brings both hands up to
+                // clamp the ball and pulls it down to the chest; a one-handed swat
+                // chops the lead (right) hand from straight up down through the ball
+                // while the off-hand stays up for verticality.
+                float k = _pc.BlockProgress01;
+                if (_pc.BlockTwoHanded)
+                {
+                    float arm = Mathf.Lerp(-178f, -120f, k); // overhead → secure at chest
+                    Pose(_armR, _elbowR, _wristR, arm, -15f, 0f);
+                    Pose(_armL, _elbowL, _wristL, arm, -15f, 0f);
+                }
+                else
+                {
+                    Pose(_armR, _elbowR, _wristR, Mathf.Lerp(-178f, -80f, k), -6f, Mathf.Lerp(0f, -45f, k));
+                    Pose(_armL, _elbowL, _wristL, -170f, -8f, 0f);
+                }
+            }
             else if (_followThrough > 0f)
             {
                 Pose(_armR, _elbowR, _wristR, releaseArmDegrees, releaseElbowDegrees, releaseWristDegrees);

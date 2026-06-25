@@ -524,10 +524,7 @@ namespace MarioBasketball.Gameplay
                 float chance = Mathf.Clamp(blockBaseChance + blockStatScale * (blk - quality), 0f, blockMaxChance) * blockMult;
                 if (Random.value < chance)
                 {
-                    Vector3 away = transform.position - hoop.AimPoint; away.y = 0f;
-                    gm.ball.Pass(away.sqrMagnitude > 0.01f ? away : -transform.forward, shovePower * 0.6f);
-                    gm.RecordBlock(_defender);
-                    gm.OnShotMissed(_pc); // blocked → streak broken
+                    _defender.ResolveBlock(_pc, hoop.AimPoint); // swat away or snatch clean
                     End();
                     return;
                 }

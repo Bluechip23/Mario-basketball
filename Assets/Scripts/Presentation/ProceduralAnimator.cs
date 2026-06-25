@@ -187,6 +187,7 @@ namespace MarioBasketball.Presentation
             // Body tilt: whip around on a spin move, sprawl to the floor when
             // knocked down, or lean into a fadeaway jump shot.
             bool spinMove = _pc.IsDribbleMoveGesture && _pc.CurrentDribbleMove == DribbleMoveType.Spin;
+            bool postSpin = _pc.IsDoingPostMove && _pc.PostMoveType == PostMove.Spin;
             if (_model != null)
             {
                 if (spinMove && !_pc.IsFallen)
@@ -195,6 +196,13 @@ namespace MarioBasketball.Presentation
                     // actually whips); direction follows the dribbling hand.
                     float spinDir = _ball != null && _ball.DribbleHand < 0 ? -1f : 1f;
                     _model.localRotation = Quaternion.Euler(0f, spinDir * 360f * _pc.DribbleMoveProgress01, 0f);
+                }
+                else if (postSpin && !_pc.IsFallen)
+                {
+                    // Spin off the defender: whip the body through a full turn off the
+                    // pivot (direct rotation so the spin actually reads). This is a
+                    // separation move — no shot goes up.
+                    _model.localRotation = Quaternion.Euler(0f, 360f * _pc.PostMoveGesture01, 0f);
                 }
                 else
                 {
@@ -238,6 +246,13 @@ namespace MarioBasketball.Presentation
                             100f; // spin / up-and-under
                         float lean = move == PostMove.TurnaroundJumper ? -fadeLeanAngle : 0f;
                         want = Quaternion.Euler(lean, turn, 0f);
+                    }
+                    else if (_pc.IsDoingPostMove)
+                    {
+                        // Power drop step (spin is handled above): drop the shoulder
+                        // and lunge into the lane — a hard step, not a shot.
+                        float lunge = Mathf.Sin(Mathf.PI * _pc.PostMoveGesture01);
+                        want = Quaternion.Euler(postPosterLean + lunge * 22f, 0f, 0f);
                     }
                     else if (_pc.IsPosting)
                     {

@@ -95,6 +95,8 @@ namespace MarioBasketball.Gameplay
         public int calledShotMax = 2;
         [Tooltip("Called Shot: only shots launched within this distance (m) of the hoop — i.e. within half court — qualify.")]
         public float calledShotRange = 14f;
+        [Tooltip("Called Shot: how long the on-screen callout (\"CALLED SHOT!\" etc.) lingers.")]
+        public float calledShotCalloutTime = 1.4f;
         [Tooltip("Min planar speed (m/s) to count as actively dribbling.")]
         public float dribbleMoveThreshold = 0.6f;
 
@@ -233,6 +235,12 @@ namespace MarioBasketball.Gameplay
         public float diveSpeed = 9f;
         public float diveBallSeekRange = 6f;
         public float shoveDuration = 0.35f;
+
+        [Header("Post separation moves (spin / power drop step → drive out)")]
+        [Tooltip("Burst speed (m/s) a spin / power drop step drives toward the rim as it breaks out of the post.")]
+        public float postDriveBurstSpeed = 6.5f;
+        [Tooltip("How long the spin whirl / drop-step lunge animates as the player breaks out of the post to finish.")]
+        public float postMoveDriveTime = 0.4f;
 
         [Header("Push / foul (Power)")]
         public float pushRange = 1.7f;
@@ -464,6 +472,39 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which post move is currently being shot — drives the distinct
         /// hook / power-drop-step / fadeaway body animation.</summary>
         public PostMove CurrentPostMove => _post != null ? _post.CurrentMove : PostMove.Hook;
+        /// <summary>Mid spin / power-drop-step footwork — a move that beats the
+        /// defender and drives you OUT of the post toward the rim (you finish it
+        /// yourself). Lives here, not on the post, so it survives the post ending.
+        /// Drives the spin/lunge body animation.</summary>
+        public bool IsDoingPostMove => _postMoveGestureTimer > 0f;
+        /// <summary>How far through the spin / drop-step footwork (0-1).</summary>
+        public float PostMoveGesture01 =>
+            postMoveDriveTime > 0.0001f ? Mathf.Clamp01(1f - _postMoveGestureTimer / postMoveDriveTime) : 0f;
+        /// <summary>Which separation move is driving out of the post (spin vs power
+        /// drop step) — picks the spin whirl vs the shoulder-down lunge animation.</summary>
+        public PostMove PostMoveType => _postMoveType;
+        /// <summary>This player has Delfan's Called Shot trait (the HUD shows charges).</summary>
+        public bool HasCalledShot => HasTrait(HiddenTrait.CalledShot);
+        /// <summary>Called Shot charges left this game.</summary>
+        public int CalledShotsRemaining => HasCalledShot ? Mathf.Max(0, calledShotMax - _calledShotsUsed) : 0;
+        /// <summary>Right now there's a callable shot in the air (within half court,
+        /// charge to spend) — the HUD prompts the double-tap.</summary>
+        public bool CanCallShotNow
+        {
+            get
+            {
+                if (!HasCalledShot || _calledShotsUsed >= calledShotMax) return false;
+                var ball = Ball;
+                return ball != null && ball.State == BallController.BallState.Shot
+                    && ball.Shooter == this && _lastShotDistance <= calledShotRange;
+            }
+        }
+        /// <summary>A brief Called-Shot message to surface (or null) — "CALLED SHOT!"
+        /// on a make, or a nudge explaining why a double-tap didn't take.</summary>
+        public string CalledShotCallout => _calledShotCalloutTimer > 0f ? _calledShotCallout : null;
+        /// <summary>Fade weight (0-1) for the current callout, for the HUD to dim it out.</summary>
+        public float CalledShotCallout01 =>
+            calledShotCalloutTime > 0.0001f ? Mathf.Clamp01(_calledShotCalloutTimer / calledShotCalloutTime) : 0f;
         /// <summary>How hard the player is backing their man down (0 = holding,
         /// 1 = driving at full power) — sinks the post stance deeper as they go.</summary>
         public float PostDrive01 => (_post != null && _post.IsPosting && !IsPostShooting && _post.maxBackdownSpeed > 0.01f)
@@ -490,6 +531,9 @@ namespace MarioBasketball.Gameplay
         Vector2 _moveIntent;
         bool _sprintIntent;
         bool _sprintingNow;
+        float _postMoveGestureTimer; // spin / power-drop footwork driving out of the post
+        PostMove _postMoveType;
+        bool _postRepostBlocked;     // after a drive-out, block re-posting until RB is released
         float _turbo = 1f;
         float _stealCooldown;
         float _stunTimer;
@@ -540,6 +584,8 @@ namespace MarioBasketball.Gameplay
         bool _gainedFromRebound;
         float _lastShotDistance;
         int _calledShotsUsed;
+        string _calledShotCallout;
+        float _calledShotCalloutTimer;
         float _passGestureTimer;
         float _stealGestureTimer;
         DribbleMoveType _dribbleMoveType;
@@ -602,6 +648,7 @@ namespace MarioBasketball.Gameplay
             _input.PostNorthPressed += OnPostNorth;
             _input.PostEastPressed += OnPostEast;
             _input.PostWestPressed += OnPostWest;
+            _input.PostButtonReleased += OnPostButtonReleased;
             _input.DribbleFlick += OnDribbleFlick;
             _input.TurboDoubleTap += OnTurboDoubleTap;
             _input.Enable();
@@ -621,6 +668,7 @@ namespace MarioBasketball.Gameplay
             _input.PostNorthPressed -= OnPostNorth;
             _input.PostEastPressed -= OnPostEast;
             _input.PostWestPressed -= OnPostWest;
+            _input.PostButtonReleased -= OnPostButtonReleased;
             _input.DribbleFlick -= OnDribbleFlick;
             _input.TurboDoubleTap -= OnTurboDoubleTap;
             _input.Disable();
@@ -640,6 +688,8 @@ namespace MarioBasketball.Gameplay
             float dt = Time.deltaTime;
             if (_stealCooldown > 0f) _stealCooldown -= dt;
             if (_stunTimer > 0f) _stunTimer -= dt;
+            if (_postMoveGestureTimer > 0f) _postMoveGestureTimer -= dt;
+            if (_calledShotCalloutTimer > 0f) _calledShotCalloutTimer -= dt;
             if (_fallTimer > 0f) _fallTimer -= dt;
             if (_hangTimer > 0f) _hangTimer -= dt;
             if (_skyTimer > 0f) _skyTimer -= dt;
@@ -683,6 +733,7 @@ namespace MarioBasketball.Gameplay
                 // so the trigger no longer doubles as a tap-to-spin gesture.
                 _prevSprintHeld = _input.SprintHeld;
                 HandlePostHold();
+                HandleBackDownHold();
             }
 
             UpdateKillerInstinct();
@@ -801,6 +852,22 @@ namespace MarioBasketball.Gameplay
 
         void HandlePostHold()
         {
+            // While a post shot is going up, releasing the post-up button is NOT a
+            // cancel — it's how you let the shot go (you naturally come off the post
+            // button as you rise into it). Put the shot up instead of dropping out of
+            // the post empty-handed. The post ends itself when the shot resolves.
+            if (_post != null && _post.PostShotActive)
+            {
+                if (!_input.PostUpHeld) _post.ReleasePostShot();
+                return;
+            }
+            // Mid spin / power-drop drive-out: don't re-post on top of the drive.
+            if (IsDoingPostMove) return;
+            // After driving out of the post, don't auto-repost while the post button
+            // is still held — you have to release it and press again to post anew.
+            if (!_input.PostUpHeld) _postRepostBlocked = false;
+            if (_postRepostBlocked) return;
+
             bool wantPost = _input.PostUpHeld && HasBall && !IsStunned && _cc.isGrounded;
             if (wantPost && !IsPosting) _post.Begin(NearestOpponentTo(transform.position));
             else if (!_input.PostUpHeld && IsPosting) _post.End();
@@ -1345,11 +1412,19 @@ namespace MarioBasketball.Gameplay
         void OnTurboDoubleTap()
         {
             if (MatchPause.IsPaused || !HasTrait(HiddenTrait.CalledShot)) return;
-            if (_calledShotsUsed >= calledShotMax) return;
             var ball = Ball;
+            // The called shot only exists while one of his own shots is in the air —
+            // a double-tap at any other time is a no-op (no spurious nudge).
             if (ball == null || ball.State != BallController.BallState.Shot || ball.Shooter != this) return;
-            if (_lastShotDistance > calledShotRange) return; // beyond half court — no dice
-            if (ball.ForceMake()) _calledShotsUsed++;
+            if (_lastShotDistance > calledShotRange) { ShowCalledShotCallout("Too far — within half court only"); return; }
+            if (_calledShotsUsed >= calledShotMax) { ShowCalledShotCallout("No called shots left"); return; }
+            if (ball.ForceMake()) { _calledShotsUsed++; ShowCalledShotCallout("CALLED SHOT!"); }
+        }
+
+        void ShowCalledShotCallout(string msg)
+        {
+            _calledShotCallout = msg;
+            _calledShotCalloutTimer = calledShotCalloutTime;
         }
 
         /// <summary>Make% lost to an air-adjust. Driven by Inside Scoring (fully
@@ -1473,9 +1548,12 @@ namespace MarioBasketball.Gameplay
         // passHoldThreshold → hard pass (fast, flat, lives in the steal lane).
         void OnPassPressed()
         {
-            // A is also the post Drop Step — don't start a pass while posting, so
-            // the two don't fight (exit the post to pass it out).
-            if (MatchPause.IsPaused || IsStunned || IsPosting || !HasBall || _passCharging) return;
+            // A is the pass at all times — you can kick it out of the post too (the
+            // release ends the post and throws). The one exception is a post shot
+            // already going up: that's committed, so A there releases the shot rather
+            // than starting a pass.
+            if (MatchPause.IsPaused || IsStunned || !HasBall || _passCharging) return;
+            if (_post != null && _post.PostShotActive) return;
             if (IconPassActive) { PassToSlot(0); return; } // LB + A → pass to teammate 1
             _passCharging = true;
             _passChargeTime = 0f;
@@ -1871,13 +1949,28 @@ namespace MarioBasketball.Gameplay
             }
         }
 
+        // RT tapped. Backing your man down (posting) and bumping a poster off
+        // (defending one) are now continuous HOLDS handled in HandleBackDownHold,
+        // so a tap here only matters in open space — a shove / reach foul attempt.
         public void TriggerBackDown()
         {
             if (MatchPause.IsPaused || IsStunned) return;
-            if (IsPosting) { _post.OffenseTap(); return; }       // push in
+            if (IsPosting || FindPosterGuardingMe() != null) return; // those are holds now
+            TryPush();                                              // push/foul in space
+        }
+
+        // Held RT: drive the back-down battle every frame. Backing down while you
+        // post, bumping off while you defend a poster.
+        void HandleBackDownHold()
+        {
+            if (IsStunned || _input == null || !_input.BackDownHeld) return;
+            if (IsPosting)
+            {
+                if (!IsPostShooting) _post.OffensePush(Time.deltaTime);
+                return;
+            }
             var poster = FindPosterGuardingMe();
-            if (poster != null) { poster.DefenderTap(); return; } // bump a poster
-            TryPush();                                            // push/foul in space
+            if (poster != null) poster.DefenderPush(Time.deltaTime);
         }
 
         /// <summary>AI hook to commit a foul.</summary>
@@ -1947,6 +2040,15 @@ namespace MarioBasketball.Gameplay
         // B — the spin move.
         void OnPostEast() => TriggerPostMove(PostMove.Spin);
 
+        // Letting go of a post button puts the shot up, timed like a jump shot: the
+        // press starts the move and its release meter, the button-up fires it at that
+        // point. (Pressing a post button again still releases it too, so either the
+        // hold-and-release or a second tap works.)
+        void OnPostButtonReleased()
+        {
+            if (IsPosting && _post != null && _post.PostShotActive) _post.ReleasePostShot();
+        }
+
         public void TriggerPostMove(PostMove move)
         {
             if (MatchPause.IsPaused || IsStunned || !IsPosting) return;
@@ -1954,6 +2056,25 @@ namespace MarioBasketball.Gameplay
             // the shot) rather than starting a new move.
             if (_post.PostShotActive) { _post.ReleasePostShot(); return; }
             _post.DoMove(move);
+        }
+
+        /// <summary>A spin / power drop step beat the defender — break OUT of the
+        /// post and drive at the rim (the move never scores on its own; the player
+        /// finishes with a dunk/layup, pulls a shot, or passes). Called by
+        /// <see cref="PostUpController"/> after it resolves the move's footwork.</summary>
+        public void StartPostDrive(PostMove move)
+        {
+            Vector3 toRim = RimDirection();
+            if (_post != null) _post.End();          // leave the post — now a live driver
+            _postRepostBlocked = true;               // don't snap back into the post on the held button
+            _postMoveType = move;
+            _postMoveGestureTimer = postMoveDriveTime;
+            if (toRim.sqrMagnitude > 0.01f)
+            {
+                Vector3 d = toRim.normalized;
+                ApplyShove(d * postDriveBurstSpeed); // carry toward the rim
+                transform.rotation = Quaternion.LookRotation(d, Vector3.up); // face up to finish
+            }
         }
 
         // ---- AI hooks ------------------------------------------------------

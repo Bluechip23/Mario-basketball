@@ -20,6 +20,7 @@ namespace MarioBasketball.UI
         GUIStyle _centerShot;
         GUIStyle _head;
         GUIStyle _sideInfo;
+        GUIStyle _callout;
 
         // Team jersey colours (match GameBootstrap HomeColor / AwayColor).
         static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
@@ -47,6 +48,7 @@ namespace MarioBasketball.UI
             _head ??= new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _head.normal.textColor = Color.white;
             _sideInfo ??= new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold };
+            _callout ??= new GUIStyle(GUI.skin.label) { fontSize = 34, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
 
             var gm = GameManager.Instance;
             if (gm != null)
@@ -78,6 +80,19 @@ namespace MarioBasketball.UI
                     string posting = humanPc.IsPosting ? "   [POSTING]" : "";
                     GUI.Label(new Rect(20, 138, 700, 24), $"{human.stats.characterName}{posting}", _small);
 
+                    // Called Shot (Delfan): show charges left so the player knows the
+                    // ability is there; the prominent "call it" prompt only appears
+                    // while a shot is actually in the air, plus a fading result callout.
+                    if (humanPc.HasCalledShot)
+                    {
+                        int left = humanPc.CalledShotsRemaining;
+                        string pips = new string('●', left)
+                                    + new string('○', Mathf.Max(0, humanPc.calledShotMax - left));
+                        GUI.Label(new Rect(20, 158, 320, 22), $"CALLED SHOT  {pips}", _small);
+                    }
+                    DrawCallShotPrompt(humanPc);
+                    DrawCalledShotCallout(humanPc);
+
                     if (humanPc.IconPassActive) DrawIconButtons(gm, humanPc);
                     else if (humanPc.IsAimingPass) DrawPassIcons(gm, humanPc);
 
@@ -104,7 +119,7 @@ namespace MarioBasketball.UI
                     {
                         float lev = Mathf.Clamp(humanPc.Post.Leverage, -humanPc.Post.maxLeverage, humanPc.Post.maxLeverage);
                         float frac = Mathf.InverseLerp(-humanPc.Post.maxLeverage, humanPc.Post.maxLeverage, lev);
-                        GUI.Label(new Rect(20, 178, 300, 20), "Back-down (tap RT):", _small);
+                        GUI.Label(new Rect(20, 178, 300, 20), "Back-down (hold RT):", _small);
                         GUI.Box(new Rect(150, 180, 160, 14), GUIContent.none);
                         GUI.Box(new Rect(150, 180, 160 * frac, 14), GUIContent.none);
                     }
@@ -157,6 +172,32 @@ namespace MarioBasketball.UI
             float half = centerW / 2f - 4f;
             DrawTeamInfo(new Rect(centerX, infoY, half, 38f), gm.Home, TextAnchor.UpperLeft, HomeColor);
             DrawTeamInfo(new Rect(centerX + centerW / 2f + 4f, infoY, half, 38f), gm.Away, TextAnchor.UpperRight, AwayColor);
+        }
+
+        // While a callable shot is in the air, pulse a prompt so the player knows
+        // NOW is the moment to double-tap LT. Only shows when the shot qualifies.
+        void DrawCallShotPrompt(PlayerController human)
+        {
+            if (!human.CanCallShotNow) return;
+            float pulse = 0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 12f);
+            _callout.normal.textColor = new Color(1f, 0.82f, 0.2f, pulse);
+            GUI.Label(new Rect(0, Screen.height * 0.42f, Screen.width, 44f),
+                "DOUBLE-TAP LT — CALL IT!", _callout);
+        }
+
+        // A short Called-Shot message that flashes centre-screen and fades out — gold
+        // for a make ("CALLED SHOT!"), softer for a "wrong time / no charges" nudge.
+        void DrawCalledShotCallout(PlayerController human)
+        {
+            string msg = human.CalledShotCallout;
+            if (string.IsNullOrEmpty(msg)) return;
+            float a = human.CalledShotCallout01;
+            bool made = msg == "CALLED SHOT!";
+            Color c = made ? new Color(1f, 0.82f, 0.2f) : new Color(1f, 1f, 1f, 0.92f);
+            c.a *= Mathf.Clamp01(a * 1.6f); // hold full, then fade at the tail
+            _callout.normal.textColor = c;
+            float rise = (1f - a) * 24f; // drift upward as it fades
+            GUI.Label(new Rect(0, Screen.height * 0.30f - rise, Screen.width, 48f), msg, _callout);
         }
 
         void DrawTeamInfo(Rect r, TeamState team, TextAnchor align, Color color)

@@ -7,8 +7,11 @@ namespace MarioBasketball.Characters
     /// stat who is only reliable on <see cref="CatchAndShootOnly"/> looks, not
     /// off the dribble.
     ///
-    /// Only the documented example is defined for now. The full set will be
-    /// designed alongside the roster — do not invent new traits ad hoc.
+    /// Every value below except <see cref="CatchAndShootOnly"/> is assigned to a
+    /// roster character and wired into gameplay (see the per-value notes for
+    /// where). <see cref="CatchAndShootOnly"/> is the original placeholder example:
+    /// it is documented but not yet assigned to anyone or implemented. Do not
+    /// invent new traits ad hoc — design them alongside the roster.
     /// </summary>
     public enum HiddenTrait
     {

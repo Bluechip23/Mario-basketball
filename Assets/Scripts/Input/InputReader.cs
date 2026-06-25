@@ -21,6 +21,9 @@ namespace MarioBasketball.InputControl
         public Vector2 PassAim { get; private set; }
         public bool SprintHeld { get; private set; }
         public bool PostUpHeld { get; private set; }
+        /// <summary>RT held — backs your man down while posting, or bumps a poster
+        /// off while defending one. A continuous push, not a tap.</summary>
+        public bool BackDownHeld { get; private set; }
         /// <summary>LB held — bring up teammate pass icons (passing only).</summary>
         public bool IconHeld { get; private set; }
 
@@ -50,6 +53,10 @@ namespace MarioBasketball.InputControl
         /// <summary>West face button (X) while posting — the turnaround (fadeaway)
         /// jumper, or the power drop step with turbo (LT) held.</summary>
         public event Action PostWestPressed;
+        /// <summary>Any post face button was released — times a post shot's release
+        /// (hold the move button to rise, let go at the marker to put it up, like a
+        /// jump shot).</summary>
+        public event Action PostButtonReleased;
 
         readonly InputAction _move;
         readonly InputAction _passAim;
@@ -142,6 +149,10 @@ namespace MarioBasketball.InputControl
             _postNorth.performed += _ => PostNorthPressed?.Invoke();
             _postEast.performed += _ => PostEastPressed?.Invoke();
             _postWest.performed += _ => PostWestPressed?.Invoke();
+            // Releasing any post face button times the shot's release.
+            _postNorth.canceled += _ => PostButtonReleased?.Invoke();
+            _postEast.canceled += _ => PostButtonReleased?.Invoke();
+            _postWest.canceled += _ => PostButtonReleased?.Invoke();
         }
 
         public void Enable()
@@ -167,13 +178,14 @@ namespace MarioBasketball.InputControl
             PassAim = _passAim.ReadValue<Vector2>();
             SprintHeld = _sprint.IsPressed();
             PostUpHeld = _postUp.IsPressed();
+            BackDownHeld = _backDown.IsPressed(); // RT held — back-down / bump push
             IconHeld = _iconPass.IsPressed(); // LB / C held = pass-icon modifier
             DetectFlick();
             DetectTurboDoubleTap();
         }
 
         /// <summary>Max seconds between the two turbo taps to count as a double-tap.</summary>
-        public float turboDoubleTapWindow = 0.3f;
+        public float turboDoubleTapWindow = 0.45f;
         bool _prevSprint;
         float _lastSprintPressTime = -10f;
 

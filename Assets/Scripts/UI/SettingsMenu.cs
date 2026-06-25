@@ -188,7 +188,7 @@ namespace MarioBasketball.UI
                 ("Dribble move (break down the D)", "B", "X"),
                 ("Dribble flick — step-back / cross", "Right-stick flick", "—"),
                 ("Post up (hold)", "RB", "R"),
-                ("Back down in the post", "RT", "B"),
+                ("Back down in the post (hold)", "RT", "B"),
                 ("Post: hook / drop step / spin / fake", "Y / A / LT-tap / B", "H / G / V / T"),
                 ("Post advanced (hold LT + Y/A)", "sky hook / power step", "Shift + H/G"),
             }),

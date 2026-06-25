@@ -9,11 +9,12 @@ namespace MarioBasketball.Gameplay
     /// back to the basket and a <b>back-down battle</b> plays out against the
     /// engaged defender:
     /// <list type="bullet">
-    ///   <item>The offense taps Back Down (<see cref="OffenseTap"/>) to push in;
-    ///   each tap is worth their effective <b>Power</b>.</item>
-    ///   <item>The defender resists — a human defender taps
-    ///   (<see cref="DefenderTap"/>); an AI defender resists automatically from
-    ///   Power + Post Defense. More power means fewer taps are needed.</item>
+    ///   <item>The offense backs down to push in — a human <b>holds</b> RT
+    ///   (<see cref="OffensePush"/>), the AI taps (<see cref="OffenseTap"/>);
+    ///   the push is worth their effective <b>Power</b>.</item>
+    ///   <item>The defender resists — a human defender <b>holds</b> RT to push off
+    ///   (<see cref="DefenderPush"/>); an AI defender resists automatically from
+    ///   Power + Post Defense.</item>
     /// </list>
     /// A running <see cref="Leverage"/> value tilts toward whoever's winning:
     /// positive backs the offense toward the rim (better post shots); a big
@@ -27,8 +28,10 @@ namespace MarioBasketball.Gameplay
     public class PostUpController : MonoBehaviour
     {
         [Header("Back-down battle")]
-        [Tooltip("Leverage gained per Power point on each offense tap.")]
+        [Tooltip("Leverage gained per Power point on each offense tap (AI uses taps).")]
         public float tapImpulse = 0.06f;
+        [Tooltip("Leverage gained/lost per Power point per second while a human HOLDS RT to back down (offense) or bump off (defense).")]
+        public float backDownHoldRate = 1.6f;
         [Tooltip("AI defender passive resist scale (× Power per second).")]
         public float autoDefenderResist = 0.45f;
         [Tooltip("Leverage bleeds back to zero at this rate per second.")]
@@ -73,6 +76,10 @@ namespace MarioBasketball.Gameplay
         [Range(0f, 1f)] public float turnaroundBlockMult = 0.4f;
         [Tooltip("Block-chance multiplier on an up-and-under off a bitten fake.")]
         [Range(0f, 1f)] public float upAndUnderBlockMult = 0.25f;
+
+        [Header("Separation moves (spin / power drop step — beat the man, drive OUT to finish)")]
+        [Tooltip("How long a shaken defender is frozen when a spin shakes them loose.")]
+        public float spinFreeze = 0.5f;
 
         [Header("Shimmy (right-stick hard dribble in the post)")]
         public float shimmyPower = 5f;
@@ -166,6 +173,35 @@ namespace MarioBasketball.Gameplay
             float power = _pc.EffectiveStat(StatType.Power);
             _leverage += power * tapImpulse * (_fakeActive ? 1.5f : 1f);
             _leverage = Mathf.Min(_leverage, maxLeverage);
+        }
+
+        /// <summary>Human poster holding RT: drive leverage up continuously (a real
+        /// back-down) at a rate that overcomes the defender's resist and walks them
+        /// toward the rim. <paramref name="dt"/> is this frame's delta time.</summary>
+        public void OffensePush(float dt)
+        {
+            if (!IsPosting || PostShotActive) return;
+            float power = _pc.EffectiveStat(StatType.Power);
+            _leverage += power * backDownHoldRate * dt * (_fakeActive ? 1.5f : 1f);
+            _leverage = Mathf.Min(_leverage, maxLeverage);
+        }
+
+        /// <summary>Human defender holding RT: continuously push off the back-down
+        /// (mirror of <see cref="DefenderTap"/> over time). Overwhelmed by a sealed
+        /// poster, the push barely moves them and risks getting put on the floor.</summary>
+        public void DefenderPush(float dt)
+        {
+            if (!IsPosting || _defender == null) return;
+            float power = _defender.EffectiveStat(StatType.Power);
+            if (_leverage >= overwhelmLeverage)
+            {
+                if (Random.value < overwhelmFallChance * dt) { _defender.Stun(overwhelmFallStun, fall: true); return; }
+                _leverage -= power * backDownHoldRate * dt * 0.5f; // can barely move them
+            }
+            else
+            {
+                _leverage -= power * backDownHoldRate * dt;        // push off toward breaking free
+            }
         }
 
         /// <summary>The defender taps RT to push off and disengage from the
@@ -322,9 +358,11 @@ namespace MarioBasketball.Gameplay
             float deep = Mathf.Clamp01(_leverage / maxLeverage);
             float fakeBonus = _fakeActive ? fakeQualityBonus : 0f;
 
-            // Each case below runs its footwork (leverage, shoves, a spin's strip
-            // risk) immediately, then hands off to BeginPostShot — the shot at
-            // the end is what the player has to time.
+            // Shooting moves (hook, drop step, turnaround, up-and-under) run their
+            // footwork then hand off to BeginPostShot — the timed shot at the end.
+            // Separation moves (spin, power drop step) only create space and NEVER
+            // shoot; the player then shoots, finishes, or passes. Fake is its own
+            // gesture.
             switch (move)
             {
                 case PostMove.Fake:
@@ -343,20 +381,9 @@ namespace MarioBasketball.Gameplay
                     break;
 
                 case PostMove.Spin:
-                    float spinQuality = offense - 0.6f * defense + 3f * deep + fakeBonus;
-                    float strip = Mathf.Clamp(spinStripBaseChance + 0.04f * (defense - offense), 0f, 0.6f);
-                    if (Random.value < strip && _defender != null)
-                    {
-                        // Spun into trouble — stripped.
-                        gm.ball.PickUp(_defender);
-                        gm.OnPossessionGained(_defender);
-                        gm.RecordSteal(_defender);
-                        gm.OnShotMissed(_pc); // lost it — streak broken
-                        End();
-                        return;
-                    }
-                    BeginPostShot(spinQuality, blockable: true);
-                    break;
+                    // A pure separation move — spins off the defender, never shoots.
+                    ResolveSpin(offense, defense);
+                    return;
 
                 case PostMove.SkyHook:
                     // Released above everything — unblockable, but a tougher make.
@@ -364,8 +391,9 @@ namespace MarioBasketball.Gameplay
                     break;
 
                 case PostMove.PowerDropStep:
-                    ResolvePowerDropStep(offense, defense, fakeBonus);
-                    break;
+                    // A pure separation move — bulldozes into the lane, never shoots.
+                    ResolvePowerDropStep();
+                    return;
 
                 case PostMove.TurnaroundJumper:
                     // Face up and fade — lives on Mid Range, the fade kills the block.
@@ -387,14 +415,40 @@ namespace MarioBasketball.Gameplay
             }
         }
 
-        /// <summary>Bulldoze into the lane off the Power stat: shoves the defender
-        /// aside (or flattens an overpowered one) before the finish.</summary>
-        void ResolvePowerDropStep(float offense, float defense, float fakeBonus)
+        /// <summary>Spin off the defender: a quick separation move that gains a step
+        /// of post position and can shake the defender (freezing them for a beat). It
+        /// NEVER scores — afterward the player shoots, finishes, or passes. Spinning
+        /// into a strong defender still risks a strip.</summary>
+        void ResolveSpin(float offense, float defense)
+        {
+            var gm = GameManager.Instance;
+            float strip = Mathf.Clamp(spinStripBaseChance + 0.04f * (defense - offense), 0f, 0.6f);
+            if (Random.value < strip && _defender != null)
+            {
+                gm.ball.PickUp(_defender);
+                gm.OnPossessionGained(_defender);
+                gm.RecordSteal(_defender);
+                gm.OnShotMissed(_pc); // lost it — streak broken
+                End();
+                return;
+            }
+
+            // Shake the defender (Post Offense vs Post Defense) → frozen for a beat,
+            // then spin off and drive OUT of the post toward the rim (you finish it).
+            if (_defender != null)
+            {
+                float shake = Mathf.Clamp(0.45f + 0.05f * (offense - defense), 0.1f, 0.9f);
+                if (Random.value < shake) _defender.Stun(spinFreeze);
+            }
+            _pc.StartPostDrive(PostMove.Spin);
+        }
+
+        /// <summary>Power drop step: bulldoze off the Power stat, shoving the defender
+        /// aside (or flattening an overpowered one), then drive OUT of the post toward
+        /// the rim. It NEVER scores on its own — the player finishes it.</summary>
+        void ResolvePowerDropStep()
         {
             float power = _pc.EffectiveStat(StatType.Power);
-            _leverage = Mathf.Min(maxLeverage, _leverage + dropStepLungeLeverage + 0.2f * power);
-            float deep = Mathf.Clamp01(_leverage / maxLeverage);
-
             if (_defender != null)
             {
                 Vector3 aside = _defender.transform.position - transform.position; aside.y = 0f;
@@ -403,9 +457,7 @@ namespace MarioBasketball.Gameplay
                 if (power - _defender.EffectiveStat(StatType.Power) >= powerDropKnockdownGap)
                     _defender.Stun(0.7f, fall: true); // run clean over them
             }
-
-            float finish = Mathf.Max(offense, _pc.EffectiveStat(StatType.InsideScoring), _pc.EffectiveStat(StatType.Dunk));
-            BeginPostShot(finish + 0.25f * power - 0.5f * defense + 5f * deep + fakeBonus, blockable: true);
+            _pc.StartPostDrive(PostMove.PowerDropStep);
         }
 
         /// <summary>Footwork is done — launch the shot and start its release

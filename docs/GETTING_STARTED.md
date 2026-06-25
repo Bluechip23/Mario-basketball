@@ -67,7 +67,7 @@ bindings exist as a fallback.
 | **Switch player** (defense) | A (✕) or LB (L1) | Q |
 | **Dive** for a loose ball | B (○) | X |
 | **Post up** (hold) | RB (R1) | R |
-| **Back down** / bump / **push-foul** | RT (R2) | B |
+| **Back down** (hold) / bump / **push-foul** | RT (R2) | B |
 | Post move — **Pump fake** | Y (△) | T |
 | Post move — **Spin** | B (○) | V |
 | Post move — **Turnaround jumper** | X (□) | H |
@@ -82,13 +82,16 @@ Power, it knocks players around (and can pop the ball loose). It's free up to
 throw make% scales with the shooter's Mid Range). Nobody fouls out.
 
 **Post game:** with the ball, hold **RB** to turn your back to the basket, then
-tap **RT** (Back down) to bulldoze your defender toward the rim — a
-Power-vs-Power tap battle; if they win they shove you off or knock you down.
-With position, hit a post move: **Y** pump fake, **B** spin, **X** turnaround
-jumper. Hold **LT** for the heavy versions — **LT + Y** is the hook shot,
-**LT + X** the power drop step. Each shot pops a release meter you time like a
-jumper. **A** is always the pass, so you can kick it out at any time. On defense
-against a poster, mash **RT** to bump them off.
+**hold RT** (Back down) to bulldoze your defender toward the rim — a
+Power-vs-Power battle; if they win they shove you off or knock you down.
+With position, your **shots** are **X** (turnaround fadeaway) and **LT + Y**
+(hook): each pops a release meter you time like a jumper — hold to rise, let go
+at the marker. Your **moves** never score on their own — they beat the defender
+and break you **out of the post on a drive to the rim**, where you finish it
+yourself: **B** spins off the defender, **LT + X** is a power drop step that
+bulldozes him aside. **Y** is a pump fake to get the defender airborne. **A** is
+always the pass, so you can kick it out at any time. On defense against a poster,
+mash **RT** to bump them off.
 
 > Because the buttons are contextual, the same face button does different things
 > by situation (e.g. **A** shoots with the ball, switches on defense, and is the

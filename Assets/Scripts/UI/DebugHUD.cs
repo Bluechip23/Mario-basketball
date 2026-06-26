@@ -21,6 +21,8 @@ namespace MarioBasketball.UI
         GUIStyle _head;
         GUIStyle _sideInfo;
         GUIStyle _callout;
+        GUIStyle _blockBig;
+        GUIStyle _blockSub;
 
         // Team jersey colours (match GameBootstrap HomeColor / AwayColor).
         static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
@@ -62,6 +64,8 @@ namespace MarioBasketball.UI
                 string onFire = OnFireNames(gm);
                 if (!string.IsNullOrEmpty(onFire))
                     GUI.Label(new Rect(Screen.width - 340, 14, 320, 26), $"ON FIRE: {onFire}", _mid);
+
+                DrawBlockFlash(gm);
 
                 if (gm.State == GameState.GameOver)
                 {
@@ -172,6 +176,22 @@ namespace MarioBasketball.UI
             float half = centerW / 2f - 4f;
             DrawTeamInfo(new Rect(centerX, infoY, half, 38f), gm.Home, TextAnchor.UpperLeft, HomeColor);
             DrawTeamInfo(new Rect(centerX + centerW / 2f + 4f, infoY, half, 38f), gm.Away, TextAnchor.UpperRight, AwayColor);
+        }
+
+        // A swatted shot flashes a big "REJECTED!" + the blocker's name centre-top,
+        // punching in then fading out — the same beat a 2K block animation sells.
+        void DrawBlockFlash(GameManager gm)
+        {
+            string who = gm.BlockFlashName;
+            if (string.IsNullOrEmpty(who)) return;
+            _blockBig ??= new GUIStyle(GUI.skin.label) { fontSize = 44, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _blockSub ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            float a = gm.BlockFlash01;
+            float alpha = Mathf.Clamp01(a * 1.8f); // hold bright, fade at the tail
+            _blockBig.normal.textColor = new Color(1f, 0.30f, 0.20f, alpha);
+            _blockSub.normal.textColor = new Color(1f, 0.85f, 0.85f, alpha);
+            GUI.Label(new Rect(0, Screen.height * 0.22f, Screen.width, 58f), "REJECTED!", _blockBig);
+            GUI.Label(new Rect(0, Screen.height * 0.22f + 52f, Screen.width, 26f), $"blocked by {who}", _blockSub);
         }
 
         // While a callable shot is in the air, pulse a prompt so the player knows

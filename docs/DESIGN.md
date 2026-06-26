@@ -382,8 +382,11 @@ Lineups are chosen on the pre-match **team select** screen (see below).
   subject to them too):
   - A defender near the shooter widens the miss (Perimeter/Post Defense), and a
     point-blank defender can **block** (Blocks vs the finisher's stat).
-  - **Steal** strips a nearby handler — Steals vs Ball Handling, on a cooldown
-    (Steal button); the AI uses it on defense.
+  - **Steal** pokes at a nearby handler — Steals vs Ball Handling, on a cooldown
+    (Steal button); the AI uses it on defense. A successful poke is either a
+    **clean strip** (you take the ball) or just **knocks it loose** into a
+    contested free ball — cleaner takes the better your Steals beats their
+    Ball Handling (`stealCleanBase`/`stealCleanScale`).
 - **Fouling** (push, the RT "muscle" button): shove the nearest opponent —
   Power vs Power knockback, can knock a weaker player down and pop the ball
   loose. Each push is a **team foul**. Below **10 team fouls** there's no

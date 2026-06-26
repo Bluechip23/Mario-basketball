@@ -212,7 +212,19 @@ namespace MarioBasketball.Core
             if (blocker == null) return;
             Box.AddBlock(blocker);
             if (blocker.isHuman) Haptics.Play(Haptics.Cue.Block);
+            // Flash a big "REJECTED!" callout naming the blocker (read by the HUD).
+            _blockFlashName = blocker.Character != null ? blocker.Character.stats.characterName : "";
+            _blockFlashTimer = BlockFlashTime;
         }
+
+        const float BlockFlashTime = 2f;
+        float _blockFlashTimer;
+        string _blockFlashName = "";
+        /// <summary>The blocker's name to flash on a rejection, or null when none is
+        /// live. The HUD draws a centred "REJECTED!" callout off this.</summary>
+        public string BlockFlashName => _blockFlashTimer > 0f ? _blockFlashName : null;
+        /// <summary>Fade weight (0-1) for the current block flash.</summary>
+        public float BlockFlash01 => Mathf.Clamp01(_blockFlashTimer / BlockFlashTime);
 
         /// <summary>Record a <b>steal</b> for <paramref name="thief"/> and buzz a
         /// human controller. A steal is only credited when the thief actually came
@@ -629,6 +641,7 @@ namespace MarioBasketball.Core
         void Update()
         {
             float dt = Time.deltaTime;
+            if (_blockFlashTimer > 0f) _blockFlashTimer -= dt;
             switch (State)
             {
                 case GameState.Playing:

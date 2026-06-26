@@ -123,6 +123,10 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which post move is currently going up (drives the body
         /// animation — a hook reads very differently from a power drop step).</summary>
         public PostMove CurrentMove { get; private set; }
+
+        /// <summary>The current hook is shot with the LEFT hand (locked at the shot's
+        /// start) — the hand furthest from the basket, shielding the ball.</summary>
+        public bool HookLeftHand { get; private set; }
         float PostShotMeterDuration => Mathf.Max(0.01f, postShotPerfectTime + postShotAutoReleaseAfter);
         /// <summary>How full the post-shot release meter is (0-1).</summary>
         public float PostShotChargeFraction => PostShotActive ? Mathf.Clamp01(_postShotTimer / PostShotMeterDuration) : 0f;
@@ -470,6 +474,18 @@ namespace MarioBasketball.Gameplay
             _postShotBlockable = blockable;
             _postShotBlockMult = blockMult;
             DriveVelocity = Vector3.zero; // first frame; PostShotDrive takes over as it rises
+
+            // Lock in the hook hand: shoot with the hand FURTHEST from the basket
+            // (the outside hand, shielding the ball) — right hook off the right
+            // block, left hook off the left. Rim on the player's right → left hand.
+            var gm = GameManager.Instance;
+            Hoop hoop = gm != null ? gm.GetAttackingHoop(_pc.team) : null;
+            if (hoop != null)
+            {
+                Vector3 toRim = hoop.AimPoint - transform.position; toRim.y = 0f;
+                HookLeftHand = toRim.sqrMagnitude > 0.0001f
+                    && Vector3.Dot(toRim.normalized, transform.right) > 0f;
+            }
         }
 
         /// <summary>Footwork drift while a post shot rises: a drop step / power drop

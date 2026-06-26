@@ -158,6 +158,10 @@ namespace MarioBasketball.AI
 
         void OffenseWithBall(GameManager gm)
         {
+            // Already rising into a jump shot or finish — hold still and let it go up
+            // (don't drift it into a fadeaway or try to pass mid-air).
+            if (_pc.IsShooting || _pc.IsFinishing) { _pc.SetMoveIntent(Vector2.zero, false); return; }
+
             Hoop hoop = gm.GetAttackingHoop(_pc.team);
             if (hoop == null) return;
 

@@ -65,7 +65,7 @@ namespace MarioBasketball.UI
                 if (!string.IsNullOrEmpty(onFire))
                     GUI.Label(new Rect(Screen.width - 340, 14, 320, 26), $"ON FIRE: {onFire}", _mid);
 
-                DrawBlockFlash(gm);
+                DrawHighlight(gm);
 
                 if (gm.State == GameState.GameOver)
                 {
@@ -178,20 +178,23 @@ namespace MarioBasketball.UI
             DrawTeamInfo(new Rect(centerX + centerW / 2f + 4f, infoY, half, 38f), gm.Away, TextAnchor.UpperRight, AwayColor);
         }
 
-        // A swatted shot flashes a big "REJECTED!" + the blocker's name centre-top,
-        // punching in then fading out — the same beat a 2K block animation sells.
-        void DrawBlockFlash(GameManager gm)
+        // A highlight moment (rejection, poster, steal, ankles) flashes big centre-
+        // top with a sub-line, punching in then fading — the beat a 2K highlight sells.
+        void DrawHighlight(GameManager gm)
         {
-            string who = gm.BlockFlashName;
-            if (string.IsNullOrEmpty(who)) return;
+            string big = gm.HighlightBig;
+            if (string.IsNullOrEmpty(big)) return;
             _blockBig ??= new GUIStyle(GUI.skin.label) { fontSize = 44, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _blockSub ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            float a = gm.BlockFlash01;
-            float alpha = Mathf.Clamp01(a * 1.8f); // hold bright, fade at the tail
-            _blockBig.normal.textColor = new Color(1f, 0.30f, 0.20f, alpha);
-            _blockSub.normal.textColor = new Color(1f, 0.85f, 0.85f, alpha);
-            GUI.Label(new Rect(0, Screen.height * 0.22f, Screen.width, 58f), "REJECTED!", _blockBig);
-            GUI.Label(new Rect(0, Screen.height * 0.22f + 52f, Screen.width, 26f), $"blocked by {who}", _blockSub);
+            float alpha = Mathf.Clamp01(gm.Highlight01 * 1.8f); // hold bright, fade at the tail
+            Color c = gm.HighlightColor; c.a = alpha;
+            Color sub = Color.Lerp(c, Color.white, 0.6f); sub.a = alpha;
+            _blockBig.normal.textColor = c;
+            _blockSub.normal.textColor = sub;
+            GUI.Label(new Rect(0, Screen.height * 0.22f, Screen.width, 58f), big, _blockBig);
+            string subLine = gm.HighlightSub;
+            if (!string.IsNullOrEmpty(subLine))
+                GUI.Label(new Rect(0, Screen.height * 0.22f + 52f, Screen.width, 26f), subLine, _blockSub);
         }
 
         // While a callable shot is in the air, pulse a prompt so the player knows

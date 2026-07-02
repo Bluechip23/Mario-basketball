@@ -1483,6 +1483,16 @@ namespace MarioBasketball.Gameplay
             makeChance += makeBonus;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
+
+            // Poster: a dunk thrown DOWN over a defender who was right there contesting.
+            if (make && isDunk && defender != null && _character != null
+                && HorizontalDistance(defender.transform.position, transform.position) < contestRange
+                && GameManager.Instance != null)
+            {
+                string on = defender.Character != null ? $"on {defender.Character.stats.characterName}" : "throws it down";
+                GameManager.Instance.ShowHighlight("POSTER!", $"{_character.stats.characterName} {on}", new Color(1f, 0.72f, 0.15f));
+            }
+
             // A dunk slams straight down from above; a layup is a softer drop.
             float flight = isDunk ? dunkFlightTime : finishFlightTime;
             Ball.Shoot(aim, team, 2, flight, ShotMath.AimOffset(make), this);
@@ -1990,6 +2000,12 @@ namespace MarioBasketball.Gameplay
                 _dribbleBoostTimer = dribbleBoostTime; // burst past them
                 if (RimDirection().sqrMagnitude > 0.01f)
                     transform.rotation = Quaternion.LookRotation(RimDirection().normalized, Vector3.up);
+            }
+            // Highlight the ankle-breaker.
+            if (_character != null && GameManager.Instance != null)
+            {
+                string on = victim.Character != null ? $"{_character.stats.characterName} broke {victim.Character.stats.characterName}" : "";
+                GameManager.Instance.ShowHighlight("ANKLES!", on, new Color(0.65f, 0.5f, 1f));
             }
         }
 

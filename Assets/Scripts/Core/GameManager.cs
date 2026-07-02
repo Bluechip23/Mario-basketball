@@ -212,19 +212,37 @@ namespace MarioBasketball.Core
             if (blocker == null) return;
             Box.AddBlock(blocker);
             if (blocker.isHuman) Haptics.Play(Haptics.Cue.Block);
-            // Flash a big "REJECTED!" callout naming the blocker (read by the HUD).
-            _blockFlashName = blocker.Character != null ? blocker.Character.stats.characterName : "";
-            _blockFlashTimer = BlockFlashTime;
+            ShowHighlight("REJECTED!", NameSub("blocked by", blocker), new Color(1f, 0.30f, 0.20f));
         }
 
-        const float BlockFlashTime = 2f;
-        float _blockFlashTimer;
-        string _blockFlashName = "";
-        /// <summary>The blocker's name to flash on a rejection, or null when none is
-        /// live. The HUD draws a centred "REJECTED!" callout off this.</summary>
-        public string BlockFlashName => _blockFlashTimer > 0f ? _blockFlashName : null;
-        /// <summary>Fade weight (0-1) for the current block flash.</summary>
-        public float BlockFlash01 => Mathf.Clamp01(_blockFlashTimer / BlockFlashTime);
+        // ---- Highlight callout ---------------------------------------------
+        // One big centred flash the HUD renders — rejections, posters, steals,
+        // broken ankles. Latest highlight wins; it punches in then fades.
+        const float HighlightTime = 2f;
+        float _highlightTimer;
+        string _highlightBig = "", _highlightSub = "";
+        Color _highlightColor = Color.white;
+        /// <summary>The big highlight line to flash (or null when none is live).</summary>
+        public string HighlightBig => _highlightTimer > 0f ? _highlightBig : null;
+        /// <summary>The smaller sub-line under the highlight (may be empty).</summary>
+        public string HighlightSub => _highlightSub;
+        /// <summary>Colour of the current highlight.</summary>
+        public Color HighlightColor => _highlightColor;
+        /// <summary>Fade weight (0-1) for the current highlight.</summary>
+        public float Highlight01 => Mathf.Clamp01(_highlightTimer / HighlightTime);
+
+        /// <summary>Flash a big centred highlight (rejection / poster / steal /
+        /// ankles). The HUD draws it; the most recent call wins.</summary>
+        public void ShowHighlight(string big, string sub, Color color)
+        {
+            _highlightBig = big ?? "";
+            _highlightSub = sub ?? "";
+            _highlightColor = color;
+            _highlightTimer = HighlightTime;
+        }
+
+        static string NameSub(string prefix, PlayerController p) =>
+            p != null && p.Character != null ? $"{prefix} {p.Character.stats.characterName}" : "";
 
         /// <summary>Record a <b>steal</b> for <paramref name="thief"/> and buzz a
         /// human controller. A steal is only credited when the thief actually came
@@ -237,6 +255,7 @@ namespace MarioBasketball.Core
             Box.AddSteal(thief);
             BeginFastBreak(thief.team); // take off the other way
             if (thief.isHuman) Haptics.Play(Haptics.Cue.Steal);
+            ShowHighlight("STEAL!", NameSub("", thief).Trim(), new Color(0.35f, 0.72f, 1f));
         }
 
         // ---- Rebounding / loose balls --------------------------------------
@@ -641,7 +660,7 @@ namespace MarioBasketball.Core
         void Update()
         {
             float dt = Time.deltaTime;
-            if (_blockFlashTimer > 0f) _blockFlashTimer -= dt;
+            if (_highlightTimer > 0f) _highlightTimer -= dt;
             switch (State)
             {
                 case GameState.Playing:

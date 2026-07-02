@@ -194,6 +194,8 @@ namespace MarioBasketball.Gameplay
         public float ankleStun = 0.9f;
         public float dribbleBaseChance = 0.45f;
         public float dribbleStatScale = 0.06f;
+        [Tooltip("Where in the move the defender actually falls — fraction of the move's length (0 = instant, 1 = the very end). ~0.6 lands the fall on the move's peak so you see the move cause it.")]
+        [Range(0f, 1f)] public float ankleBreakAtFraction = 0.6f;
 
         [Header("Dribble flicks (right-stick hard dribbles for separation)")]
         [Tooltip("Min gap between flicks — kept above the move length so each breakdown plays out before the next instead of stacking into a blur.")]
@@ -222,6 +224,8 @@ namespace MarioBasketball.Gameplay
         public float blockGestureTime = 0.5f;
         [Tooltip("How long an airborne blocker hangs at the top of the contest after swatting (the Mario stall).")]
         public float blockHangTime = 0.45f;
+        [Tooltip("Reactive hop height (m) a flat-footed blocker pops up with so the swat reads as a contest instead of a standing wave.")]
+        public float blockContestHopHeight = 0.5f;
         [Tooltip("Base chance a block is a clean two-handed snatch (their possession) vs a one-handed swat (loose ball). Scales up a little with Blocks.")]
         [Range(0f, 1f)] public float blockTwoHandBaseChance = 0.35f;
 
@@ -236,6 +240,12 @@ namespace MarioBasketball.Gameplay
         public float stealStatScale = 0.035f;
         public float stealMinChance = 0.02f;
         public float stealMaxChance = 0.4f;
+        [Tooltip("On a successful poke, the base chance it's a CLEAN strip (you take the ball) vs just knocking it loose into a free ball. Scales up with your Steals over their Ball Handling.")]
+        [Range(0f, 1f)] public float stealCleanBase = 0.45f;
+        [Tooltip("Per point of (Steals − Ball Handling), how much more often the poke is a clean strip rather than a knock-loose.")]
+        public float stealCleanScale = 0.05f;
+        [Tooltip("How hard a knocked-loose ball pops free of the handler.")]
+        public float stealKnockPower = 3.5f;
 
         [Header("Dive / shove")]
         public float diveDuration = 0.5f;
@@ -248,6 +258,8 @@ namespace MarioBasketball.Gameplay
         public float postDriveBurstSpeed = 3.5f;
         [Tooltip("How long the spin whirl / drop-step lunge animates as the player breaks out of the post to finish — long enough to actually watch the move.")]
         public float postMoveDriveTime = 0.85f;
+        [Tooltip("How fast the player turns INTO a drop-step drive (slerp rate) — smooth, so it reads as a step rather than snapping to face the rim.")]
+        public float postDriveTurnLerp = 9f;
 
         [Header("Push / foul (Power)")]
         public float pushRange = 1.7f;
@@ -489,6 +501,9 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which post move is currently being shot — drives the distinct
         /// hook / power-drop-step / fadeaway body animation.</summary>
         public PostMove CurrentPostMove => _post != null ? _post.CurrentMove : PostMove.Hook;
+        /// <summary>The current hook shoots left-handed (the hand furthest from the
+        /// basket) — drives which arm sweeps the hook in the animator.</summary>
+        public bool PostShotLeftHand => _post != null && _post.HookLeftHand;
         /// <summary>Mid spin / power-drop-step footwork — a move that beats the
         /// defender and drives you OUT of the post toward the rim (you finish it
         /// yourself). Lives here, not on the post, so it survives the post ending.
@@ -500,6 +515,9 @@ namespace MarioBasketball.Gameplay
         /// <summary>Which separation move is driving out of the post (spin vs power
         /// drop step) — picks the spin whirl vs the shoulder-down lunge animation.</summary>
         public PostMove PostMoveType => _postMoveType;
+        /// <summary>Which way the power drop step swings through (true = step left) —
+        /// drives the drop-step pivot/shoulder-drop direction in the animator.</summary>
+        public bool PostDriveStepLeft => _postDriveStepLeft;
         /// <summary>This player has Delfan's Called Shot trait (the HUD shows charges).</summary>
         public bool HasCalledShot => HasTrait(HiddenTrait.CalledShot);
         /// <summary>Called Shot charges left this game.</summary>
@@ -550,6 +568,8 @@ namespace MarioBasketball.Gameplay
         bool _sprintingNow;
         float _postMoveGestureTimer; // spin / power-drop footwork driving out of the post
         PostMove _postMoveType;
+        Vector3 _postDriveFaceDir; // drop-step drive turns smoothly toward this
+        bool _postDriveStepLeft;   // which way the drop step swings through
         bool _postRepostBlocked;     // after a drive-out, block re-posting until RB is released
         float _turbo = 1f;
         float _stealCooldown;
@@ -591,6 +611,10 @@ namespace MarioBasketball.Gameplay
         bool _prevSprintHeld; // edge-detects a fresh LT press (arms the finish air-adjust)
         float _dribbleCooldown;
         float _dribbleBoostTimer;
+        PlayerController _ankleBreakVictim; // falls when the move hits its peak, not at the start
+        float _ankleBreakTimer;
+        float _ankleBreakStun;
+        bool _ankleBreakBoost;
         float _flickCooldown;
         float _lastLateralFlickTime = -10f;
         float _lastLateralFlickSign;
@@ -718,6 +742,7 @@ namespace MarioBasketball.Gameplay
             if (_pushCooldown > 0f) _pushCooldown -= dt;
             if (_dribbleCooldown > 0f) _dribbleCooldown -= dt;
             if (_dribbleBoostTimer > 0f) _dribbleBoostTimer -= dt;
+            TickAnkleBreak(dt);
             if (_flickCooldown > 0f) _flickCooldown -= dt;
             if (_passGestureTimer > 0f) _passGestureTimer -= dt;
             if (_stealGestureTimer > 0f) _stealGestureTimer -= dt;
@@ -763,6 +788,7 @@ namespace MarioBasketball.Gameplay
             AdvanceShotMeter(dt);
             AdvanceFinish(dt);
             Move();
+            TickPostDriveFacing(dt); // smooth the turn into a drop-step drive (after Move's own rotation)
             // Turbo bar: burn while sprinting, recover otherwise (flat rates).
             _turbo = Mathf.Clamp01(_turbo + (_sprintingNow ? -turboDrainPerSec : turboRegenPerSec) * dt);
             UpdateDribbleState();
@@ -828,6 +854,9 @@ namespace MarioBasketball.Gameplay
             if (!_shooting) return;
             if (IsStunned || !HasBall) { _shooting = false; return; } // lost the ball / knocked
             _shotCharge += dt;
+            // The AI doesn't time a meter — it releases right at the apex for clean
+            // form (the make roll already happened at full quality).
+            if (!isHuman && _shotCharge >= _apexTime) { ReleaseJumpShot(); return; }
             if (_shotCharge >= ShotMeterDuration) ReleaseJumpShot(); // held too long → late shot
         }
 
@@ -972,9 +1001,9 @@ namespace MarioBasketball.Gameplay
                 horizontal = d > 0.01f ? toRim.normalized * approach : Vector3.zero;
                 if (d > 0.01f) { rotateToMove = true; faceDir = toRim.normalized; }
 
-                // Air-adjust steering: hold LB and push the stick to drift laterally
-                // through the air — swing around a shot-blocker and finish from the
-                // other side of the rim.
+                // Air-adjust steering: once you've armed the contort with an LT tap
+                // in the air, push the stick to drift laterally — swing around a
+                // shot-blocker and finish from the other side of the rim.
                 if (adjusting)
                 {
                     Vector3 steer = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
@@ -1137,8 +1166,11 @@ namespace MarioBasketball.Gameplay
             if (MatchPause.IsPaused || IsStunned || IsPosting || _shooting || _finishing) return;
             // Inside, leap and attack the rim (same as the human) rather than firing
             // the ball off from the ground; the finish auto-resolves at the basket.
+            // Outside, rise into a real jump shot that releases at the apex — NOT an
+            // instant launch from a standstill (that read as the ball teleporting at
+            // the rim with no shooting motion).
             if (InsideRange()) StartFinish();
-            else ExecuteShot(1f, QuickCatchReady());
+            else BeginJumpShot();
         }
 
         // Human shooting: hold to rise, release to commit. Jump shots use the
@@ -1153,6 +1185,16 @@ namespace MarioBasketball.Gameplay
 
             if (InsideRange()) { StartFinish(); return; }
 
+            BeginJumpShot();
+        }
+
+        /// <summary>Rise into a jump shot (shared by the human's press and the AI).
+        /// The human releases on the timing meter; the AI auto-releases at the apex
+        /// (see <see cref="AdvanceShotMeter"/>) so it actually leaps and shoots
+        /// instead of firing the ball off from a standstill.</summary>
+        void BeginJumpShot()
+        {
+            if (!HasBall) return;
             _pendingQuickCatch = QuickCatchReady(); // captured at the catch, before the jump
             _shooting = true;
             _shotCharge = 0f;
@@ -1388,10 +1430,14 @@ namespace MarioBasketball.Gameplay
             Vector3 d = toward - transform.position; d.y = 0f;
             if (d.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.LookRotation(d.normalized, Vector3.up);
-            if (_cc != null && !_cc.isGrounded) // stall in the air like a finisher
+            if (_cc != null && !_cc.isGrounded) // already up — stall at the top like a finisher
             {
                 _hangTimer = Mathf.Max(_hangTimer, blockHangTime);
                 _hangTarget = transform.position;
+            }
+            else if (_cc != null) // flat-footed — pop up so the swat reads as a contest
+            {
+                _verticalVelocity = Mathf.Sqrt(-2f * gravity * blockContestHopHeight);
             }
         }
 
@@ -1443,6 +1489,16 @@ namespace MarioBasketball.Gameplay
             makeChance += makeBonus;
             makeChance = Mathf.Clamp(makeChance, 0f, ShotMath.MaxChance);
             bool make = Random.value < makeChance;
+
+            // Poster: a dunk thrown DOWN over a defender who was right there contesting.
+            if (make && isDunk && defender != null && _character != null
+                && HorizontalDistance(defender.transform.position, transform.position) < contestRange
+                && GameManager.Instance != null)
+            {
+                string on = defender.Character != null ? $"on {defender.Character.stats.characterName}" : "throws it down";
+                GameManager.Instance.ShowHighlight("POSTER!", $"{_character.stats.characterName} {on}", new Color(1f, 0.72f, 0.15f));
+            }
+
             // A dunk slams straight down from above; a layup is a softer drop.
             float flight = isDunk ? dunkFlightTime : finishFlightTime;
             Ball.Shoot(aim, team, 2, flight, ShotMath.AimOffset(make), this);
@@ -1793,7 +1849,7 @@ namespace MarioBasketball.Gameplay
         /// <summary>A directed pass to a teammate (used by the AI).</summary>
         public void PassToward(Vector3 worldPoint)
         {
-            if (MatchPause.IsPaused || IsStunned || !HasBall) return;
+            if (MatchPause.IsPaused || IsStunned || !HasBall || _shooting || _finishing) return;
             _passGestureTimer = passGestureTime; // throw animation
             if (GameManager.Instance != null) GameManager.Instance.TryStartFromInbound();
             Ball.PassTo(worldPoint, receiver: NearestTeammateTo(worldPoint));
@@ -1839,11 +1895,25 @@ namespace MarioBasketball.Gameplay
             float steal = EffectiveStat(StatType.Steals);
             float handle = holder.EffectiveStat(StatType.BallHandling);
             float chance = Mathf.Clamp(stealBaseChance + stealStatScale * (steal - handle), stealMinChance, stealMaxChance);
-            if (Random.value < chance)
+            if (Random.value >= chance) return; // whiffed the poke
+
+            // Got a hand on it. A clean strip takes the ball outright; otherwise you
+            // just knock it loose into a contested free ball (no steal credited
+            // unless you come up with it).
+            float clean = Mathf.Clamp01(stealCleanBase + stealCleanScale * (steal - handle));
+            if (Random.value < clean)
             {
                 gm.ball.PickUp(this);
                 gm.OnPossessionGained(this);
                 gm.RecordSteal(this);
+            }
+            else
+            {
+                // Bat it loose off the handler's hands — a live ball for anyone.
+                Vector3 dir = holder.transform.position - transform.position; dir.y = 0f;
+                if (dir.sqrMagnitude < 0.01f) dir = holder.transform.forward;
+                Vector3 from = holder.transform.position + Vector3.up * (holder.BodyHeight * 0.55f);
+                gm.ball.Swat(from, dir, stealKnockPower);
             }
         }
 
@@ -1893,9 +1963,8 @@ namespace MarioBasketball.Gameplay
 
             if (Random.value < chance)
             {
-                def.Stun(ankleStun, fall: true);  // broken ankles — they hit the deck
-                _dribbleBoostTimer = dribbleBoostTime; // separation
-                if (RimDirection().sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(RimDirection().normalized, Vector3.up);
+                // Broke them — but the fall lands at the move's peak, not now.
+                ScheduleAnkleBreak(def, ankleStun, boost: true);
             }
             else
             {
@@ -1907,6 +1976,42 @@ namespace MarioBasketball.Gameplay
                     GameManager.Instance.OnPossessionGained(def);
                     GameManager.Instance.RecordSteal(def); // defender poked it away
                 }
+            }
+        }
+
+        /// <summary>Schedule the defender's fall for the PEAK of the move (not the
+        /// instant it starts), so you watch the move and then watch it break them.
+        /// <paramref name="boost"/> grants the offensive separation + rim-facing the
+        /// moment they go down.</summary>
+        void ScheduleAnkleBreak(PlayerController victim, float stun, bool boost)
+        {
+            if (victim == null) return;
+            _ankleBreakVictim = victim;
+            _ankleBreakStun = stun;
+            _ankleBreakBoost = boost;
+            _ankleBreakTimer = Mathf.Max(0.02f, _dribbleMoveDuration * ankleBreakAtFraction);
+        }
+
+        void TickAnkleBreak(float dt)
+        {
+            if (_ankleBreakTimer <= 0f) return;
+            _ankleBreakTimer -= dt;
+            if (_ankleBreakTimer > 0f) return;
+            var victim = _ankleBreakVictim;
+            _ankleBreakVictim = null;
+            if (victim == null) return;
+            victim.Stun(_ankleBreakStun, fall: true); // NOW they hit the deck
+            if (_ankleBreakBoost)
+            {
+                _dribbleBoostTimer = dribbleBoostTime; // burst past them
+                if (RimDirection().sqrMagnitude > 0.01f)
+                    transform.rotation = Quaternion.LookRotation(RimDirection().normalized, Vector3.up);
+            }
+            // Highlight the ankle-breaker.
+            if (_character != null && GameManager.Instance != null)
+            {
+                string on = victim.Character != null ? $"{_character.stats.characterName} broke {victim.Character.stats.characterName}" : "";
+                GameManager.Instance.ShowHighlight("ANKLES!", on, new Color(0.65f, 0.5f, 1f));
             }
         }
 
@@ -2004,8 +2109,10 @@ namespace MarioBasketball.Gameplay
             float shake = Mathf.Clamp(dribbleBaseChance + dribbleStatScale * (bh - pd), 0.05f, 0.85f);
             if (Random.value < shake)
             {
-                if (hesitationCross) def.Stun(ankleStun, fall: true); // highlight: broken ankles
-                else def.Stun(flickFreeze);                            // shaken off a beat
+                // The ankle-breaker fall lands at the move's peak; a plain shake is
+                // a quick freeze that can stay immediate.
+                if (hesitationCross) ScheduleAnkleBreak(def, ankleStun, boost: false);
+                else def.Stun(flickFreeze);
             }
             else
             {
@@ -2132,6 +2239,11 @@ namespace MarioBasketball.Gameplay
         public void StartPostDrive(PostMove move)
         {
             Vector3 toRim = RimDirection();
+            // Which way to swing the drop step through — toward the baseline off the
+            // block you're on (rim on your right → step/turn left). Locked now, before
+            // we turn to face the rim.
+            _postDriveStepLeft = toRim.sqrMagnitude > 0.0001f
+                && Vector3.Dot(toRim.normalized, transform.right) > 0f;
             if (_post != null) _post.End();          // leave the post — now a live driver
             _postRepostBlocked = true;               // don't snap back into the post on the held button
             _postMoveType = move;
@@ -2140,8 +2252,24 @@ namespace MarioBasketball.Gameplay
             {
                 Vector3 d = toRim.normalized;
                 ApplyShove(d * postDriveBurstSpeed); // carry toward the rim
-                transform.rotation = Quaternion.LookRotation(d, Vector3.up); // face up to finish
+                if (move == PostMove.Spin)
+                    transform.rotation = Quaternion.LookRotation(d, Vector3.up); // the whirl hides the snap
+                else
+                    _postDriveFaceDir = d; // drop step: turn INTO the step (slerp), don't snap-glitch
             }
+        }
+
+        // Rotate smoothly into a drop-step drive instead of snapping (which read as a
+        // glitch). Runs while the drive gesture is live; the spin handles its own facing.
+        void TickPostDriveFacing(float dt)
+        {
+            if (_postMoveGestureTimer <= 0f || _postDriveFaceDir.sqrMagnitude < 0.01f)
+            {
+                _postDriveFaceDir = Vector3.zero;
+                return;
+            }
+            Quaternion want = Quaternion.LookRotation(_postDriveFaceDir, Vector3.up);
+            transform.rotation = Quaternion.Slerp(transform.rotation, want, postDriveTurnLerp * dt);
         }
 
         // ---- AI hooks ------------------------------------------------------

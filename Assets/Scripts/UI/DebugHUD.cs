@@ -21,6 +21,8 @@ namespace MarioBasketball.UI
         GUIStyle _head;
         GUIStyle _sideInfo;
         GUIStyle _callout;
+        GUIStyle _blockBig;
+        GUIStyle _blockSub;
 
         // Team jersey colours (match GameBootstrap HomeColor / AwayColor).
         static readonly Color HomeColor = new Color(0.85f, 0.15f, 0.15f);
@@ -63,6 +65,8 @@ namespace MarioBasketball.UI
                 if (!string.IsNullOrEmpty(onFire))
                     GUI.Label(new Rect(Screen.width - 340, 14, 320, 26), $"ON FIRE: {onFire}", _mid);
 
+                DrawHighlight(gm);
+
                 if (gm.State == GameState.GameOver)
                 {
                     string winner = gm.HomeScore == gm.AwayScore ? "TIE" :
@@ -97,8 +101,8 @@ namespace MarioBasketball.UI
                     else if (humanPc.IsAimingPass) DrawPassIcons(gm, humanPc);
 
                     if (humanPc.IsFinishing)
-                        GUI.Label(new Rect((Screen.width - 320) / 2f, Screen.height - 232f, 320f, 22f),
-                            "In the air — hold LT + stick to steer around the block  ·  X pass", _mid);
+                        GUI.Label(new Rect((Screen.width - 360) / 2f, Screen.height - 232f, 360f, 22f),
+                            "In the air — tap LT to contort, stick to steer around the block  ·  X lays it in", _mid);
 
                     // Timing meter: rises for both a jump shot and a post move (hook,
                     // turnaround, drop step…). Hit the marker for a perfect release.
@@ -172,6 +176,25 @@ namespace MarioBasketball.UI
             float half = centerW / 2f - 4f;
             DrawTeamInfo(new Rect(centerX, infoY, half, 38f), gm.Home, TextAnchor.UpperLeft, HomeColor);
             DrawTeamInfo(new Rect(centerX + centerW / 2f + 4f, infoY, half, 38f), gm.Away, TextAnchor.UpperRight, AwayColor);
+        }
+
+        // A highlight moment (rejection, poster, steal, ankles) flashes big centre-
+        // top with a sub-line, punching in then fading — the beat a 2K highlight sells.
+        void DrawHighlight(GameManager gm)
+        {
+            string big = gm.HighlightBig;
+            if (string.IsNullOrEmpty(big)) return;
+            _blockBig ??= new GUIStyle(GUI.skin.label) { fontSize = 44, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _blockSub ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            float alpha = Mathf.Clamp01(gm.Highlight01 * 1.8f); // hold bright, fade at the tail
+            Color c = gm.HighlightColor; c.a = alpha;
+            Color sub = Color.Lerp(c, Color.white, 0.6f); sub.a = alpha;
+            _blockBig.normal.textColor = c;
+            _blockSub.normal.textColor = sub;
+            GUI.Label(new Rect(0, Screen.height * 0.22f, Screen.width, 58f), big, _blockBig);
+            string subLine = gm.HighlightSub;
+            if (!string.IsNullOrEmpty(subLine))
+                GUI.Label(new Rect(0, Screen.height * 0.22f + 52f, Screen.width, 26f), subLine, _blockSub);
         }
 
         // While a callable shot is in the air, pulse a prompt so the player knows

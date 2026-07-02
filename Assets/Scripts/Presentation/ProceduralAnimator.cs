@@ -249,10 +249,22 @@ namespace MarioBasketball.Presentation
                     }
                     else if (_pc.IsDoingPostMove)
                     {
-                        // Power drop step (spin is handled above): drop the shoulder
-                        // and lunge into the lane — a hard step, not a shot.
-                        float lunge = Mathf.Sin(Mathf.PI * _pc.PostMoveGesture01);
-                        want = Quaternion.Euler(postPosterLean + lunge * 22f, 0f, 0f);
+                        // Power drop step (spin is handled above): plant, drop the
+                        // inside shoulder and swing the body THROUGH the step into the
+                        // lane — a hard pivoting drop step, then drive on. The roll
+                        // (shoulder drop) + yaw (pivot through) read as a step, not a
+                        // forward-tilt slide.
+                        float p = _pc.PostMoveGesture01;
+                        float dip = Mathf.Sin(Mathf.PI * p);        // 0→1→0 weight through the step
+                        // Pivot through the step and square BACK up (0→1→0) so the body
+                        // finishes facing the rim (the transform) instead of ending
+                        // yawed off-axis and snapping straight when the gesture ends.
+                        float pivot = Mathf.Sin(Mathf.PI * Mathf.Clamp01(p * 1.15f));
+                        float side = _pc.PostDriveStepLeft ? -1f : 1f; // step baseline-side off the block
+                        want = Quaternion.Euler(
+                            postPosterLean + dip * 30f,             // sink and lunge forward
+                            pivot * 42f * side,                     // pivot the torso through the step
+                            dip * 20f * side);                      // drop the lead shoulder
                     }
                     else if (_pc.IsPosting)
                     {
@@ -760,16 +772,19 @@ namespace MarioBasketball.Presentation
                 case PostMove.Hook:
                 case PostMove.SkyHook:
                 {
-                    // Shooting arm (right) sweeps from the shoulder up and over the
-                    // head in the hook arc; the wrist snaps through near the top. The
-                    // sky hook releases that touch higher and straighter.
+                    // Shoot with the hand furthest from the basket (locked at the
+                    // shot's start): it sweeps from the shoulder up and over the head
+                    // in the hook arc, the wrist snapping through near the top; the
+                    // other arm bars out a sliver of space. Sky hook releases higher.
                     float top = move == PostMove.SkyHook ? -192f : -176f;
                     float sweep = Mathf.Lerp(-58f, top, k);
                     float flick = Mathf.Clamp01((k - 0.65f) / 0.35f);
-                    Pose(_armR, _elbowR, _wristR, sweep, -12f,
-                        Mathf.Lerp(gatherWristDegrees, releaseWristDegrees, flick));
-                    // Off arm (left): raised, bent ~90°, barring out a sliver of space.
-                    Pose(_armL, _elbowL, _wristL, hookGuardArmDegrees, hookGuardElbowDegrees, 0f);
+                    float wrist = Mathf.Lerp(gatherWristDegrees, releaseWristDegrees, flick);
+                    bool left = _pc.PostShotLeftHand;
+                    Transform sA = left ? _armL : _armR, sE = left ? _elbowL : _elbowR, sW = left ? _wristL : _wristR;
+                    Transform gA = left ? _armR : _armL, gE = left ? _elbowR : _elbowL, gW = left ? _wristR : _wristL;
+                    Pose(sA, sE, sW, sweep, -12f, wrist);
+                    Pose(gA, gE, gW, hookGuardArmDegrees, hookGuardElbowDegrees, 0f);
                     break;
                 }
 

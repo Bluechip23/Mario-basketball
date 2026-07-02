@@ -224,6 +224,8 @@ namespace MarioBasketball.Gameplay
         public float blockGestureTime = 0.5f;
         [Tooltip("How long an airborne blocker hangs at the top of the contest after swatting (the Mario stall).")]
         public float blockHangTime = 0.45f;
+        [Tooltip("Reactive hop height (m) a flat-footed blocker pops up with so the swat reads as a contest instead of a standing wave.")]
+        public float blockContestHopHeight = 0.5f;
         [Tooltip("Base chance a block is a clean two-handed snatch (their possession) vs a one-handed swat (loose ball). Scales up a little with Blocks.")]
         [Range(0f, 1f)] public float blockTwoHandBaseChance = 0.35f;
 
@@ -999,9 +1001,9 @@ namespace MarioBasketball.Gameplay
                 horizontal = d > 0.01f ? toRim.normalized * approach : Vector3.zero;
                 if (d > 0.01f) { rotateToMove = true; faceDir = toRim.normalized; }
 
-                // Air-adjust steering: hold LB and push the stick to drift laterally
-                // through the air — swing around a shot-blocker and finish from the
-                // other side of the rim.
+                // Air-adjust steering: once you've armed the contort with an LT tap
+                // in the air, push the stick to drift laterally — swing around a
+                // shot-blocker and finish from the other side of the rim.
                 if (adjusting)
                 {
                     Vector3 steer = new Vector3(_moveIntent.x, 0f, _moveIntent.y);
@@ -1428,10 +1430,14 @@ namespace MarioBasketball.Gameplay
             Vector3 d = toward - transform.position; d.y = 0f;
             if (d.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.LookRotation(d.normalized, Vector3.up);
-            if (_cc != null && !_cc.isGrounded) // stall in the air like a finisher
+            if (_cc != null && !_cc.isGrounded) // already up — stall at the top like a finisher
             {
                 _hangTimer = Mathf.Max(_hangTimer, blockHangTime);
                 _hangTarget = transform.position;
+            }
+            else if (_cc != null) // flat-footed — pop up so the swat reads as a contest
+            {
+                _verticalVelocity = Mathf.Sqrt(-2f * gravity * blockContestHopHeight);
             }
         }
 

@@ -101,8 +101,8 @@ namespace MarioBasketball.UI
                     else if (humanPc.IsAimingPass) DrawPassIcons(gm, humanPc);
 
                     if (humanPc.IsFinishing)
-                        GUI.Label(new Rect((Screen.width - 320) / 2f, Screen.height - 232f, 320f, 22f),
-                            "In the air — hold LT + stick to steer around the block  ·  X pass", _mid);
+                        GUI.Label(new Rect((Screen.width - 360) / 2f, Screen.height - 232f, 360f, 22f),
+                            "In the air — tap LT to contort, stick to steer around the block  ·  X lays it in", _mid);
 
                     // Timing meter: rises for both a jump shot and a post move (hook,
                     // turnaround, drop step…). Hit the marker for a perfect release.

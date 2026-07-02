@@ -256,11 +256,14 @@ namespace MarioBasketball.Presentation
                         // forward-tilt slide.
                         float p = _pc.PostMoveGesture01;
                         float dip = Mathf.Sin(Mathf.PI * p);        // 0→1→0 weight through the step
-                        float through = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(p * 1.3f)); // pivot accumulates
+                        // Pivot through the step and square BACK up (0→1→0) so the body
+                        // finishes facing the rim (the transform) instead of ending
+                        // yawed off-axis and snapping straight when the gesture ends.
+                        float pivot = Mathf.Sin(Mathf.PI * Mathf.Clamp01(p * 1.15f));
                         float side = _pc.PostDriveStepLeft ? -1f : 1f; // step baseline-side off the block
                         want = Quaternion.Euler(
                             postPosterLean + dip * 30f,             // sink and lunge forward
-                            through * 46f * side,                   // pivot the torso through the step
+                            pivot * 42f * side,                     // pivot the torso through the step
                             dip * 20f * side);                      // drop the lead shoulder
                     }
                     else if (_pc.IsPosting)
